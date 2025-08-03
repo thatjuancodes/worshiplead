@@ -1,0 +1,35 @@
+{
+  "name": "WorshipLead - Church Worship Team Management",
+  "short_name": "WorshipLead",
+  "description": "Streamline your church worship team management with WorshipLead. Schedule services, manage song libraries, coordinate team members, and plan worship sets with ease.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["productivity", "business", "music"],
+  "lang": "en",
+  "dir": "ltr"
+} 
