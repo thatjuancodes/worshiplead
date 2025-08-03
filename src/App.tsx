@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import './App.css'
 import './pages/ScheduleService.css'
+import './pages/ServiceDetail.css'
 
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
@@ -10,6 +11,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Songbank } from './pages/Songbank'
 import { TeamManagement } from './pages/TeamManagement'
 import { ScheduleService } from './pages/ScheduleService'
+import { ServiceDetail } from './pages/ServiceDetail'
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
         <Route path="/songbank" element={<Songbank />} />
         <Route path="/team" element={<TeamManagement />} />
         <Route path="/schedule" element={<ScheduleService />} />
+        <Route path="/service/:id" element={<ServiceDetail />} />
+        <Route path="/service/:id/edit" element={<ServiceDetail />} />
       </Routes>
     </Router>
   )

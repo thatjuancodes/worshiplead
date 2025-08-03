@@ -182,6 +182,13 @@ export function ScheduleService() {
     })
   }
 
+  const formatServiceTitle = (dateString: string, title: string) => {
+    const date = new Date(dateString)
+    const month = date.toLocaleDateString('en-US', { month: 'short' })
+    const day = date.getDate()
+    return `${month} ${day} - ${title}`
+  }
+
   const getStatusBadge = (status: string) => {
     const statusClasses = {
       draft: 'status-draft',
@@ -343,7 +350,7 @@ export function ScheduleService() {
                   <div key={service.id} className="service-item">
                     <div className="service-info">
                       <div className="service-header">
-                        <h4 className="service-title">{service.title}</h4>
+                        <h4 className="service-title">{formatServiceTitle(service.service_date, service.title)}</h4>
                         <span className={getStatusBadge(service.status)}>
                           {service.status}
                         </span>
@@ -362,21 +369,21 @@ export function ScheduleService() {
                             {service.description}
                           </p>
                         )}
+                        <div className="service-actions">
+                          <button
+                            onClick={() => navigate(`/service/${service.id}`)}
+                            className="btn btn-primary btn-small"
+                          >
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => navigate(`/service/${service.id}/edit`)}
+                            className="btn btn-secondary btn-small"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="service-actions">
-                      <button
-                        onClick={() => navigate(`/service/${service.id}`)}
-                        className="btn btn-primary btn-small"
-                      >
-                        View Details
-                      </button>
-                      <button
-                        onClick={() => navigate(`/service/${service.id}/edit`)}
-                        className="btn btn-secondary btn-small"
-                      >
-                        Edit
-                      </button>
                     </div>
                   </div>
                 ))}
