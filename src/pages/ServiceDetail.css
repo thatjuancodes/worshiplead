@@ -201,6 +201,125 @@
   font-size: 14px;
 }
 
+/* Add Song Form */
+.add-song-form {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.add-song-form h4 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.add-song-form .form-group {
+  margin-bottom: 16px;
+}
+
+.add-song-form label {
+  display: block;
+  font-weight: 500;
+  color: #374151;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.add-song-form select,
+.add-song-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.add-song-form select:focus,
+.add-song-form input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.add-song-form .form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* Service Songs List */
+.service-songs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.service-song-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.service-song-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.song-position {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.song-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.song-title {
+  font-weight: 600;
+  color: #1a202c;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.song-notes {
+  color: #6b7280;
+  font-size: 14px;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.song-key {
+  color: #64748b;
+  font-size: 12px;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.song-actions {
+  flex-shrink: 0;
+}
+
 /* Status Badges */
 .status-badge {
   font-size: 12px;
@@ -307,6 +426,15 @@
 
 .btn-secondary:hover:not(:disabled) {
   background: #4b5563;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
 }
 
 .btn-small {

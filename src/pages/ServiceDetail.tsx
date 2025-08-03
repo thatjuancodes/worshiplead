@@ -17,6 +17,27 @@ interface WorshipService {
   updated_at: string
 }
 
+interface Song {
+  id: string
+  title: string
+  artist: string
+  key?: string
+  bpm?: number
+  ccli_number?: string
+  tags?: string[]
+}
+
+interface ServiceSong {
+  id: string
+  service_id: string
+  song_id: string
+  position: number
+  notes?: string
+  created_at: string
+  updated_at: string
+  songs: Song
+}
+
 interface OrganizationData {
   organization_id: string
   role: string
@@ -33,7 +54,14 @@ export function ServiceDetail() {
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [service, setService] = useState<WorshipService | null>(null)
+  const [serviceSongs, setServiceSongs] = useState<ServiceSong[]>([])
+  const [availableSongs, setAvailableSongs] = useState<Song[]>([])
+  const [showAddSongForm, setShowAddSongForm] = useState(false)
+  const [selectedSongId, setSelectedSongId] = useState('')
+  const [songNotes, setSongNotes] = useState('')
+  const [addingSong, setAddingSong] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -95,6 +123,141 @@ export function ServiceDetail() {
       loadService()
     }
   }, [organization, loadService])
+
+  const loadServiceSongs = useCallback(async () => {
+    if (!service) return
+
+    try {
+      const { data, error } = await supabase
+        .from('service_songs')
+        .select(`
+          *,
+          songs (
+            id,
+            title,
+            artist,
+            key,
+            bpm,
+            ccli_number,
+            tags
+          )
+        `)
+        .eq('service_id', service.id)
+        .order('position', { ascending: true })
+
+      if (error) {
+        console.error('Error loading service songs:', error)
+        return
+      }
+
+      setServiceSongs(data || [])
+    } catch (error) {
+      console.error('Error loading service songs:', error)
+    }
+  }, [service])
+
+  const loadAvailableSongs = useCallback(async () => {
+    if (!organization) return
+
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .select('*')
+        .eq('organization_id', organization.organization_id)
+        .order('title', { ascending: true })
+
+      if (error) {
+        console.error('Error loading available songs:', error)
+        return
+      }
+
+      setAvailableSongs(data || [])
+    } catch (error) {
+      console.error('Error loading available songs:', error)
+    }
+  }, [organization])
+
+  const handleAddSong = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!service || !selectedSongId) {
+      setError('Please select a song to add.')
+      return
+    }
+
+    try {
+      setAddingSong(true)
+      setError('')
+
+      // Get the next position number
+      const nextPosition = serviceSongs.length + 1
+
+      const { data, error } = await supabase
+        .from('service_songs')
+        .insert({
+          service_id: service.id,
+          song_id: selectedSongId,
+          position: nextPosition,
+          notes: songNotes.trim() || null
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error adding song to service:', error)
+        setError('Failed to add song to service. Please try again.')
+        return
+      }
+
+      setSuccess('Song added to service successfully!')
+      setSelectedSongId('')
+      setSongNotes('')
+      setShowAddSongForm(false)
+      
+      await loadServiceSongs()
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      console.error('Error adding song to service:', error)
+      setError('Failed to add song to service. Please try again.')
+    } finally {
+      setAddingSong(false)
+    }
+  }
+
+  const handleRemoveSong = async (serviceSongId: string) => {
+    if (!confirm('Are you sure you want to remove this song from the service?')) return
+
+    try {
+      const { error } = await supabase
+        .from('service_songs')
+        .delete()
+        .eq('id', serviceSongId)
+
+      if (error) {
+        console.error('Error removing song from service:', error)
+        setError('Failed to remove song from service.')
+        return
+      }
+
+      setSuccess('Song removed from service successfully!')
+      await loadServiceSongs()
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      console.error('Error removing song from service:', error)
+      setError('Failed to remove song from service.')
+    }
+  }
+
+  useEffect(() => {
+    if (service) {
+      loadServiceSongs()
+      loadAvailableSongs()
+    }
+  }, [service, loadServiceSongs, loadAvailableSongs])
 
   const handleSignOut = async () => {
     try {
@@ -275,15 +438,101 @@ export function ServiceDetail() {
             <div className="service-songs-section">
               <div className="section-header">
                 <h3>Service Songs</h3>
-                <button className="btn btn-primary btn-small">
-                  Add Songs
+                <button 
+                  onClick={() => setShowAddSongForm(!showAddSongForm)}
+                  className="btn btn-primary btn-small"
+                >
+                  {showAddSongForm ? 'Cancel' : 'Add Songs'}
                 </button>
               </div>
+
+              {showAddSongForm && (
+                <div className="add-song-form">
+                  <h4>Add Song to Service</h4>
+                  <form onSubmit={handleAddSong}>
+                    <div className="form-group">
+                      <label htmlFor="songSelect">Select Song</label>
+                      <select
+                        id="songSelect"
+                        value={selectedSongId}
+                        onChange={(e) => setSelectedSongId(e.target.value)}
+                        required
+                      >
+                        <option value="">Choose a song...</option>
+                        {availableSongs.map(song => (
+                          <option key={song.id} value={song.id}>
+                            {song.title} - {song.artist}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="songNotes">Notes (optional)</label>
+                      <input
+                        type="text"
+                        id="songNotes"
+                        value={songNotes}
+                        onChange={(e) => setSongNotes(e.target.value)}
+                        placeholder="e.g., special number, ending song"
+                      />
+                    </div>
+                    <div className="form-actions">
+                      <button 
+                        type="submit" 
+                        className="btn btn-primary"
+                        disabled={addingSong || !selectedSongId}
+                      >
+                        {addingSong ? 'Adding Song...' : 'Add Song'}
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary"
+                        onClick={() => setShowAddSongForm(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
               
-              <div className="no-songs">
-                <p>No songs added to this service yet</p>
-                <p>Add songs from your songbank to create a setlist</p>
-              </div>
+              {serviceSongs.length === 0 ? (
+                <div className="no-songs">
+                  <p>No songs added to this service yet</p>
+                  <p>Add songs from your songbank to create a setlist</p>
+                </div>
+              ) : (
+                <div className="service-songs-list">
+                  {serviceSongs.map((serviceSong, index) => (
+                    <div key={serviceSong.id} className="service-song-item">
+                      <div className="song-position">
+                        {serviceSong.position}
+                      </div>
+                      <div className="song-info">
+                        <div className="song-title">
+                          {serviceSong.songs.title} - {serviceSong.songs.artist}
+                        </div>
+                        {serviceSong.notes && (
+                          <div className="song-notes">
+                            {serviceSong.notes}
+                          </div>
+                        )}
+                        {serviceSong.songs.key && (
+                          <span className="song-key">Key: {serviceSong.songs.key}</span>
+                        )}
+                      </div>
+                      <div className="song-actions">
+                        <button
+                          onClick={() => handleRemoveSong(serviceSong.id)}
+                          className="btn btn-danger btn-small"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="service-notes-section">

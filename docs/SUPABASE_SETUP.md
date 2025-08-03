@@ -142,6 +142,20 @@ CREATE TABLE worship_services (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create service_songs table for song assignments
+CREATE TABLE service_songs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES worship_services(id) ON DELETE CASCADE NOT NULL,
+  song_id UUID REFERENCES songs(id) ON DELETE CASCADE NOT NULL,
+  position INTEGER NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  -- Ensure unique position per service
+  UNIQUE(service_id, position)
+);
+
 -- Enable Row Level Security
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -149,6 +163,7 @@ ALTER TABLE organization_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE worship_services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_songs ENABLE ROW LEVEL SECURITY;
 
 -- Organization policies (working for signup flow)
 CREATE POLICY "Allow organization creation" ON organizations
@@ -274,6 +289,43 @@ CREATE POLICY "Users can delete services in their organization" ON worship_servi
     organization_id IN (
       SELECT organization_id FROM organization_memberships 
       WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+-- Service songs policies (organization-based access)
+CREATE POLICY "Users can view service songs in their organization" ON service_songs
+  FOR SELECT USING (
+    service_id IN (
+      SELECT ws.id FROM worship_services ws
+      JOIN organization_memberships om ON ws.organization_id = om.organization_id
+      WHERE om.user_id = auth.uid() AND om.status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can create service songs in their organization" ON service_songs
+  FOR INSERT WITH CHECK (
+    service_id IN (
+      SELECT ws.id FROM worship_services ws
+      JOIN organization_memberships om ON ws.organization_id = om.organization_id
+      WHERE om.user_id = auth.uid() AND om.status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can update service songs in their organization" ON service_songs
+  FOR UPDATE USING (
+    service_id IN (
+      SELECT ws.id FROM worship_services ws
+      JOIN organization_memberships om ON ws.organization_id = om.organization_id
+      WHERE om.user_id = auth.uid() AND om.status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can delete service songs in their organization" ON service_songs
+  FOR DELETE USING (
+    service_id IN (
+      SELECT ws.id FROM worship_services ws
+      JOIN organization_memberships om ON ws.organization_id = om.organization_id
+      WHERE om.user_id = auth.uid() AND om.status = 'active'
     )
   );
 
