@@ -268,11 +268,17 @@
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   transition: all 0.2s ease;
+  cursor: grab;
+  user-select: none;
 }
 
 .service-song-item:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
+}
+
+.service-song-item:active {
+  cursor: grabbing;
 }
 
 .song-position {
@@ -318,6 +324,27 @@
 
 .song-actions {
   flex-shrink: 0;
+}
+
+/* Drag and Drop Visual Indicators */
+.service-song-item[data-dragging="true"] {
+  opacity: 0.5;
+  transform: rotate(5deg);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.service-songs-list {
+  position: relative;
+}
+
+.service-songs-list::before {
+  content: "Drag to reorder songs";
+  position: absolute;
+  top: -30px;
+  left: 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
 }
 
 /* Status Badges */

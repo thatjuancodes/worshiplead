@@ -3,6 +3,25 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import type { User } from '@supabase/supabase-js'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import './ServiceDetail.css'
 
 interface WorshipService {
@@ -47,10 +66,79 @@ interface OrganizationData {
   }[]
 }
 
+// Sortable Song Item Component
+function SortableSongItem({ 
+  serviceSong, 
+  onRemove 
+}: { 
+  serviceSong: ServiceSong
+  onRemove: (id: string) => void 
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: serviceSong.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className="service-song-item"
+      {...attributes}
+      {...listeners}
+    >
+      <div className="song-position">
+        {serviceSong.position}
+      </div>
+      <div className="song-info">
+        <div className="song-title">
+          {serviceSong.songs.title} - {serviceSong.songs.artist}
+        </div>
+        {serviceSong.notes && (
+          <div className="song-notes">
+            {serviceSong.notes}
+          </div>
+        )}
+        {serviceSong.songs.key && (
+          <span className="song-key">Key: {serviceSong.songs.key}</span>
+        )}
+      </div>
+      <div className="song-actions">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove(serviceSong.id)
+          }}
+          className="btn btn-danger btn-small"
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function ServiceDetail() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const [loading, setLoading] = useState(true)
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [service, setService] = useState<WorshipService | null>(null)
@@ -249,6 +337,76 @@ export function ServiceDetail() {
     } catch (error) {
       console.error('Error removing song from service:', error)
       setError('Failed to remove song from service.')
+    }
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (active.id !== over?.id) {
+      const oldIndex = serviceSongs.findIndex(song => song.id === active.id)
+      const newIndex = serviceSongs.findIndex(song => song.id === over?.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // Store original order for potential rollback
+        const originalSongs = [...serviceSongs]
+        
+        // Update local state immediately for smooth UX with new positions
+        const newSongs = arrayMove(serviceSongs, oldIndex, newIndex).map((song, index) => ({
+          ...song,
+          position: index + 1
+        }))
+        setServiceSongs(newSongs)
+
+        // Update positions in Supabase using temporary positions to avoid conflicts
+        try {
+          // First, set all positions to temporary negative values to avoid conflicts
+          for (let i = 0; i < newSongs.length; i++) {
+            const song = newSongs[i]
+            const tempPosition = -(i + 1) // Use negative values as temporary positions
+            
+            const { error } = await supabase
+              .from('service_songs')
+              .update({ position: tempPosition })
+              .eq('id', song.id)
+
+            if (error) {
+              console.error('Error setting temporary position:', error)
+              setError('Failed to save new song order.')
+              // Revert to original order immediately
+              setServiceSongs(originalSongs)
+              return
+            }
+          }
+
+          // Then, set the final positions
+          for (let i = 0; i < newSongs.length; i++) {
+            const song = newSongs[i]
+            const finalPosition = i + 1
+            
+            const { error } = await supabase
+              .from('service_songs')
+              .update({ position: finalPosition })
+              .eq('id', song.id)
+
+            if (error) {
+              console.error('Error setting final position:', error)
+              setError('Failed to save new song order.')
+              // Revert to original order immediately
+              setServiceSongs(originalSongs)
+              return
+            }
+          }
+
+          setSuccess('Song order updated successfully!')
+          setTimeout(() => setSuccess(''), 3000)
+        } catch (error) {
+          console.error('Error updating song positions:', error)
+          setError('Failed to save new song order.')
+          // Revert to original order immediately
+          setServiceSongs(originalSongs)
+        }
+      }
     }
   }
 
@@ -502,36 +660,26 @@ export function ServiceDetail() {
                   <p>Add songs from your songbank to create a setlist</p>
                 </div>
               ) : (
-                <div className="service-songs-list">
-                  {serviceSongs.map((serviceSong, index) => (
-                    <div key={serviceSong.id} className="service-song-item">
-                      <div className="song-position">
-                        {serviceSong.position}
-                      </div>
-                      <div className="song-info">
-                        <div className="song-title">
-                          {serviceSong.songs.title} - {serviceSong.songs.artist}
-                        </div>
-                        {serviceSong.notes && (
-                          <div className="song-notes">
-                            {serviceSong.notes}
-                          </div>
-                        )}
-                        {serviceSong.songs.key && (
-                          <span className="song-key">Key: {serviceSong.songs.key}</span>
-                        )}
-                      </div>
-                      <div className="song-actions">
-                        <button
-                          onClick={() => handleRemoveSong(serviceSong.id)}
-                          className="btn btn-danger btn-small"
-                        >
-                          Remove
-                        </button>
-                      </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={serviceSongs.map(song => song.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="service-songs-list">
+                      {serviceSongs.map((serviceSong) => (
+                        <SortableSongItem
+                          key={serviceSong.id}
+                          serviceSong={serviceSong}
+                          onRemove={handleRemoveSong}
+                        />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
 
