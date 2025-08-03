@@ -1,48 +1,52 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
+import type { User } from '@supabase/supabase-js'
 import './Dashboard.css'
+
+interface OrganizationData {
+  organization_id: string
+  role: string
+  organizations: {
+    name: string
+    slug: string
+  }[]
+}
 
 export function Dashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const [organization, setOrganization] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [organization, setOrganization] = useState<OrganizationData | null>(null)
 
-  useEffect(() => {
-    checkUserAndOrganization()
-  }, [])
-
-  const checkUserAndOrganization = async () => {
+  const checkUserAndOrganization = useCallback(async () => {
     try {
-      // Check if user is authenticated
       const currentUser = await getCurrentUser()
-      
       if (!currentUser) {
-        // User not authenticated, redirect to login
         navigate('/login')
         return
       }
-
       setUser(currentUser)
 
-      // Check if user has an organization
       const userOrg = await getUserPrimaryOrganization(currentUser.id)
-      
+      console.log('User organization data:', userOrg) // Debug log
       if (!userOrg) {
-        // User has no organization, redirect to organization setup
-        navigate('/organization-setup')
+        navigate('/organization-setup') // Redirect if no organization
         return
       }
-
       setOrganization(userOrg)
       setLoading(false)
     } catch (error) {
       console.error('Error checking user and organization:', error)
-      // If there's an error, redirect to login
       navigate('/login')
     }
-  }
+  }, [navigate])
+
+  useEffect(() => {
+    checkUserAndOrganization()
+  }, [checkUserAndOrganization])
+
+
 
   const handleSignOut = async () => {
     try {
@@ -78,7 +82,7 @@ export function Dashboard() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.name}
+              {organization?.organizations?.[0]?.name}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out
@@ -91,7 +95,7 @@ export function Dashboard() {
         <div className="dashboard-container">
           <div className="dashboard-welcome">
             <h2>Welcome to Worship Lead</h2>
-            <p>You're logged into <strong>{organization?.organizations?.name}</strong></p>
+            <p>You're logged into <strong>{organization?.organizations?.[0]?.name}</strong></p>
           </div>
 
           <div className="dashboard-content">

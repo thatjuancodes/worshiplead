@@ -104,137 +104,129 @@ export async function createUserAccount({ email, password, firstName, lastName }
 
 // Step 2a: Create organization and membership for new user
 export async function createOrganizationAndMembership(userId: string, { name, slug }: OrganizationData) {
-  try {
-    // Check if organization slug is unique
-    const { data: existingOrg, error: slugCheckError } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', slug)
-      .single()
+  // Check if organization slug is unique
+  const { data: existingOrg, error: slugCheckError } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', slug)
+    .single()
 
-    if (slugCheckError && slugCheckError.code !== 'PGRST116') {
-      throw slugCheckError
-    }
-
-    if (existingOrg) {
-      throw new Error('Organization slug already exists. Please choose a different name.')
-    }
-
-    // Create organization
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .insert({
-        name: name,
-        slug: slug,
-      })
-      .select()
-      .single()
-
-    if (orgError) {
-      console.error('Error creating organization:', orgError)
-      throw new Error('Failed to create organization')
-    }
-
-    // Create membership record
-    const { error: membershipError } = await supabase
-      .from('organization_memberships')
-      .insert({
-        organization_id: orgData.id,
-        user_id: userId,
-        role: 'owner',
-        status: 'active',
-      })
-
-    if (membershipError) {
-      console.error('Error creating membership:', membershipError)
-      // Try to clean up the organization if membership creation fails
-      await supabase.from('organizations').delete().eq('id', orgData.id)
-      throw new Error('Failed to create organization membership')
-    }
-
-    return orgData
-  } catch (error) {
-    throw error
+  if (slugCheckError && slugCheckError.code !== 'PGRST116') {
+    throw slugCheckError
   }
+
+  if (existingOrg) {
+    throw new Error('Organization slug already exists. Please choose a different name.')
+  }
+
+  // Create organization
+  const { data: orgData, error: orgError } = await supabase
+    .from('organizations')
+    .insert({
+      name: name,
+      slug: slug,
+    })
+    .select()
+    .single()
+
+  if (orgError) {
+    console.error('Error creating organization:', orgError)
+    throw new Error('Failed to create organization')
+  }
+
+  // Create membership record
+  const { error: membershipError } = await supabase
+    .from('organization_memberships')
+    .insert({
+      organization_id: orgData.id,
+      user_id: userId,
+      role: 'owner',
+      status: 'active',
+    })
+
+  if (membershipError) {
+    console.error('Error creating membership:', membershipError)
+    // Try to clean up the organization if membership creation fails
+    await supabase.from('organizations').delete().eq('id', orgData.id)
+    throw new Error('Failed to create organization membership')
+  }
+
+  return orgData
 }
 
 // Step 2b: Join existing organization via invite
 export async function joinOrganizationViaInvite(userId: string, organizationSlug: string) {
-  try {
-    // Find organization by slug
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', organizationSlug)
-      .single()
+  // Find organization by slug
+  const { data: org, error: orgError } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', organizationSlug)
+    .single()
 
-    if (orgError || !org) {
-      throw new Error('Invalid organization invite link')
-    }
-
-    // Get user's email from profile
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('id', userId)
-      .single()
-
-    if (profileError || !userProfile) {
-      throw new Error('User profile not found')
-    }
-
-    // Check if user is already invited
-    const { data: invite, error: inviteError } = await supabase
-      .from('organization_invites')
-      .select('*')
-      .eq('organization_id', org.id)
-      .eq('email', userProfile.email)
-      .eq('status', 'pending')
-      .single()
-
-    if (inviteError || !invite) {
-      throw new Error('No valid invite found for this email and organization')
-    }
-
-    // Check if invite is expired
-    if (new Date(invite.expires_at) < new Date()) {
-      throw new Error('Invite has expired')
-    }
-
-    // Create membership record
-    const { error: membershipError } = await supabase
-      .from('organization_memberships')
-      .insert({
-        organization_id: org.id,
-        user_id: userId,
-        role: 'member',
-        status: 'active',
-        invited_by: invite.invited_by,
-      })
-
-    if (membershipError) {
-      console.error('Error creating membership:', membershipError)
-      throw new Error('Failed to join organization')
-    }
-
-    // Mark invite as accepted
-    const { error: inviteUpdateError } = await supabase
-      .from('organization_invites')
-      .update({ 
-        status: 'accepted',
-        accepted_at: new Date().toISOString()
-      })
-      .eq('id', invite.id)
-
-    if (inviteUpdateError) {
-      console.error('Error updating invite:', inviteUpdateError)
-      // Don't throw here as the membership was created successfully
-    }
-
-    return org
-  } catch (error) {
-    throw error
+  if (orgError || !org) {
+    throw new Error('Invalid organization invite link')
   }
+
+  // Get user's email from profile
+  const { data: userProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .single()
+
+  if (profileError || !userProfile) {
+    throw new Error('User profile not found')
+  }
+
+  // Check if user is already invited
+  const { data: invite, error: inviteError } = await supabase
+    .from('organization_invites')
+    .select('*')
+    .eq('organization_id', org.id)
+    .eq('email', userProfile.email)
+    .eq('status', 'pending')
+    .single()
+
+  if (inviteError || !invite) {
+    throw new Error('No valid invite found for this email and organization')
+  }
+
+  // Check if invite is expired
+  if (new Date(invite.expires_at) < new Date()) {
+    throw new Error('Invite has expired')
+  }
+
+  // Create membership record
+  const { error: membershipError } = await supabase
+    .from('organization_memberships')
+    .insert({
+      organization_id: org.id,
+      user_id: userId,
+      role: 'member',
+      status: 'active',
+      invited_by: invite.invited_by,
+    })
+
+  if (membershipError) {
+    console.error('Error creating membership:', membershipError)
+    throw new Error('Failed to join organization')
+  }
+
+  // Mark invite as accepted
+  const { error: inviteUpdateError } = await supabase
+    .from('organization_invites')
+    .update({ 
+      status: 'accepted',
+      accepted_at: new Date().toISOString()
+    })
+    .eq('id', invite.id)
+
+  if (inviteUpdateError) {
+    console.error('Error updating invite:', inviteUpdateError)
+    // Don't throw here as the membership was created successfully
+  }
+
+  return org
 }
 
 // Legacy signup function (for backward compatibility)
@@ -386,7 +378,7 @@ export async function signUpWithInvite({ email, password, firstName, lastName, o
 // Check organization slug availability
 export async function checkSlugAvailability(slug: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('organizations')
       .select('id')
       .eq('slug', slug)

@@ -16,13 +16,20 @@ A vanilla React TypeScript project built with Vite, following modern development
 ```
 src/
 ├── components/          # Reusable React components
-│   ├── Counter.tsx     # Counter component with state management
-│   ├── LogoSection.tsx # Logo display component
-│   ├── InfoSection.tsx # Information display component
+│   ├── Header.tsx      # Navigation header component
+│   ├── HeroSection.tsx # Landing page hero section
+│   ├── FeaturesSection.tsx # Features showcase
+│   ├── Footer.tsx      # Footer component
 │   └── index.ts        # Component exports
-├── utils/              # Utility functions
-│   └── errorHandling.ts # Error handling utilities
-├── assets/             # Static assets
+├── pages/              # Page components
+│   ├── HomePage.tsx    # Landing page
+│   ├── LoginPage.tsx   # User login page
+│   ├── SignupPage.tsx  # User registration page
+│   ├── Dashboard.tsx   # Main dashboard
+│   └── OrganizationSetup.tsx # Organization setup page
+├── lib/                # Library utilities
+│   ├── supabase.ts     # Supabase client configuration
+│   └── auth.ts         # Authentication functions
 ├── App.tsx             # Main application component
 ├── main.tsx            # Application entry point
 └── index.css           # Global styles
@@ -102,11 +109,11 @@ yarn tsc --noEmit
 
 ## Error Handling
 
-The project includes a comprehensive error handling system in `src/utils/errorHandling.ts`:
+The project includes comprehensive error handling throughout the application:
 
-- `handleApiError()` - Standardizes error objects
-- `displayErrorMessage()` - Formats errors for user display
-- `ApiError` interface - Type-safe error structure
+- Proper error boundaries and user-friendly error messages
+- Type-safe error handling in authentication functions
+- Graceful fallbacks for network and API errors
 
 ## Supabase Setup
 
