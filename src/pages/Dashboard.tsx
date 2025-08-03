@@ -117,7 +117,12 @@ export function Dashboard() {
                 <div className="action-card">
                   <h4>Song Library</h4>
                   <p>Manage your song collection</p>
-                  <button className="btn btn-secondary">Browse Songs</button>
+                  <button 
+                    onClick={() => navigate('/songbank')} 
+                    className="btn btn-secondary"
+                  >
+                    Browse Songs
+                  </button>
                 </div>
               </div>
             </div>

@@ -111,11 +111,30 @@ CREATE TABLE organization_invites (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create songs table for songbank feature
+CREATE TABLE songs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  youtube_url TEXT,
+  spotify_url TEXT,
+  key TEXT,
+  bpm INTEGER,
+  ccli_number TEXT,
+  tags TEXT[] DEFAULT '{}',
+  lyrics TEXT,
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable Row Level Security
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_invites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
 
 -- Organization policies (working for signup flow)
 CREATE POLICY "Allow organization creation" ON organizations
@@ -178,6 +197,39 @@ CREATE POLICY "Organization admins can update invites" ON organization_invites
     )
   );
 
+-- Songs policies (organization-based access)
+CREATE POLICY "Users can view songs in their organization" ON songs
+  FOR SELECT USING (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can create songs in their organization" ON songs
+  FOR INSERT WITH CHECK (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can update songs in their organization" ON songs
+  FOR UPDATE USING (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can delete songs in their organization" ON songs
+  FOR DELETE USING (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
 -- Note: These RLS policies are permissive for development
 -- For production, consider making them more restrictive:
 -- - SELECT policies: Only show data the user should see
@@ -200,6 +252,11 @@ CREATE TRIGGER update_profiles_updated_at
 
 CREATE TRIGGER update_organization_memberships_updated_at
   BEFORE UPDATE ON organization_memberships
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_songs_updated_at
+  BEFORE UPDATE ON songs
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 ```
@@ -246,6 +303,22 @@ CREATE TRIGGER update_organization_memberships_updated_at
    - `accepted_at` (Timestamp, Nullable)
    - `declined_at` (Timestamp, Nullable)
    - `created_at` (Timestamp)
+
+**songs table:**
+   - `id` (UUID, Primary Key)
+   - `organization_id` (UUID, References organizations)
+   - `title` (Text, Required)
+   - `artist` (Text, Required)
+   - `youtube_url` (Text, Optional)
+   - `spotify_url` (Text, Optional)
+   - `key` (Text, Optional)
+   - `bpm` (Integer, Optional)
+   - `ccli_number` (Text, Optional)
+   - `tags` (Text Array, Default: empty array)
+   - `lyrics` (Text, Optional)
+   - `created_by` (UUID, References auth.users, Nullable)
+   - `created_at` (Timestamp)
+   - `updated_at` (Timestamp)
 
 ## Step 5: Authentication Configuration
 

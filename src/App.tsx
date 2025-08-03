@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
 import { OrganizationSetup } from './pages/OrganizationSetup'
 import { Dashboard } from './pages/Dashboard'
+import { Songbank } from './pages/Songbank'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/organization-setup" element={<OrganizationSetup />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/songbank" element={<Songbank />} />
       </Routes>
     </Router>
   )
