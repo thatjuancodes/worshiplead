@@ -298,6 +298,13 @@ export function Songbank() {
             </div>
             
             <div className="songbank-actions">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="btn btn-secondary"
+              >
+                ← Back to Dashboard
+              </button>
+              
               <div className="view-toggle">
                 <button
                   onClick={() => setViewMode('cards')}

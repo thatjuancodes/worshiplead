@@ -109,7 +109,7 @@ export function Dashboard() {
                     onClick={() => navigate('/schedule')} 
                     className="btn btn-primary"
                   >
-                    Create Schedule
+                    Manage Schedule
                   </button>
                 </div>
 
@@ -131,7 +131,7 @@ export function Dashboard() {
                     onClick={() => navigate('/songbank')} 
                     className="btn btn-secondary"
                   >
-                    Browse Songs
+                    Manage Songs
                   </button>
                 </div>
               </div>
