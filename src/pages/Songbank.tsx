@@ -281,7 +281,7 @@ export function Songbank() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.[0]?.name}
+              {organization?.organizations?.name || organization?.organizations?.[0]?.name}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out

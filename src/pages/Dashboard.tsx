@@ -82,7 +82,7 @@ export function Dashboard() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.[0]?.name}
+              {organization?.organizations?.name || organization?.organizations?.[0]?.name}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out
@@ -95,7 +95,7 @@ export function Dashboard() {
         <div className="dashboard-container">
           <div className="dashboard-welcome">
             <h2>Welcome to Worship Lead</h2>
-            <p>You're logged into <strong>{organization?.organizations?.[0]?.name}</strong></p>
+            <p>You're logged into <strong>{organization?.organizations?.name || organization?.organizations?.[0]?.name}</strong></p>
           </div>
 
           <div className="dashboard-content">

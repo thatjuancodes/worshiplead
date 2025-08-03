@@ -216,7 +216,7 @@ export function ScheduleService() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.[0]?.name || 'Loading...'}
+              {organization?.organizations?.name || organization?.organizations?.[0]?.name || 'Loading...'}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out
