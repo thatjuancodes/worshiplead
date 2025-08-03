@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { handleApiError, displayErrorMessage } from '../utils/errorHandling'
+import { Link, useNavigate } from 'react-router-dom'
+import { signIn } from '../lib/auth'
 import './LoginPage.css'
 
 export function LoginPage() {
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -27,18 +28,17 @@ export function LoginPage() {
     setError(null)
 
     try {
-      // TODO: Implement actual login logic here
-      console.log('Login attempt:', formData)
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // For now, just show a success message
-      alert('Login functionality will be implemented soon!')
-      
+      const { user, session } = await signIn({
+        email: formData.email,
+        password: formData.password
+      })
+
+      if (user && session) {
+        // Redirect to dashboard after successful login
+        navigate('/dashboard')
+      }
     } catch (err) {
-      const apiError = handleApiError(err)
-      setError(displayErrorMessage(apiError))
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     } finally {
       setIsLoading(false)
     }
@@ -103,7 +103,7 @@ export function LoginPage() {
         <div className="login-footer">
           <p>
             Don't have an account?{' '}
-            <Link to="/" className="link">
+            <Link to="/signup" className="link">
               Sign up for free
             </Link>
           </p>

@@ -15,10 +15,33 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
-// Database types (you can generate these from Supabase CLI)
+// Database types for multi-tenant SaaS
 export interface Database {
   public: {
     Tables: {
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       profiles: {
         Row: {
           id: string
@@ -43,6 +66,82 @@ export interface Database {
           last_name?: string
           created_at?: string
           updated_at?: string
+        }
+      }
+      organization_memberships: {
+        Row: {
+          id: string
+          organization_id: string
+          user_id: string
+          role: 'owner' | 'admin' | 'member'
+          status: 'active' | 'inactive' | 'suspended'
+          joined_at: string
+          left_at: string | null
+          invited_by: string | null
+          accepted_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          user_id: string
+          role?: 'owner' | 'admin' | 'member'
+          status?: 'active' | 'inactive' | 'suspended'
+          joined_at?: string
+          left_at?: string | null
+          invited_by?: string | null
+          accepted_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          user_id?: string
+          role?: 'owner' | 'admin' | 'member'
+          status?: 'active' | 'inactive' | 'suspended'
+          joined_at?: string
+          left_at?: string | null
+          invited_by?: string | null
+          accepted_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      organization_invites: {
+        Row: {
+          id: string
+          organization_id: string
+          email: string
+          invited_by: string
+          status: 'pending' | 'accepted' | 'expired' | 'declined'
+          expires_at: string
+          accepted_at: string | null
+          declined_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          email: string
+          invited_by: string
+          status?: 'pending' | 'accepted' | 'expired' | 'declined'
+          expires_at: string
+          accepted_at?: string | null
+          declined_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          email?: string
+          invited_by?: string
+          status?: 'pending' | 'accepted' | 'expired' | 'declined'
+          expires_at?: string
+          accepted_at?: string | null
+          declined_at?: string | null
+          created_at?: string
         }
       }
     }

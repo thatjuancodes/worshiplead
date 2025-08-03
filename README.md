@@ -110,75 +110,22 @@ The project includes a comprehensive error handling system in `src/utils/errorHa
 
 ## Supabase Setup
 
-### Prerequisites
+For detailed Supabase configuration instructions, see [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
+
+### Quick Start
 
 1. Create a Supabase project at [https://supabase.com](https://supabase.com)
-2. Get your project URL and anon key from the API settings
-
-### Environment Configuration
-
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Add your Supabase credentials to `.env`:
-   ```bash
-   VITE_SUPABASE_URL=your_supabase_project_url_here
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-   ```
-
-### Database Setup
-
-1. Create a `profiles` table in your Supabase database:
-   ```sql
-   CREATE TABLE profiles (
-     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-     email TEXT UNIQUE NOT NULL,
-     first_name TEXT NOT NULL,
-     last_name TEXT NOT NULL,
-     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-   );
-   ```
-
-2. Set up Row Level Security (RLS):
-   ```sql
-   ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-   
-   CREATE POLICY "Users can view own profile" ON profiles
-     FOR SELECT USING (auth.uid() = id);
-   
-   CREATE POLICY "Users can update own profile" ON profiles
-     FOR UPDATE USING (auth.uid() = id);
-   
-   CREATE POLICY "Users can insert own profile" ON profiles
-     FOR INSERT WITH CHECK (auth.uid() = id);
-   ```
-
-3. Create a trigger to automatically update the `updated_at` column:
-   ```sql
-   CREATE OR REPLACE FUNCTION update_updated_at_column()
-   RETURNS TRIGGER AS $$
-   BEGIN
-     NEW.updated_at = NOW();
-     RETURN NEW;
-   END;
-   $$ language 'plpgsql';
-
-   CREATE TRIGGER update_profiles_updated_at
-     BEFORE UPDATE ON profiles
-     FOR EACH ROW
-     EXECUTE FUNCTION update_updated_at_column();
-   ```
+2. Copy the example environment file: `cp .env.example .env`
+3. Add your Supabase credentials to `.env`
+4. Follow the complete setup guide in `docs/SUPABASE_SETUP.md`
 
 ### Authentication
 
 The app includes:
-- User registration with email/password
-- User login/logout
-- Session management
-- Profile creation and management
+- Multi-tenant organization-based user registration
+- User login/logout with session management
+- Organization invite system
+- Role-based access control (Owner, Admin, Member)
 - Error handling with user-friendly messages
 
 ## Contributing

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { handleApiError, displayErrorMessage } from '../utils/errorHandling'
+import { Link, useNavigate } from 'react-router-dom'
+import { createUserAccount } from '../lib/auth'
 import './SignupPage.css'
 
 export function SignupPage() {
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -43,18 +44,22 @@ export function SignupPage() {
     }
 
     try {
-      // TODO: Implement actual signup logic here
-      console.log('Signup attempt:', formData)
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // For now, just show a success message
-      alert('Signup functionality will be implemented soon!')
-      
+      const { user, session } = await createUserAccount({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName
+      })
+
+      if (user && session) {
+        // Redirect to organization setup after successful signup
+        navigate('/organization-setup')
+      } else if (user && !session) {
+        // Email confirmation required
+        setError('Please check your email to confirm your account before signing in.')
+      }
     } catch (err) {
-      const apiError = handleApiError(err)
-      setError(displayErrorMessage(apiError))
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     } finally {
       setIsLoading(false)
     }

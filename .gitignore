@@ -19,6 +19,9 @@ dist-ssr
 .env.test.local
 .env.production.local
 
+# Private documentation not meant for public repo
+/docs/PRIVATE_HOSTING_GUIDE.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
