@@ -176,32 +176,20 @@ export function TeamManagement() {
     setSuccess('')
 
     try {
-      // Check if user already exists by email
-      const { data: existingUsers, error: userError } = await supabase
-        .from('profiles')
-        .select('id')
+      // Check if invitation already exists for this email
+      const { data: existingInvites, error: inviteError } = await supabase
+        .from('organization_invites')
+        .select('id, status')
+        .eq('organization_id', organization.organization_id)
         .eq('email', inviteEmail.trim())
+        .eq('status', 'pending')
 
-      if (userError) {
-        console.error('Error checking existing user:', userError)
-        // Continue anyway - the invitation will still work
-      } else if (existingUsers && existingUsers.length > 0) {
-        const existingUser = existingUsers[0]
-        // User exists, check if they're already a member
-        const { data: existingMembers, error: memberError } = await supabase
-          .from('organization_memberships')
-          .select('id')
-          .eq('organization_id', organization.organization_id)
-          .eq('user_id', existingUser.id)
-          .eq('status', 'active')
-
-        if (memberError) {
-          console.error('Error checking existing membership:', memberError)
-        } else if (existingMembers && existingMembers.length > 0) {
-          setError('This user is already a member of your organization.')
-          setInviting(false)
-          return
-        }
+      if (inviteError) {
+        console.error('Error checking existing invites:', inviteError)
+      } else if (existingInvites && existingInvites.length > 0) {
+        setError('An invitation has already been sent to this email address.')
+        setInviting(false)
+        return
       }
 
       // Create our custom invite record for tracking FIRST
@@ -226,32 +214,28 @@ export function TeamManagement() {
         return
       }
 
-      // Now call the Edge Function to send invitation email
+      // Create invitation link for manual sharing
+      const inviteUrl = `${window.location.origin}/signup?invite=${inviteData.id}`
       const organizationName = organization.organizations?.name || organization.organizations?.[0]?.name || 'Your Organization'
       const invitedByName = user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name || 'A team member'
 
-      const { data: emailData, error: emailError } = await supabase.functions.invoke('clever-worker', {
-        body: {
-          email: inviteEmail.trim(),
-          organizationName,
-          invitedBy: invitedByName,
-          organizationId: organization.organization_id,
-          inviteId: inviteData.id
-        }
-      })
-
-      if (emailError) {
-        console.error('Error sending invite email:', emailError)
-        // Don't fail completely - the invitation record was created successfully
-        // Just show a warning that email failed
-        setError(`Invitation created but email failed to send: ${emailError.message}. You can manually share the invitation link.`)
-        await loadInvites() // Still reload the invites list
-        await loadMembers()
-        return
+      // Call the Edge Function to log the invitation (for future email integration)
+      try {
+        await supabase.functions.invoke('clever-worker', {
+          body: {
+            email: inviteEmail.trim(),
+            organizationName,
+            invitedBy: invitedByName,
+            organizationId: organization.organization_id,
+            inviteId: inviteData.id
+          }
+        })
+      } catch (error) {
+        console.log('Edge function call failed (expected for now):', error)
       }
 
       setInviteEmail('')
-      setSuccess('Invitation email sent successfully! The user will receive an email with signup instructions.')
+      setSuccess(`Invitation created successfully! Copy and share this link: ${inviteUrl}`)
       await loadInvites()
       await loadMembers()
     } catch (error) {

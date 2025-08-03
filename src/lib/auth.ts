@@ -58,19 +58,27 @@ export interface Organization {
 }
 
 // Create user account only (no organization)
-export async function createUserAccount({ email, password, firstName, lastName }: SignupData) {
+export async function createUserAccount({ email, password, firstName, lastName }: SignupData, skipEmailConfirmation = false) {
   try {
     // Sign up the user with Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const signUpOptions: any = {
       email,
       password,
       options: {
         data: {
           first_name: firstName,
           last_name: lastName,
-        }
+        },
+        emailRedirectTo: `${window.location.origin}/dashboard`
       }
-    })
+    }
+
+    // If skipEmailConfirmation is true, we'll handle email confirmation differently
+    if (skipEmailConfirmation) {
+      signUpOptions.options.emailConfirm = true
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp(signUpOptions)
 
     if (authError) {
       throw authError
@@ -80,11 +88,13 @@ export async function createUserAccount({ email, password, firstName, lastName }
     if (authData.user) {
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           id: authData.user.id,
           email: email,
           first_name: firstName,
           last_name: lastName,
+        }, {
+          onConflict: 'id'
         })
 
       if (profileError) {

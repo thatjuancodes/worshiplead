@@ -154,23 +154,90 @@ export function SignupPage() {
     }
 
     try {
-      const { user, session } = await createUserAccount({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName
-      })
+      // For invited users, we'll handle the signup differently
+      let user, session
+      
+      if (invitation) {
+        // For invited users, create account and immediately confirm email via Edge Function
+        const { user: newUser, session: newSession } = await createUserAccount({
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          lastName: formData.lastName
+        })
+        
+        user = newUser
+        session = newSession
+        
+        console.log('Invited user signup result:', { user, session, invitation })
+        
+        if (user) {
+          // Immediately call Edge Function to confirm email and add to organization
+          try {
+            console.log('Calling Edge Function with inviteId:', invitation.id)
+            const { data, error } = await supabase.functions.invoke('rapid-endpoint', {
+              body: { inviteId: invitation.id }
+            })
 
-      if (user && session) {
-        // If user signed up with an invitation, automatically join the organization
-        if (invitation) {
-          await joinOrganizationFromInvitation(user.id, invitation)
+            console.log('Edge Function response:', { data, error })
+
+            if (error) {
+              console.error('Error confirming invitation:', error)
+              let errorMessage = 'Unknown error occurred'
+              
+              if (error.message) {
+                errorMessage = error.message
+              } else if (error.error) {
+                errorMessage = error.error
+              } else if (typeof error === 'string') {
+                errorMessage = error
+              }
+              
+              setError(`Account created successfully, but there was an issue with the invitation: ${errorMessage}. Please contact your administrator.`)
+              setIsLoading(false)
+              return
+            } else {
+              // Success - user is confirmed and added to organization
+              // Refresh the session to get the updated user data
+              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession()
+              
+              if (refreshError) {
+                console.error('Error refreshing session:', refreshError)
+              }
+              
+              navigate('/dashboard')
+              return
+            }
+          } catch (inviteError) {
+            console.error('Error in invitation flow:', inviteError)
+            setError('Account created successfully, but there was an issue with the invitation. Please contact your administrator.')
+            setIsLoading(false)
+            return
+          }
         }
-        // Redirect to dashboard (user will be automatically added to organization)
-        navigate('/dashboard')
-      } else if (user && !session) {
-        // Email confirmation required
-        setError('Please check your email to confirm your account before signing in.')
+      } else {
+        // Regular signup
+        const { user: newUser, session: newSession } = await createUserAccount({
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          lastName: formData.lastName
+        })
+        
+        user = newUser
+        session = newSession
+        
+        console.log('Regular signup result:', { user, session })
+      }
+
+      if (user) {
+        // Regular signup - check if we have a session
+        if (session) {
+          navigate('/dashboard')
+        } else {
+          // Email confirmation required for regular signup
+          setError('Please check your email to confirm your account before signing in.')
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
