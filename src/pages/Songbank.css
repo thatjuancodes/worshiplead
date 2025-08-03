@@ -448,6 +448,7 @@
 
 .btn-secondary:hover:not(:disabled) {
   background: #4b5563;
+  color: white;
 }
 
 .btn-danger {

@@ -221,6 +221,7 @@
 
 .btn-secondary:hover:not(:disabled) {
   background: #e2e8f0;
+  color: #1f2937;
 }
 
 .btn-text {
