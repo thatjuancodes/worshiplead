@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export function HeroSection() {
   return (
     <section className="hero">
@@ -18,7 +20,7 @@ export function HeroSection() {
         </div>
 
         <p className="hero-login">
-          Already have an account? <a href="#" className="login-link">Login</a>
+          Already have an account? <Link to="/login" className="login-link">Login</Link>
         </p>
       </div>
     </section>

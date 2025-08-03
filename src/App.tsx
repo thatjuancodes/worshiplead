@@ -1,23 +1,17 @@
-import { useRef } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import './App.css'
 
-import { Header, HeroSection, FeaturesSection, Footer } from './components'
+import { HomePage } from './pages/HomePage'
+import { LoginPage } from './pages/LoginPage'
 
 function App() {
-  const featuresRef = useRef<HTMLElement>(null)
-
   return (
-    <div className="app">
-      <Header />
-
-      <main>
-        <HeroSection />
-
-        <FeaturesSection ref={featuresRef} />
-      </main>
-
-      <Footer />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+      </Routes>
+    </Router>
   )
 }
 

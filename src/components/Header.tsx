@@ -1,19 +1,19 @@
-interface HeaderProps {
-  onFeaturesClick?: () => void
-}
+import { Link } from 'react-router-dom'
 
-export function Header({ onFeaturesClick }: HeaderProps) {
+export function Header() {
   return (
     <header className="header">
       <div className="header-content">
         <div className="logo">
-          <h1>Worship Lead</h1>
+          <Link to="/" className="logo-link">
+            <h1>Worship Lead</h1>
+          </Link>
         </div>
 
         <nav className="nav">
-          <button className="btn btn-secondary">
+          <Link to="/login" className="btn btn-secondary">
             Login
-          </button>
+          </Link>
 
           <button className="btn btn-primary">
             Try for free
