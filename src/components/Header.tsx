@@ -15,9 +15,9 @@ export function Header() {
             Login
           </Link>
 
-          <button className="btn btn-primary">
+          <Link to="/signup" className="btn btn-primary">
             Try for free
-          </button>
+          </Link>
         </nav>
       </div>
     </header>

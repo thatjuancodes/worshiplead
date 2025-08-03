@@ -14,9 +14,9 @@ export function HeroSection() {
         </p>
 
         <div className="hero-actions">
-          <button className="btn btn-primary btn-large">
+          <Link to="/signup" className="btn btn-primary btn-large">
             Try for free
-          </button>
+          </Link>
         </div>
 
         <p className="hero-login">
