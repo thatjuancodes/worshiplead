@@ -11,7 +11,21 @@ interface OrganizationData {
   organizations: {
     name: string
     slug: string
+  } | {
+    name: string
+    slug: string
   }[]
+}
+
+// Helper function to get organization name
+const getOrganizationName = (organization: OrganizationData | null): string => {
+  if (!organization?.organizations) return 'Loading...'
+  
+  if (Array.isArray(organization.organizations)) {
+    return organization.organizations[0]?.name || 'Loading...'
+  }
+  
+  return organization.organizations.name || 'Loading...'
 }
 
 interface OrganizationInvite {
@@ -34,7 +48,7 @@ interface OrganizationMember {
     first_name: string
     last_name: string
     email: string
-  }
+  } | null
 }
 
 export function TeamManagement() {
@@ -216,7 +230,7 @@ export function TeamManagement() {
 
       // Create invitation link for manual sharing
       const inviteUrl = `${window.location.origin}/signup?invite=${inviteData.id}`
-      const organizationName = organization.organizations?.name || organization.organizations?.[0]?.name || 'Your Organization'
+      const organizationName = getOrganizationName(organization) || 'Your Organization'
       const invitedByName = user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name || 'A team member'
 
       // Call the Edge Function to log the invitation (for future email integration)
@@ -317,7 +331,7 @@ export function TeamManagement() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.name || organization?.organizations?.[0]?.name || 'Loading...'}
+              {getOrganizationName(organization)}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out
@@ -346,7 +360,7 @@ export function TeamManagement() {
           <div className="team-content">
             <div className="team-sections-grid">
               <div className="team-section">
-                <h3>{organization?.organizations?.name || organization?.organizations?.[0]?.name || 'Organization'} - Team Members ({members.length})</h3>
+                <h3>{getOrganizationName(organization) || 'Organization'} - Team Members ({members.length})</h3>
                 {members.length === 0 ? (
                   <div className="no-members">
                     <p>No members found</p>

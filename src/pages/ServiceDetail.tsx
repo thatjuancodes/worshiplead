@@ -64,7 +64,21 @@ interface OrganizationData {
   organizations: {
     name: string
     slug: string
+  } | {
+    name: string
+    slug: string
   }[]
+}
+
+// Helper function to get organization name
+const getOrganizationName = (organization: OrganizationData | null): string => {
+  if (!organization?.organizations) return 'Loading...'
+  
+  if (Array.isArray(organization.organizations)) {
+    return organization.organizations[0]?.name || 'Loading...'
+  }
+  
+  return organization.organizations.name || 'Loading...'
 }
 
 // Sortable Song Item Component
@@ -150,7 +164,7 @@ export function ServiceDetail() {
   const [songNotes, setSongNotes] = useState('')
   const [addingSong, setAddingSong] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [success, setSuccess] = useState<string>('')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -281,7 +295,7 @@ export function ServiceDetail() {
       // Get the next position number
       const nextPosition = serviceSongs.length + 1
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('service_songs')
         .insert({
           service_id: service.id,
@@ -473,7 +487,7 @@ export function ServiceDetail() {
                 {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
               </span>
               <span className="organization-name">
-                {organization?.organizations?.name || organization?.organizations?.[0]?.name}
+                {getOrganizationName(organization)}
               </span>
               <button onClick={handleSignOut} className="btn btn-secondary btn-small">
                 Sign Out
@@ -523,7 +537,7 @@ export function ServiceDetail() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.name || organization?.organizations?.[0]?.name}
+              {getOrganizationName(organization)}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out
@@ -554,6 +568,18 @@ export function ServiceDetail() {
               </button>
             </div>
           </div>
+
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="success-message">
+              {success}
+            </div>
+          )}
 
           <div className="service-content">
             <div className="service-info-section">

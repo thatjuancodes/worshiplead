@@ -95,45 +95,7 @@ export function SignupPage() {
     if (error) setError(null)
   }
 
-  const joinOrganizationFromInvitation = async (userId: string, invitationData: {
-    id: string
-    organization_id: string
-    invited_by: string
-  }) => {
-    try {
-      // Create organization membership
-      const { error: membershipError } = await supabase
-        .from('organization_memberships')
-        .insert({
-          organization_id: invitationData.organization_id,
-          user_id: userId,
-          role: 'member',
-          status: 'active',
-          invited_by: invitationData.invited_by,
-          accepted_at: new Date().toISOString()
-        })
-
-      if (membershipError) {
-        console.error('Error creating membership:', membershipError)
-        return
-      }
-
-      // Update invitation status to accepted
-      const { error: inviteError } = await supabase
-        .from('organization_invites')
-        .update({
-          status: 'accepted',
-          accepted_at: new Date().toISOString()
-        })
-        .eq('id', invitationData.id)
-
-      if (inviteError) {
-        console.error('Error updating invitation:', inviteError)
-      }
-    } catch (error) {
-      console.error('Error joining organization from invitation:', error)
-    }
-  }
+  // joinOrganizationFromInvitation function removed as it's no longer used
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -199,7 +161,7 @@ export function SignupPage() {
             } else {
               // Success - user is confirmed and added to organization
               // Refresh the session to get the updated user data
-              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession()
+              const { error: refreshError } = await supabase.auth.refreshSession()
               
               if (refreshError) {
                 console.error('Error refreshing session:', refreshError)

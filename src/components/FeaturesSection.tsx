@@ -20,7 +20,7 @@ function FeatureCard({ title, description, icon }: FeatureCardProps) {
   )
 }
 
-export const FeaturesSection = forwardRef<HTMLElement>((props, ref) => {
+export const FeaturesSection = forwardRef<HTMLElement>((_, ref) => {
   const features = [
     {
       title: 'Scheduling',

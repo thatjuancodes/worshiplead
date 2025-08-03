@@ -16,15 +16,7 @@ interface WorshipService {
   updated_at: string
 }
 
-interface Song {
-  id: string
-  title: string
-  artist: string
-  key?: string
-  bpm?: number
-  ccli_number?: string
-  tags?: string[]
-}
+// Song interface moved to where it's actually used
 
 interface OrganizationData {
   organization_id: string
@@ -32,7 +24,21 @@ interface OrganizationData {
   organizations: {
     name: string
     slug: string
+  } | {
+    name: string
+    slug: string
   }[]
+}
+
+// Helper function to get organization name
+const getOrganizationName = (organization: OrganizationData | null): string => {
+  if (!organization?.organizations) return 'Loading...'
+  
+  if (Array.isArray(organization.organizations)) {
+    return organization.organizations[0]?.name || 'Loading...'
+  }
+  
+  return organization.organizations.name || 'Loading...'
 }
 
 export function ScheduleService() {
@@ -124,7 +130,7 @@ export function ScheduleService() {
       setCreating(true)
       setError('')
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('worship_services')
         .insert({
           organization_id: organization.organization_id,
@@ -223,7 +229,7 @@ export function ScheduleService() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.name || organization?.organizations?.[0]?.name || 'Loading...'}
+              {getOrganizationName(organization)}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out

@@ -12,7 +12,21 @@ interface OrganizationData {
   organizations: {
     name: string
     slug: string
+  } | {
+    name: string
+    slug: string
   }[]
+}
+
+// Helper function to get organization name
+const getOrganizationName = (organization: OrganizationData | null): string => {
+  if (!organization?.organizations) return 'Loading...'
+  
+  if (Array.isArray(organization.organizations)) {
+    return organization.organizations[0]?.name || 'Loading...'
+  }
+  
+  return organization.organizations.name || 'Loading...'
 }
 
 interface WorshipService {
@@ -202,7 +216,7 @@ export function ServiceEdit() {
                 {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
               </span>
               <span className="organization-name">
-                {organization?.organizations?.name || organization?.organizations?.[0]?.name}
+                {getOrganizationName(organization)}
               </span>
               <button onClick={handleSignOut} className="btn btn-secondary btn-small">
                 Sign Out
@@ -252,7 +266,7 @@ export function ServiceEdit() {
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.name || organization?.organizations?.[0]?.name}
+              {getOrganizationName(organization)}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out
