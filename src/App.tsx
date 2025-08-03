@@ -1,23 +1,23 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useRef } from 'react'
 import './App.css'
 
-import { Counter, LogoSection, InfoSection } from './components'
+import { Header, HeroSection, FeaturesSection, Footer } from './components'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const featuresRef = useRef<HTMLElement>(null)
 
   return (
-    <>
-      <LogoSection viteLogo={viteLogo} reactLogo={reactLogo} />
+    <div className="app">
+      <Header />
 
-      <h1>Vite + React</h1>
+      <main>
+        <HeroSection />
 
-      <Counter count={count} onIncrement={() => setCount((count) => count + 1)} />
+        <FeaturesSection ref={featuresRef} />
+      </main>
 
-      <InfoSection />
-    </>
+      <Footer />
+    </div>
   )
 }
 
