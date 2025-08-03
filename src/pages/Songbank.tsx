@@ -38,6 +38,8 @@ export function Songbank() {
   const [selectedKey, setSelectedKey] = useState('')
   const [selectedTag, setSelectedTag] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [editingSong, setEditingSong] = useState<Song | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [formData, setFormData] = useState({
     title: '',
@@ -165,6 +167,72 @@ export function Songbank() {
     } catch (error) {
       console.error('Error deleting song:', error)
     }
+  }
+
+  const handleEditSong = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!organization || !editingSong) return
+
+    try {
+      const tagsArray = formData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0)
+
+      const { error } = await supabase
+        .from('songs')
+        .update({
+          title: formData.title,
+          artist: formData.artist,
+          youtube_url: formData.youtube_url || null,
+          spotify_url: formData.spotify_url || null,
+          key: formData.key || null,
+          bpm: formData.bpm ? parseInt(formData.bpm) : null,
+          ccli_number: formData.ccli_number || null,
+          tags: tagsArray,
+          lyrics: formData.lyrics || null
+        })
+        .eq('id', editingSong.id)
+
+      if (error) {
+        console.error('Error updating song:', error)
+        return
+      }
+
+      // Reset form and reload songs
+      setFormData({
+        title: '',
+        artist: '',
+        youtube_url: '',
+        spotify_url: '',
+        key: '',
+        bpm: '',
+        ccli_number: '',
+        tags: '',
+        lyrics: ''
+      })
+      setShowEditForm(false)
+      setEditingSong(null)
+      await loadSongs(organization.organization_id)
+    } catch (error) {
+      console.error('Error updating song:', error)
+    }
+  }
+
+  const openEditForm = (song: Song) => {
+    setEditingSong(song)
+    setFormData({
+      title: song.title,
+      artist: song.artist,
+      youtube_url: song.youtube_url || '',
+      spotify_url: song.spotify_url || '',
+      key: song.key || '',
+      bpm: song.bpm?.toString() || '',
+      ccli_number: song.ccli_number || '',
+      tags: song.tags.join(', '),
+      lyrics: song.lyrics || ''
+    })
+    setShowEditForm(true)
   }
 
   const filteredSongs = songs.filter(song => {
@@ -387,6 +455,134 @@ export function Songbank() {
             </div>
           )}
 
+          {showEditForm && (
+            <div className="add-song-form">
+              <h3>Edit Song</h3>
+              <form onSubmit={handleEditSong}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="edit-title">Title *</label>
+                    <input
+                      type="text"
+                      id="edit-title"
+                      value={formData.title}
+                      onChange={(e) => setFormData({...formData, title: e.target.value})}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit-artist">Artist *</label>
+                    <input
+                      type="text"
+                      id="edit-artist"
+                      value={formData.artist}
+                      onChange={(e) => setFormData({...formData, artist: e.target.value})}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="edit-youtube_url">YouTube URL</label>
+                    <input
+                      type="url"
+                      id="edit-youtube_url"
+                      value={formData.youtube_url}
+                      onChange={(e) => setFormData({...formData, youtube_url: e.target.value})}
+                      placeholder="https://youtube.com/watch?v=..."
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit-spotify_url">Spotify URL</label>
+                    <input
+                      type="url"
+                      id="edit-spotify_url"
+                      value={formData.spotify_url}
+                      onChange={(e) => setFormData({...formData, spotify_url: e.target.value})}
+                      placeholder="https://open.spotify.com/track/..."
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="edit-key">Key</label>
+                    <input
+                      type="text"
+                      id="edit-key"
+                      value={formData.key}
+                      onChange={(e) => setFormData({...formData, key: e.target.value})}
+                      placeholder="C, G, D, etc."
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit-bpm">BPM</label>
+                    <input
+                      type="number"
+                      id="edit-bpm"
+                      value={formData.bpm}
+                      onChange={(e) => setFormData({...formData, bpm: e.target.value})}
+                      placeholder="120"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit-ccli_number">CCLI Number</label>
+                    <input
+                      type="text"
+                      id="edit-ccli_number"
+                      value={formData.ccli_number}
+                      onChange={(e) => setFormData({...formData, ccli_number: e.target.value})}
+                      placeholder="123456"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit-tags">Tags</label>
+                  <input
+                    type="text"
+                    id="edit-tags"
+                    value={formData.tags}
+                    onChange={(e) => setFormData({...formData, tags: e.target.value})}
+                    placeholder="praise, reflection, communion (comma-separated)"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="edit-lyrics">Lyrics</label>
+                  <textarea
+                    id="edit-lyrics"
+                    value={formData.lyrics}
+                    onChange={(e) => setFormData({...formData, lyrics: e.target.value})}
+                    placeholder="Enter song lyrics (markdown supported)"
+                    rows={6}
+                  />
+                </div>
+
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary">
+                    Update Song
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setShowEditForm(false)
+                      setEditingSong(null)
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
           <div className="songbank-filters">
             <div className="search-box">
               <input
@@ -470,6 +666,12 @@ export function Songbank() {
 
                   <div className="song-actions">
                     <button 
+                      onClick={() => openEditForm(song)}
+                      className="btn btn-secondary btn-small"
+                    >
+                      Edit
+                    </button>
+                    <button 
                       onClick={() => handleDeleteSong(song.id)}
                       className="btn btn-danger btn-small"
                     >
@@ -528,12 +730,20 @@ export function Songbank() {
                           )}
                         </td>
                         <td>
-                          <button 
-                            onClick={() => handleDeleteSong(song.id)}
-                            className="btn btn-danger btn-small"
-                          >
-                            Delete
-                          </button>
+                          <div className="table-actions">
+                            <button 
+                              onClick={() => openEditForm(song)}
+                              className="btn btn-secondary btn-small"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteSong(song.id)}
+                              className="btn btn-danger btn-small"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

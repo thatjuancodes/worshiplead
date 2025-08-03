@@ -362,6 +362,12 @@
   gap: 0.5rem;
 }
 
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .no-songs {
   text-align: center;
   padding: 48px;
