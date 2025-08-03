@@ -105,7 +105,12 @@ export function Dashboard() {
                 <div className="action-card">
                   <h4>Schedule Service</h4>
                   <p>Plan your next worship service</p>
-                  <button className="btn btn-primary">Create Schedule</button>
+                  <button 
+                    onClick={() => navigate('/schedule')} 
+                    className="btn btn-primary"
+                  >
+                    Create Schedule
+                  </button>
                 </div>
 
                 <div className="action-card">

@@ -128,12 +128,27 @@ CREATE TABLE songs (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create worship_services table for scheduling feature
+CREATE TABLE worship_services (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  service_date DATE NOT NULL,
+  service_time TIME,
+  description TEXT,
+  status TEXT CHECK (status IN ('draft', 'published', 'completed')) DEFAULT 'draft',
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable Row Level Security
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE worship_services ENABLE ROW LEVEL SECURITY;
 
 -- Organization policies (working for signup flow)
 CREATE POLICY "Allow organization creation" ON organizations
@@ -222,6 +237,39 @@ CREATE POLICY "Users can update songs in their organization" ON songs
   );
 
 CREATE POLICY "Users can delete songs in their organization" ON songs
+  FOR DELETE USING (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+-- Worship services policies (organization-based access)
+CREATE POLICY "Users can view services in their organization" ON worship_services
+  FOR SELECT USING (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can create services in their organization" ON worship_services
+  FOR INSERT WITH CHECK (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can update services in their organization" ON worship_services
+  FOR UPDATE USING (
+    organization_id IN (
+      SELECT organization_id FROM organization_memberships 
+      WHERE user_id = auth.uid() AND status = 'active'
+    )
+  );
+
+CREATE POLICY "Users can delete services in their organization" ON worship_services
   FOR DELETE USING (
     organization_id IN (
       SELECT organization_id FROM organization_memberships 
