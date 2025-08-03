@@ -23,6 +23,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import './ServiceDetail.css'
+import './Dashboard.css'
 
 interface WorshipService {
   id: string
@@ -461,17 +462,18 @@ export function ServiceDetail() {
   if (error) {
     return (
       <div className="service-detail">
-        <header className="service-header">
-          <div className="service-header-content">
-            <div className="service-logo">
+        <header className="dashboard-header">
+          <div className="dashboard-header-content">
+            <div className="dashboard-logo">
               <h1>Worship Lead</h1>
             </div>
-            <div className="service-user-info">
+            
+            <div className="dashboard-user-info">
               <span className="user-name">
                 {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
               </span>
               <span className="organization-name">
-                {organization?.organizations?.name || organization?.organizations?.[0]?.name || 'Loading...'}
+                {organization?.organizations?.name || organization?.organizations?.[0]?.name}
               </span>
               <button onClick={handleSignOut} className="btn btn-secondary btn-small">
                 Sign Out
@@ -510,17 +512,18 @@ export function ServiceDetail() {
 
   return (
     <div className="service-detail">
-      <header className="service-header">
-        <div className="service-header-content">
-          <div className="service-logo">
+      <header className="dashboard-header">
+        <div className="dashboard-header-content">
+          <div className="dashboard-logo">
             <h1>Worship Lead</h1>
           </div>
-          <div className="service-user-info">
+          
+          <div className="dashboard-user-info">
             <span className="user-name">
               {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
             </span>
             <span className="organization-name">
-              {organization?.organizations?.name || organization?.organizations?.[0]?.name || 'Loading...'}
+              {organization?.organizations?.name || organization?.organizations?.[0]?.name}
             </span>
             <button onClick={handleSignOut} className="btn btn-secondary btn-small">
               Sign Out
