@@ -88,6 +88,13 @@
   gap: 24px;
 }
 
+.team-sections-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
 .team-section {
   background: white;
   border-radius: 8px;
@@ -183,6 +190,19 @@
   font-size: 16px;
 }
 
+.pending-invites-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.pending-invites-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #374151;
+}
+
 .invites-list {
   display: flex;
   flex-direction: column;
@@ -211,9 +231,140 @@
   font-size: 16px;
 }
 
+.invite-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
 .invite-date {
   color: #64748b;
   font-size: 14px;
+}
+
+.invite-status {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: capitalize;
+}
+
+.invite-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.invite-status-accepted {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.invite-status-expired {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Organization Details */
+.organization-info {
+  display: grid;
+  gap: 16px;
+}
+
+.org-detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.org-label {
+  font-weight: 500;
+  color: #374151;
+  min-width: 140px;
+}
+
+.org-value {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* Role Badges */
+.role-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  text-transform: capitalize;
+}
+
+.role-owner {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.role-admin {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.role-member {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Members List */
+.no-members {
+  text-align: center;
+  padding: 32px;
+  color: #6b7280;
+}
+
+.members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.member-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.member-info {
+  flex: 1;
+}
+
+.member-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.member-details {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.member-email {
+  color: #6b7280;
+}
+
+.member-joined {
+  color: #9ca3af;
+}
+
+.member-role {
+  display: flex;
+  align-items: center;
 }
 
 .invite-actions {
@@ -329,6 +480,11 @@
     width: 100%;
   }
 
+  .team-sections-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
   .invite-form {
     flex-direction: column;
     align-items: stretch;
@@ -342,5 +498,37 @@
 
   .invite-actions {
     justify-content: flex-end;
+  }
+
+  .invite-details {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .org-detail {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .org-label {
+    min-width: auto;
+  }
+
+  .member-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .member-details {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .member-role {
+    align-self: flex-end;
   }
 } 
