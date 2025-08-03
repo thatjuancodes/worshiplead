@@ -111,7 +111,12 @@ export function Dashboard() {
                 <div className="action-card">
                   <h4>Manage Team</h4>
                   <p>Add or manage team members</p>
-                  <button className="btn btn-secondary">View Team</button>
+                  <button 
+                    onClick={() => navigate('/team')} 
+                    className="btn btn-secondary"
+                  >
+                    View Team
+                  </button>
                 </div>
 
                 <div className="action-card">

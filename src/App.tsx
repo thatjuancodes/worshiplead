@@ -7,6 +7,7 @@ import { SignupPage } from './pages/SignupPage'
 import { OrganizationSetup } from './pages/OrganizationSetup'
 import { Dashboard } from './pages/Dashboard'
 import { Songbank } from './pages/Songbank'
+import { TeamManagement } from './pages/TeamManagement'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/organization-setup" element={<OrganizationSetup />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/songbank" element={<Songbank />} />
+        <Route path="/team" element={<TeamManagement />} />
       </Routes>
     </Router>
   )

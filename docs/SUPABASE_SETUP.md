@@ -104,10 +104,9 @@ CREATE TABLE organization_invites (
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
   email TEXT NOT NULL,
   invited_by UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  status TEXT CHECK (status IN ('pending', 'accepted', 'expired', 'declined')) DEFAULT 'pending',
+  status TEXT CHECK (status IN ('pending', 'accepted', 'expired')) DEFAULT 'pending',
   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
   accepted_at TIMESTAMP WITH TIME ZONE,
-  declined_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -298,10 +297,9 @@ CREATE TRIGGER update_songs_updated_at
    - `organization_id` (UUID, References organizations)
    - `email` (Text)
    - `invited_by` (UUID, References auth.users)
-   - `status` (Text, Check: 'pending', 'accepted', 'expired', 'declined')
-   - `expires_at` (Timestamp)
+   - `status` (Text, Check: 'pending', 'accepted', 'expired')
+   - `expires_at` (Timestamp, Required)
    - `accepted_at` (Timestamp, Nullable)
-   - `declined_at` (Timestamp, Nullable)
    - `created_at` (Timestamp)
 
 **songs table:**
@@ -379,6 +377,19 @@ CREATE TRIGGER update_songs_updated_at
 2. Check **Authentication** → **Logs** for any errors
 3. Verify session is created
 4. Verify user can access their organization data
+
+### 6.4 Test Team Management
+
+1. From the dashboard, click "View Team" to go to team management
+2. Try inviting a user by email address
+3. Check **Table Editor** → **organization_invites** - should have new invite with 'pending' status
+4. Copy the invite ID from the database
+5. Test the invitation flow:
+   - Go to `/signup?invite=[INVITE_ID]`
+   - Verify the email is pre-filled and organization name is shown
+   - Complete signup process
+   - Check **Table Editor** → **organization_memberships** - should have new member
+   - Check **Table Editor** → **organization_invites** - status should be 'accepted'
 
 ## Step 7: Security Best Practices
 
