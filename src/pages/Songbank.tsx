@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
+import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import './Songbank.css'
@@ -31,16 +32,7 @@ interface OrganizationData {
   }[]
 }
 
-// Helper function to get organization name
-const getOrganizationName = (organization: OrganizationData | null): string => {
-  if (!organization?.organizations) return 'Loading...'
-  
-  if (Array.isArray(organization.organizations)) {
-    return organization.organizations[0]?.name || 'Loading...'
-  }
-  
-  return organization.organizations.name || 'Loading...'
-}
+
 
 export function Songbank() {
   const navigate = useNavigate()
@@ -261,15 +253,7 @@ export function Songbank() {
   const uniqueKeys = [...new Set(songs.map(song => song.key).filter(Boolean))]
   const uniqueTags = [...new Set(songs.flatMap(song => song.tags))]
 
-  const handleSignOut = async () => {
-    try {
-      const { signOut } = await import('../lib/auth')
-      await signOut()
-      navigate('/')
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
-  }
+
 
   if (loading) {
     return (
@@ -284,25 +268,7 @@ export function Songbank() {
 
   return (
     <div className="songbank">
-      <header className="songbank-header">
-        <div className="songbank-header-content">
-          <div className="songbank-logo">
-            <h1>Worship Lead</h1>
-          </div>
-          
-          <div className="songbank-user-info">
-            <span className="user-name">
-              {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
-            </span>
-            <span className="organization-name">
-              {getOrganizationName(organization)}
-            </span>
-            <button onClick={handleSignOut} className="btn btn-secondary btn-small">
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader user={user} organization={organization} />
 
       <main className="songbank-main">
           <div className="songbank-header-section">

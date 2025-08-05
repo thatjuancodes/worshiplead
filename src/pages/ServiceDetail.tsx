@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
+import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
 import {
   DndContext,
@@ -70,16 +71,7 @@ interface OrganizationData {
   }[]
 }
 
-// Helper function to get organization name
-const getOrganizationName = (organization: OrganizationData | null): string => {
-  if (!organization?.organizations) return 'Loading...'
-  
-  if (Array.isArray(organization.organizations)) {
-    return organization.organizations[0]?.name || 'Loading...'
-  }
-  
-  return organization.organizations.name || 'Loading...'
-}
+
 
 // Sortable Song Item Component
 function SortableSongItem({ 
@@ -453,15 +445,7 @@ export function ServiceDetail() {
     }
   }, [service, loadServiceSongs, loadAvailableSongs])
 
-  const handleSignOut = async () => {
-    try {
-      const { signOut } = await import('../lib/auth')
-      await signOut()
-      navigate('/')
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
-  }
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -497,25 +481,7 @@ export function ServiceDetail() {
   if (error) {
     return (
       <div className="service-detail">
-        <header className="dashboard-header">
-          <div className="dashboard-header-content">
-            <div className="dashboard-logo">
-              <h1>Worship Lead</h1>
-            </div>
-            
-            <div className="dashboard-user-info">
-              <span className="user-name">
-                {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
-              </span>
-              <span className="organization-name">
-                {getOrganizationName(organization)}
-              </span>
-              <button onClick={handleSignOut} className="btn btn-secondary btn-small">
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader user={user} organization={organization} />
 
         <main className="service-main">
           <div className="service-container">
@@ -547,25 +513,7 @@ export function ServiceDetail() {
 
   return (
     <div className="service-detail">
-      <header className="dashboard-header">
-        <div className="dashboard-header-content">
-          <div className="dashboard-logo">
-            <h1>Worship Lead</h1>
-          </div>
-          
-          <div className="dashboard-user-info">
-            <span className="user-name">
-              {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
-            </span>
-            <span className="organization-name">
-              {getOrganizationName(organization)}
-            </span>
-            <button onClick={handleSignOut} className="btn btn-secondary btn-small">
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader user={user} organization={organization} />
 
       <main className="service-main">
         <div className="service-container">

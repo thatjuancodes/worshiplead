@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
+import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
 import './Dashboard.css'
 
@@ -16,16 +17,7 @@ interface OrganizationData {
   }[]
 }
 
-// Helper function to get organization name
-const getOrganizationName = (organization: OrganizationData | null): string => {
-  if (!organization?.organizations) return 'Loading...'
-  
-  if (Array.isArray(organization.organizations)) {
-    return organization.organizations[0]?.name || 'Loading...'
-  }
-  
-  return organization.organizations.name || 'Loading...'
-}
+
 
 export function Dashboard() {
   const navigate = useNavigate()
@@ -62,15 +54,7 @@ export function Dashboard() {
 
 
 
-  const handleSignOut = async () => {
-    try {
-      const { signOut } = await import('../lib/auth')
-      await signOut()
-      navigate('/')
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
-  }
+
 
   if (loading) {
     return (
@@ -85,31 +69,13 @@ export function Dashboard() {
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <div className="dashboard-header-content">
-          <div className="dashboard-logo">
-            <h1>Worship Lead</h1>
-          </div>
-          
-          <div className="dashboard-user-info">
-            <span className="user-name">
-              {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
-            </span>
-            <span className="organization-name">
-              {getOrganizationName(organization)}
-            </span>
-            <button onClick={handleSignOut} className="btn btn-secondary btn-small">
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader user={user} organization={organization} />
 
       <main className="dashboard-main">
         <div className="dashboard-container">
           <div className="dashboard-welcome">
             <h2>Welcome to Worship Lead</h2>
-            <p>You're logged into <strong>{getOrganizationName(organization)}</strong></p>
+            <p>You're logged into your organization</p>
           </div>
 
           <div className="dashboard-content">

@@ -195,6 +195,6 @@
   }
 
   .form-actions .btn {
-    width: 100%;
+    /* Removed width: 100% to prevent buttons from being too wide */
   }
 } 

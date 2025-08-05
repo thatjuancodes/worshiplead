@@ -409,8 +409,7 @@
   }
 
   .schedule-actions .btn {
-    flex: 1;
-    max-width: none;
+    /* Removed flex: 1 to prevent buttons from being too wide */
   }
 
   .form-row {
@@ -429,7 +428,7 @@
   }
 
   .service-actions .btn {
-    flex: 1;
+    /* Removed flex: 1 to prevent buttons from being too wide */
   }
 
   .service-header {

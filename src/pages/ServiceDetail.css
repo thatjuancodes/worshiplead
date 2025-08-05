@@ -564,7 +564,7 @@
   }
 
   .service-actions .btn {
-    flex: 1;
+    /* Removed flex: 1 to prevent buttons from being too wide */
   }
 
   .service-details-grid {

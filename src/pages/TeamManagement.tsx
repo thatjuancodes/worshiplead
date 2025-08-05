@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, getUserPrimaryOrganization, signOut } from '../lib/auth'
+import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
+import { DashboardHeader } from '../components'
 import { supabase } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import './TeamManagement.css'
@@ -17,16 +18,7 @@ interface OrganizationData {
   }[]
 }
 
-// Helper function to get organization name
-const getOrganizationName = (organization: OrganizationData | null): string => {
-  if (!organization?.organizations) return 'Loading...'
-  
-  if (Array.isArray(organization.organizations)) {
-    return organization.organizations[0]?.name || 'Loading...'
-  }
-  
-  return organization.organizations.name || 'Loading...'
-}
+
 
 interface OrganizationInvite {
   id: string
@@ -230,7 +222,11 @@ export function TeamManagement() {
 
       // Create invitation link for manual sharing
       const inviteUrl = `${window.location.origin}/onboarding`
-      const organizationName = getOrganizationName(organization) || 'Your Organization'
+      const organizationName = organization?.organizations ? 
+        (Array.isArray(organization.organizations) ? 
+          organization.organizations[0]?.name : 
+          organization.organizations.name) || 'Your Organization' : 
+        'Your Organization'
       const invitedByName = user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name || 'A team member'
 
       // Call the Edge Function to send the invitation email
@@ -299,14 +295,7 @@ export function TeamManagement() {
     }
   }
 
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      navigate('/')
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
-  }
+
 
   if (loading) {
     return (
@@ -321,24 +310,7 @@ export function TeamManagement() {
 
   return (
     <div className="team">
-      <header className="team-header">
-        <div className="team-header-content">
-          <div className="team-logo">
-            <h1>Worship Lead</h1>
-          </div>
-          <div className="team-user-info">
-            <span className="user-name">
-              {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
-            </span>
-            <span className="organization-name">
-              {getOrganizationName(organization)}
-            </span>
-            <button onClick={handleSignOut} className="btn btn-secondary btn-small">
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader user={user} organization={organization} />
 
       <main className="team-main">
         <div className="team-container">
@@ -360,7 +332,7 @@ export function TeamManagement() {
           <div className="team-content">
             <div className="team-sections-grid">
               <div className="team-section">
-                <h3>{getOrganizationName(organization) || 'Organization'} - Team Members ({members.length})</h3>
+                <h3>Team Members ({members.length})</h3>
                 {members.length === 0 ? (
                   <div className="no-members">
                     <p>No members found</p>
