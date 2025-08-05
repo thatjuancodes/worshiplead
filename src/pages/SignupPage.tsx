@@ -126,7 +126,7 @@ export function SignupPage() {
           password: formData.password,
           firstName: formData.firstName,
           lastName: formData.lastName
-        })
+        }, true) // Skip email confirmation for invited users
         
         user = newUser
         session = newSession
@@ -134,42 +134,47 @@ export function SignupPage() {
         console.log('Invited user signup result:', { user, session, invitation })
         
         if (user) {
-          // Immediately call Edge Function to confirm email and add to organization
+          // User account created and email already confirmed via createUserAccount
+          // Now we need to add them to the organization
           try {
-            console.log('Calling Edge Function with inviteId:', invitation.id)
-            const { data, error } = await supabase.functions.invoke('rapid-endpoint', {
-              body: { inviteId: invitation.id }
-            })
+            console.log('Adding user to organization via invite:', invitation.id)
+            
+            // Add user to organization membership
+            const { error: membershipError } = await supabase
+              .from('organization_memberships')
+              .insert({
+                organization_id: invitation.organization_id,
+                user_id: user.id,
+                role: 'member',
+                status: 'active',
+                invited_by: invitation.invited_by,
+                accepted_at: new Date().toISOString()
+              })
 
-            console.log('Edge Function response:', { data, error })
-
-            if (error) {
-              console.error('Error confirming invitation:', error)
-              let errorMessage = 'Unknown error occurred'
-              
-              if (error.message) {
-                errorMessage = error.message
-              } else if (error.error) {
-                errorMessage = error.error
-              } else if (typeof error === 'string') {
-                errorMessage = error
-              }
-              
-              setError(`Account created successfully, but there was an issue with the invitation: ${errorMessage}. Please contact your administrator.`)
+            if (membershipError) {
+              console.error('Error creating membership:', membershipError)
+              setError('Account created successfully, but there was an issue adding you to the organization. Please contact your administrator.')
               setIsLoading(false)
               return
-            } else {
-              // Success - user is confirmed and added to organization
-              // Refresh the session to get the updated user data
-              const { error: refreshError } = await supabase.auth.refreshSession()
-              
-              if (refreshError) {
-                console.error('Error refreshing session:', refreshError)
-              }
-              
-              navigate('/dashboard')
-              return
             }
+
+            // Update invitation status
+            const { error: inviteUpdateError } = await supabase
+              .from('organization_invites')
+              .update({
+                status: 'accepted',
+                accepted_at: new Date().toISOString()
+              })
+              .eq('id', invitation.id)
+
+            if (inviteUpdateError) {
+              console.error('Error updating invite status:', inviteUpdateError)
+              // Don't fail the whole process for this
+            }
+
+            console.log('Successfully added user to organization')
+            navigate('/dashboard')
+            return
           } catch (inviteError) {
             console.error('Error in invitation flow:', inviteError)
             setError('Account created successfully, but there was an issue with the invitation. Please contact your administrator.')

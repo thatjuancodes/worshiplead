@@ -68,14 +68,19 @@ export async function createUserAccount({ email, password, firstName, lastName }
         data: {
           first_name: firstName,
           last_name: lastName,
-        },
-        emailRedirectTo: `${window.location.origin}/dashboard`
+        }
       }
     }
 
     // If skipEmailConfirmation is true, we'll handle email confirmation differently
     if (skipEmailConfirmation) {
+      // For invited users, we don't want to send the confirmation email
+      // We'll create the user and confirm them via the edge function instead
       signUpOptions.options.emailConfirm = true
+      // Don't set emailRedirectTo to avoid triggering the confirmation email
+    } else {
+      // For regular signups, set the redirect URL
+      signUpOptions.options.emailRedirectTo = `${window.location.origin}/dashboard`
     }
 
     const { data: authData, error: authError } = await supabase.auth.signUp(signUpOptions)

@@ -233,9 +233,9 @@ export function TeamManagement() {
       const organizationName = getOrganizationName(organization) || 'Your Organization'
       const invitedByName = user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name || 'A team member'
 
-      // Call the Edge Function to log the invitation (for future email integration)
+      // Call the Edge Function to send the invitation email
       try {
-        await supabase.functions.invoke('clever-worker', {
+        await supabase.functions.invoke('send-invitation', {
           body: {
             email: inviteEmail.trim(),
             organizationName,

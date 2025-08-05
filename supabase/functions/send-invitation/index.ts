@@ -120,7 +120,8 @@ serve(async (req) => {
 
     // Instead of creating an auth record, just prepare the email data
     // The actual email sending should be handled by your email service
-    const inviteUrl = `${supabaseUrl.replace('/rest/v1', '')}/auth/v1/verify?token=${inviteId}&type=signup&next=/dashboard`;
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://your-netlify-site.netlify.app';
+    const inviteUrl = `${siteUrl}/signup?invite=${inviteId}`;
     
     const emailData = {
       to: email,
