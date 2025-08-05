@@ -49,6 +49,8 @@
   color: #6b7280;
   margin: 0;
   font-size: 16px;
+  max-width: 300px;
+  line-height: 1.5;
 }
 
 .error-message {
