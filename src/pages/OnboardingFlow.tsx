@@ -16,6 +16,7 @@ export function OnboardingFlow() {
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState<'checking' | 'profile' | 'processing' | 'complete'>('checking')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [profileData, setProfileData] = useState<ProfileData>({
     firstName: '',
@@ -371,6 +372,12 @@ export function OnboardingFlow() {
                 </div>
               )}
 
+              {success && (
+                <div className="success-message">
+                  {success}
+                </div>
+              )}
+
               <button type="submit" className="btn btn-primary">
                 Complete Setup
               </button>
@@ -402,6 +409,7 @@ export function OnboardingFlow() {
           <div className="success-message">
             <h2>Welcome!</h2>
             <p>Your account has been successfully set up.</p>
+            {success && <p>{success}</p>}
             <p>Redirecting you to the dashboard...</p>
           </div>
         </div>
