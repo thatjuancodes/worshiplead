@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
 import './InvitationHandler.css'
 
 export function InvitationHandler() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -14,7 +13,6 @@ export function InvitationHandler() {
   useEffect(() => {
     console.log('InvitationHandler: Component mounted')
     console.log('InvitationHandler: Current URL:', window.location.href)
-    console.log('InvitationHandler: Search params:', Object.fromEntries(searchParams.entries()))
     
     // Add a longer delay to ensure Supabase auth is fully ready
     // This helps with the 1-minute timeout issue
@@ -49,7 +47,7 @@ export function InvitationHandler() {
           console.log('InvitationHandler: Session user metadata:', sessionUser.user_metadata)
 
           // Extract invitation data from user metadata
-          const { invite_id, organization_id, organization_name, invited_by } = sessionUser.user_metadata
+          const { invite_id, organization_id } = sessionUser.user_metadata
 
           if (!invite_id || !organization_id) {
             console.log('InvitationHandler: Missing invitation data in session user metadata')
@@ -59,7 +57,7 @@ export function InvitationHandler() {
           }
 
           // Continue with the invitation processing using sessionUser
-          await processInvitation(sessionUser, invite_id, organization_id, organization_name, invited_by)
+          await processInvitation(sessionUser, invite_id, organization_id)
         } else {
           console.log('InvitationHandler: No session found either')
           setError('No authenticated user found. This might be due to a timeout. Please wait a moment and try clicking the invitation link again, or contact your administrator.')
@@ -71,7 +69,7 @@ export function InvitationHandler() {
         console.log('InvitationHandler: User metadata:', user.user_metadata)
 
         // Extract invitation data from user metadata
-        const { invite_id, organization_id, organization_name, invited_by } = user.user_metadata
+        const { invite_id, organization_id } = user.user_metadata
 
         if (!invite_id || !organization_id) {
           console.log('InvitationHandler: Missing invitation data in user metadata')
@@ -81,7 +79,7 @@ export function InvitationHandler() {
         }
 
         // Continue with the invitation processing using user
-        await processInvitation(user, invite_id, organization_id, organization_name, invited_by)
+        await processInvitation(user, invite_id, organization_id)
       }
 
     } catch (error) {
@@ -92,93 +90,94 @@ export function InvitationHandler() {
     }
   }
 
-  const processInvitation = async (user: any, invite_id: string, organization_id: string, organization_name: string, invited_by: string) => {
-    console.log('InvitationHandler: Processing invitation with data:', { invite_id, organization_id, organization_name, invited_by })
+    const processInvitation = async (user: any, invite_id: string, organization_id: string) => {
+    try {
+      console.log('InvitationHandler: Processing invitation with data:', { invite_id, organization_id })
 
-    // Verify the invitation exists and is valid
-    const { data: invitation, error: inviteError } = await supabase
-      .from('organization_invites')
-      .select('*')
-      .eq('id', invite_id)
-      .eq('organization_id', organization_id)
-      .eq('status', 'pending')
-      .single()
+      // Verify the invitation exists and is valid
+      const { data: invitation, error: inviteError } = await supabase
+        .from('organization_invites')
+        .select('*')
+        .eq('id', invite_id)
+        .eq('organization_id', organization_id)
+        .eq('status', 'pending')
+        .single()
 
-    if (inviteError || !invitation) {
-      console.error('Invitation verification error:', inviteError)
-      setError('Invalid or expired invitation. Please request a new one.')
-      setLoading(false)
-      return
-    }
+      if (inviteError || !invitation) {
+        console.error('Invitation verification error:', inviteError)
+        setError('Invalid or expired invitation. Please request a new one.')
+        setLoading(false)
+        return
+      }
 
-    // Check if invitation has expired
-    const now = new Date()
-    const expiresAt = new Date(invitation.expires_at)
-    if (now > expiresAt) {
-      setError('This invitation has expired. Please request a new one.')
-      setLoading(false)
-      return
-    }
+      // Check if invitation has expired
+      const now = new Date()
+      const expiresAt = new Date(invitation.expires_at)
+      if (now > expiresAt) {
+        setError('This invitation has expired. Please request a new one.')
+        setLoading(false)
+        return
+      }
 
-    // Check if user is already a member
-    const { data: existingMembership, error: checkError } = await supabase
-      .from('organization_memberships')
-      .select('id')
-      .eq('organization_id', organization_id)
-      .eq('user_id', user.id)
-      .maybeSingle()
+      // Check if user is already a member
+      const { data: existingMembership, error: checkError } = await supabase
+        .from('organization_memberships')
+        .select('id')
+        .eq('organization_id', organization_id)
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-    if (checkError) {
-      console.error('Error checking existing membership:', checkError)
-    }
+      if (checkError) {
+        console.error('Error checking existing membership:', checkError)
+      }
 
-    if (existingMembership) {
-      console.log('User is already a member of this organization')
-      setSuccess('You are already a member of this organization!')
+      if (existingMembership) {
+        console.log('User is already a member of this organization')
+        setSuccess('You are already a member of this organization!')
+        setTimeout(() => navigate('/dashboard'), 2000)
+        return
+      }
+
+      // Add user to organization
+      console.log('Adding user to organization:', { organizationId: organization_id, userId: user.id })
+      
+      const { error: membershipError } = await supabase
+        .from('organization_memberships')
+        .insert({
+          organization_id: organization_id,
+          user_id: user.id,
+          role: 'member',
+          status: 'active',
+          invited_by: invitation.invited_by,
+          accepted_at: new Date().toISOString()
+        })
+
+      if (membershipError) {
+        console.error('Error creating membership:', membershipError)
+        setError('Failed to add you to the organization. Please contact your administrator.')
+        setLoading(false)
+        return
+      }
+
+      // Update invitation status
+      const { error: updateError } = await supabase
+        .from('organization_invites')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString()
+        })
+        .eq('id', invite_id)
+
+      if (updateError) {
+        console.error('Error updating invitation:', updateError)
+        // Don't fail the whole process for this
+      }
+
+      console.log('Successfully added user to organization')
+      setSuccess('Welcome! You have been successfully added to the organization.')
+      
+      // Redirect to dashboard after a short delay
       setTimeout(() => navigate('/dashboard'), 2000)
-      return
-    }
-
-    // Add user to organization
-    console.log('Adding user to organization:', { organizationId: organization_id, userId: user.id })
-    
-    const { error: membershipError } = await supabase
-      .from('organization_memberships')
-      .insert({
-        organization_id: organization_id,
-        user_id: user.id,
-        role: 'member',
-        status: 'active',
-        invited_by: invitation.invited_by,
-        accepted_at: new Date().toISOString()
-      })
-
-    if (membershipError) {
-      console.error('Error creating membership:', membershipError)
-      setError('Failed to add you to the organization. Please contact your administrator.')
-      setLoading(false)
-      return
-    }
-
-    // Update invitation status
-    const { error: updateError } = await supabase
-      .from('organization_invites')
-      .update({
-        status: 'accepted',
-        accepted_at: new Date().toISOString()
-      })
-      .eq('id', invite_id)
-
-    if (updateError) {
-      console.error('Error updating invitation:', updateError)
-      // Don't fail the whole process for this
-    }
-
-    console.log('Successfully added user to organization')
-    setSuccess('Welcome! You have been successfully added to the organization.')
-    
-    // Redirect to dashboard after a short delay
-    setTimeout(() => navigate('/dashboard'), 2000)
 
     } catch (error) {
       console.error('Error in invitation handler:', error)

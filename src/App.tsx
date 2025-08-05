@@ -17,27 +17,27 @@ import { TeamManagement } from './pages/TeamManagement'
 import { ScheduleService } from './pages/ScheduleService'
 import { ServiceDetail } from './pages/ServiceDetail'
 import { ServiceEdit } from './pages/ServiceEdit'
-import { InvitationHandler } from './pages/InvitationHandler'
+import { OnboardingFlow } from './pages/OnboardingFlow'
 
-// Component to handle invitation redirects
-function InvitationRedirect() {
+// Component to handle onboarding for authenticated users
+function AuthenticatedHome() {
   const location = useLocation()
   
   useEffect(() => {
-    // Check if user has invitation data in their metadata
-    const checkForInvitation = async () => {
+    // Check if user is authenticated and needs onboarding
+    const checkUserStatus = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (user?.user_metadata?.invite_id) {
-          console.log('Found invitation data, redirecting to /invitation')
-          window.location.href = '/invitation'
+        if (user) {
+          console.log('Found authenticated user, redirecting to onboarding')
+          window.location.href = '/onboarding'
         }
       } catch (error) {
-        console.error('Error checking for invitation:', error)
+        console.error('Error checking user status:', error)
       }
     }
     
-    checkForInvitation()
+    checkUserStatus()
   }, [location])
 
   return <HomePage />
@@ -47,7 +47,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<InvitationRedirect />} />
+        <Route path="/" element={<AuthenticatedHome />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/organization-setup" element={<OrganizationSetup />} />
@@ -57,7 +57,7 @@ function App() {
         <Route path="/schedule" element={<ScheduleService />} />
         <Route path="/service/:id" element={<ServiceDetail />} />
         <Route path="/service/:id/edit" element={<ServiceEdit />} />
-        <Route path="/invitation" element={<InvitationHandler />} />
+        <Route path="/onboarding" element={<OnboardingFlow />} />
       </Routes>
     </Router>
   )
