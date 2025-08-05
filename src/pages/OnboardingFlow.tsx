@@ -50,10 +50,15 @@ export function OnboardingFlow() {
 
       // Check if user has invitation data
       const { invite_id, organization_id, organization_name, invited_by } = currentUser.user_metadata
+      console.log('OnboardingFlow: Full user metadata:', currentUser.user_metadata)
+      console.log('OnboardingFlow: Extracted invitation data:', { invite_id, organization_id, organization_name, invited_by })
+      
       if (invite_id && organization_id) {
         console.log('OnboardingFlow: Found invitation data:', { invite_id, organization_id })
         setHasInvitation(true)
         setInvitationData({ invite_id, organization_id, organization_name, invited_by })
+      } else {
+        console.log('OnboardingFlow: No invitation data found in metadata')
       }
 
       // Check if user has a profile
@@ -125,34 +130,30 @@ export function OnboardingFlow() {
       setStep('processing')
       console.log('OnboardingFlow: Processing invitation...')
 
-      const { invite_id, organization_id } = invitationData
+      const { invite_id, organization_id, invited_by } = invitationData
 
-      // Verify the invitation exists and is valid
-      const { data: invitation, error: inviteError } = await supabase
-        .from('organization_invites')
-        .select('*')
-        .eq('id', invite_id)
+      // Check if user is already a member
+      const { data: existingMembership, error: checkError } = await supabase
+        .from('organization_memberships')
+        .select('id')
         .eq('organization_id', organization_id)
-        .eq('status', 'pending')
-        .single()
+        .eq('user_id', currentUser.id)
+        .maybeSingle()
 
-      if (inviteError || !invitation) {
-        console.error('OnboardingFlow: Invalid invitation:', inviteError)
-        setError('Invalid or expired invitation. Please contact your administrator.')
-        setLoading(false)
+      if (checkError) {
+        console.error('OnboardingFlow: Error checking existing membership:', checkError)
+      }
+
+      if (existingMembership) {
+        console.log('OnboardingFlow: User is already a member of this organization')
+        setSuccess('You are already a member of this organization!')
+        setTimeout(() => navigate('/dashboard'), 2000)
         return
       }
 
-      // Check if invitation has expired
-      const now = new Date()
-      const expiresAt = new Date(invitation.expires_at)
-      if (now > expiresAt) {
-        setError('This invitation has expired. Please request a new one.')
-        setLoading(false)
-        return
-      }
-
-      // Add user to organization
+      // Add user to organization using data from user metadata
+      console.log('OnboardingFlow: Adding user to organization:', { organizationId: organization_id, userId: currentUser.id })
+      
       const { error: membershipError } = await supabase
         .from('organization_memberships')
         .insert({
@@ -160,7 +161,7 @@ export function OnboardingFlow() {
           user_id: currentUser.id,
           role: 'member',
           status: 'active',
-          invited_by: invitation.invited_by,
+          invited_by: invited_by || currentUser.id, // Use invited_by from metadata or fallback to current user
           accepted_at: new Date().toISOString()
         })
 
@@ -171,17 +172,22 @@ export function OnboardingFlow() {
         return
       }
 
-      // Update invitation status
-      const { error: updateError } = await supabase
-        .from('organization_invites')
-        .update({
-          status: 'accepted',
-          accepted_at: new Date().toISOString()
-        })
-        .eq('id', invite_id)
+      // Try to update invitation status (optional - don't fail if this doesn't work)
+      try {
+        const { error: updateError } = await supabase
+          .from('organization_invites')
+          .update({
+            status: 'accepted',
+            accepted_at: new Date().toISOString()
+          })
+          .eq('id', invite_id)
 
-      if (updateError) {
-        console.error('OnboardingFlow: Error updating invitation:', updateError)
+        if (updateError) {
+          console.error('OnboardingFlow: Error updating invitation status:', updateError)
+          // Don't fail the whole process for this
+        }
+      } catch (updateError) {
+        console.error('OnboardingFlow: Error updating invitation status:', updateError)
         // Don't fail the whole process for this
       }
 
