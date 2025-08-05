@@ -235,7 +235,7 @@ export function TeamManagement() {
 
       // Call the Edge Function to send the invitation email
       try {
-        await supabase.functions.invoke('send-invitation', {
+        await supabase.functions.invoke('clever-worker', {
           body: {
             email: inviteEmail.trim(),
             organizationName,
