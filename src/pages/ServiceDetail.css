@@ -268,7 +268,6 @@
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   transition: all 0.2s ease;
-  cursor: grab;
   user-select: none;
 }
 
@@ -277,9 +276,19 @@
   border-color: #cbd5e1;
 }
 
-.service-song-item:active {
-  cursor: grabbing;
+.service-song-item:hover .song-info {
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 4px;
+  padding: 4px;
+  margin: -4px;
 }
+
+.service-song-item:hover .song-actions .btn-danger {
+  background: #b91c1c;
+  transform: scale(1.05);
+}
+
+
 
 .song-position {
   display: flex;
@@ -293,11 +302,40 @@
   font-weight: 600;
   font-size: 14px;
   flex-shrink: 0;
+  cursor: grab;
+  position: relative;
+}
+
+.song-position:active {
+  cursor: grabbing;
+}
+
+.song-position::after {
+  content: "⋮⋮";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  color: #6b7280;
+  opacity: 0.6;
 }
 
 .song-info {
   flex: 1;
   min-width: 0;
+  cursor: grab;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.song-info:active {
+  cursor: grabbing;
+}
+
+.song-info:hover {
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .song-title {
@@ -324,6 +362,17 @@
 
 .song-actions {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.song-actions .btn {
+  white-space: nowrap;
+  min-width: 80px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Drag and Drop Visual Indicators */
@@ -399,6 +448,15 @@
   100% { transform: rotate(360deg); }
 }
 
+.spinner-small {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 /* Error Section */
 .error-section {
   text-align: center;
@@ -435,6 +493,7 @@
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none !important;
 }
 
 .btn-primary {
@@ -462,6 +521,10 @@
 
 .btn-danger:hover:not(:disabled) {
   background: #b91c1c;
+}
+
+.btn-danger:active {
+  background: #991b1b;
 }
 
 .btn-small {

@@ -84,10 +84,12 @@ const getOrganizationName = (organization: OrganizationData | null): string => {
 // Sortable Song Item Component
 function SortableSongItem({ 
   serviceSong, 
-  onRemove 
+  onRemove,
+  isRemoving
 }: { 
   serviceSong: ServiceSong
   onRemove: (id: string) => void 
+  isRemoving: boolean
 }) {
   const {
     attributes,
@@ -110,12 +112,11 @@ function SortableSongItem({
       style={style} 
       className="service-song-item"
       {...attributes}
-      {...listeners}
     >
-      <div className="song-position">
+      <div className="song-position" {...listeners}>
         {serviceSong.position}
       </div>
-      <div className="song-info">
+      <div className="song-info" {...listeners}>
         <div className="song-title">
           {serviceSong.songs.title} - {serviceSong.songs.artist}
         </div>
@@ -130,13 +131,26 @@ function SortableSongItem({
       </div>
       <div className="song-actions">
         <button
+          type="button"
           onClick={(e) => {
+            e.preventDefault()
             e.stopPropagation()
             onRemove(serviceSong.id)
           }}
           className="btn btn-danger btn-small"
+          title="Remove song from service"
+          disabled={isRemoving}
         >
-          Remove
+          {isRemoving ? (
+            <>
+              <span className="spinner-small"></span>
+              Removing...
+            </>
+          ) : (
+            <>
+              ✕ Remove
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -163,6 +177,7 @@ export function ServiceDetail() {
   const [selectedSongId, setSelectedSongId] = useState('')
   const [songNotes, setSongNotes] = useState('')
   const [addingSong, setAddingSong] = useState(false)
+  const [removingSong, setRemovingSong] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<string>('')
 
@@ -333,6 +348,10 @@ export function ServiceDetail() {
     if (!confirm('Are you sure you want to remove this song from the service?')) return
 
     try {
+      setRemovingSong(serviceSongId)
+      setError('')
+      setSuccess('')
+      
       const { error } = await supabase
         .from('service_songs')
         .delete()
@@ -340,7 +359,7 @@ export function ServiceDetail() {
 
       if (error) {
         console.error('Error removing song from service:', error)
-        setError('Failed to remove song from service.')
+        setError('Failed to remove song from service. Please try again.')
         return
       }
 
@@ -351,7 +370,9 @@ export function ServiceDetail() {
       setTimeout(() => setSuccess(''), 3000)
     } catch (error) {
       console.error('Error removing song from service:', error)
-      setError('Failed to remove song from service.')
+      setError('Failed to remove song from service. Please try again.')
+    } finally {
+      setRemovingSong(null)
     }
   }
 
@@ -704,6 +725,7 @@ export function ServiceDetail() {
                           key={serviceSong.id}
                           serviceSong={serviceSong}
                           onRemove={handleRemoveSong}
+                          isRemoving={removingSong === serviceSong.id}
                         />
                       ))}
                     </div>
