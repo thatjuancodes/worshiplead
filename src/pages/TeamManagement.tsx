@@ -229,7 +229,7 @@ export function TeamManagement() {
       }
 
       // Create invitation link for manual sharing
-      const inviteUrl = `${window.location.origin}/signup?invite=${inviteData.id}`
+      const inviteUrl = `${window.location.origin}/invitation`
       const organizationName = getOrganizationName(organization) || 'Your Organization'
       const invitedByName = user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name || 'A team member'
 

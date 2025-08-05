@@ -14,6 +14,7 @@ import { TeamManagement } from './pages/TeamManagement'
 import { ScheduleService } from './pages/ScheduleService'
 import { ServiceDetail } from './pages/ServiceDetail'
 import { ServiceEdit } from './pages/ServiceEdit'
+import { InvitationHandler } from './pages/InvitationHandler'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="/schedule" element={<ScheduleService />} />
         <Route path="/service/:id" element={<ServiceDetail />} />
         <Route path="/service/:id/edit" element={<ServiceEdit />} />
+        <Route path="/invitation" element={<InvitationHandler />} />
       </Routes>
     </Router>
   )
