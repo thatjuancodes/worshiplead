@@ -89,14 +89,38 @@ export function ScheduleService() {
         .from('worship_services')
         .select('*')
         .eq('organization_id', organization.organization_id)
-        .order('service_date', { ascending: false })
+        .order('service_date', { ascending: true })
+        .order('service_time', { ascending: true })
 
       if (error) {
         console.error('Error loading services:', error)
         return
       }
 
-      setServices(data || [])
+      // Sort services to show nearest upcoming service first
+      const now = new Date()
+      const sortedServices = (data || []).sort((a, b) => {
+        const dateA = new Date(a.service_date + (a.service_time ? `T${a.service_time}` : 'T00:00'))
+        const dateB = new Date(b.service_date + (b.service_time ? `T${b.service_time}` : 'T00:00'))
+        
+        // If both services are in the past, show most recent first
+        if (dateA < now && dateB < now) {
+          return dateB.getTime() - dateA.getTime()
+        }
+        
+        // If both services are in the future, show nearest first
+        if (dateA >= now && dateB >= now) {
+          return dateA.getTime() - dateB.getTime()
+        }
+        
+        // If one is past and one is future, show future first
+        if (dateA >= now && dateB < now) return -1
+        if (dateA < now && dateB >= now) return 1
+        
+        return 0
+      })
+
+      setServices(sortedServices)
     } catch (error) {
       console.error('Error loading services:', error)
     }

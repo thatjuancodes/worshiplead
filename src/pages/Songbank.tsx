@@ -54,7 +54,7 @@ export function Songbank() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
   const [editingSong, setEditingSong] = useState<Song | null>(null)
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [formData, setFormData] = useState({
     title: '',
     artist: '',
