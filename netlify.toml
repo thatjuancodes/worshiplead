@@ -5,6 +5,12 @@
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_ANON_KEY,VITE_SUPABASE_URL"
 
+# Handle client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 # Note: Environment variables should be set in Netlify Dashboard
 # Go to Site settings → Environment variables and add:
 # - VITE_SUPABASE_URL

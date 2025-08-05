@@ -27,17 +27,37 @@ function AuthenticatedHome() {
     // Check if user is authenticated and needs onboarding
     const checkUserStatus = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        console.log('AuthenticatedHome: Checking user status...')
+        const { data: { user }, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.error('AuthenticatedHome: Auth error:', error)
+          return
+        }
+        
         if (user) {
-          console.log('Found authenticated user, redirecting to onboarding')
-          window.location.href = '/onboarding'
+          console.log('AuthenticatedHome: Found authenticated user:', user.id)
+          console.log('AuthenticatedHome: User metadata:', user.user_metadata)
+          
+          // Check if user has invitation data
+          if (user.user_metadata?.invite_id) {
+            console.log('AuthenticatedHome: Found invitation data, redirecting to onboarding')
+            window.location.href = '/onboarding'
+          } else {
+            console.log('AuthenticatedHome: No invitation data found')
+          }
+        } else {
+          console.log('AuthenticatedHome: No authenticated user found')
         }
       } catch (error) {
-        console.error('Error checking user status:', error)
+        console.error('AuthenticatedHome: Error checking user status:', error)
       }
     }
     
-    checkUserStatus()
+    // Add a small delay to ensure auth is ready
+    setTimeout(() => {
+      checkUserStatus()
+    }, 1000)
   }, [location])
 
   return <HomePage />
