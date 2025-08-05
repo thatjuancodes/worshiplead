@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
-import { DashboardHeader } from '../components'
+import { DashboardHeader, DeleteServiceModal } from '../components'
 import type { User } from '@supabase/supabase-js'
 
 interface WorshipService {
@@ -49,6 +49,11 @@ export function ScheduleService() {
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [serviceToDelete, setServiceToDelete] = useState<WorshipService | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -210,6 +215,64 @@ export function ScheduleService() {
       completed: 'status-completed'
     }
     return `status-badge ${statusClasses[status as keyof typeof statusClasses] || 'status-draft'}`
+  }
+
+  const handleDeleteService = (service: WorshipService) => {
+    setServiceToDelete(service)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDeleteService = async () => {
+    if (!serviceToDelete || !organization) return
+
+    setDeleting(true)
+    setError('')
+
+    try {
+      // Delete service songs first (cascade delete)
+      const { error: songsError } = await supabase
+        .from('service_songs')
+        .delete()
+        .eq('service_id', serviceToDelete.id)
+
+      if (songsError) {
+        console.error('Error deleting service songs:', songsError)
+        throw new Error('Failed to delete service songs')
+      }
+
+      // Delete the service
+      const { error: serviceError } = await supabase
+        .from('worship_services')
+        .delete()
+        .eq('id', serviceToDelete.id)
+        .eq('organization_id', organization.organization_id)
+
+      if (serviceError) {
+        console.error('Error deleting service:', serviceError)
+        throw new Error('Failed to delete service')
+      }
+
+      // Remove from local state
+      setServices(prev => prev.filter(s => s.id !== serviceToDelete.id))
+      setSuccess(`Service "${serviceToDelete.title}" has been deleted successfully`)
+      
+      // Close modal and reset state
+      setDeleteModalOpen(false)
+      setServiceToDelete(null)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      console.error('Error deleting service:', error)
+      setError(error instanceof Error ? error.message : 'Failed to delete service')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false)
+    setServiceToDelete(null)
   }
 
   if (loading) {
@@ -379,6 +442,12 @@ export function ScheduleService() {
                           >
                             Edit
                           </button>
+                          <button
+                            onClick={() => handleDeleteService(service)}
+                            className="btn btn-danger btn-small"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -389,6 +458,14 @@ export function ScheduleService() {
           </div>
         </div>
       </main>
+
+      <DeleteServiceModal
+        isOpen={deleteModalOpen}
+        onClose={closeDeleteModal}
+        onConfirm={confirmDeleteService}
+        serviceTitle={serviceToDelete?.title || ''}
+        isLoading={deleting}
+      />
     </div>
   )
 } 

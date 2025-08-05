@@ -1,5 +1,6 @@
 export { Header } from './Header'
 export { DashboardHeader } from './DashboardHeader'
+export { DeleteServiceModal } from './DeleteServiceModal'
 export { HeroSection } from './HeroSection'
 export { FeaturesSection } from './FeaturesSection'
 export { Footer } from './Footer' 
