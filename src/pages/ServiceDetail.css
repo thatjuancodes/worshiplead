@@ -34,11 +34,13 @@
   align-items: center;
   gap: 16px;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .user-name {
   font-weight: 500;
   color: #374151;
+  white-space: nowrap;
 }
 
 .organization-name {
@@ -46,6 +48,7 @@
   background: #f1f5f9;
   padding: 4px 8px;
   border-radius: 4px;
+  white-space: nowrap;
 }
 
 .service-main {
@@ -81,6 +84,7 @@
 .service-actions {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .service-content {
@@ -173,6 +177,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  gap: 16px;
 }
 
 .section-header h3 {
@@ -250,6 +255,7 @@
   display: flex;
   gap: 12px;
   margin-top: 20px;
+  flex-wrap: wrap;
 }
 
 /* Service Songs List */
@@ -368,7 +374,7 @@
 
 .song-actions .btn {
   white-space: nowrap;
-  min-width: 80px;
+  min-width: fit-content;
   transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
@@ -488,6 +494,8 @@
   cursor: pointer;
   transition: all 0.2s ease;
   min-height: 40px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn:disabled {
@@ -557,7 +565,6 @@
 
   .service-actions .btn {
     flex: 1;
-    max-width: 200px;
   }
 
   .service-details-grid {
