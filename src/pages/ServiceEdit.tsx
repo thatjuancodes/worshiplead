@@ -3,8 +3,28 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
+import { 
+  Box, 
+  VStack, 
+  HStack, 
+  Heading, 
+  Text, 
+  Button, 
+  Spinner, 
+  useColorModeValue,
+  Container,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  Select,
+  Alert,
+  AlertIcon,
+  Flex,
+  Center,
+  Grid
+} from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
-import './ServiceEdit.css'
 
 interface OrganizationData {
   organization_id: string
@@ -17,8 +37,6 @@ interface OrganizationData {
     slug: string
   }[]
 }
-
-
 
 interface WorshipService {
   id: string
@@ -51,6 +69,14 @@ export function ServiceEdit() {
     description: '',
     status: 'draft' as 'draft' | 'published' | 'completed'
   })
+
+  // Color mode values
+  const bgColor = useColorModeValue('gray.50', 'gray.900')
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
+  const textColor = useColorModeValue('gray.800', 'white')
+  const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
+  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -170,179 +196,248 @@ export function ServiceEdit() {
     navigate(`/service/${id}`)
   }
 
-
-
   if (loading) {
     return (
-      <div className="service-edit">
-        <div className="service-loading">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-          </div>
-          <p>Loading service details...</p>
-        </div>
-      </div>
+      <Box minH="100vh" bg={bgColor}>
+        <Center h="100vh">
+          <VStack spacing={4}>
+            <Spinner size="xl" color="blue.500" />
+            <Text color={textColor}>Loading service details...</Text>
+          </VStack>
+        </Center>
+      </Box>
     )
   }
 
   if (error && !service) {
     return (
-      <div className="service-edit">
+      <Box minH="100vh" bg={bgColor}>
         <DashboardHeader user={user} organization={organization} />
 
-        <main className="service-main">
-          <div className="service-container">
-            <div className="error-section">
-              <h2>Error</h2>
-              <p>{error}</p>
-              <button onClick={() => navigate('/schedule')} className="btn btn-primary">
+        <Box as="main" py={8}>
+          <Container maxW="800px" px={6}>
+            <Box textAlign="center" py={12}>
+              <Heading as="h2" size="lg" color="red.500" mb={4}>
+                Error
+              </Heading>
+              <Text color={textMutedColor} mb={6}>
+                {error}
+              </Text>
+              <Button
+                colorScheme="blue"
+                onClick={() => navigate('/schedule')}
+                size="md"
+              >
                 Back to Services
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
+              </Button>
+            </Box>
+          </Container>
+        </Box>
+      </Box>
     )
   }
 
   if (!service) {
     return (
-      <div className="service-edit">
-        <div className="service-loading">
-          <p>Service not found</p>
-          <button onClick={() => navigate('/schedule')} className="btn btn-primary">
-            Back to Services
-          </button>
-        </div>
-      </div>
+      <Box minH="100vh" bg={bgColor}>
+        <Center h="100vh">
+          <VStack spacing={4}>
+            <Text color={textColor}>Service not found</Text>
+            <Button
+              colorScheme="blue"
+              onClick={() => navigate('/schedule')}
+              size="md"
+            >
+              Back to Services
+            </Button>
+          </VStack>
+        </Center>
+      </Box>
     )
   }
 
   return (
-    <div className="service-edit">
+    <Box minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <main className="service-main">
-        <div className="service-container">
-          <div className="service-header-section">
-            <div className="service-title">
-              <h2>Edit Service</h2>
-              <p>Update your worship service details</p>
-            </div>
-            <div className="service-actions">
-              <button
+      <Box as="main" py={8}>
+        <Container maxW="800px" px={6}>
+          {/* Header Section */}
+          <Flex 
+            justify="space-between" 
+            align="flex-start" 
+            mb={8}
+            direction={{ base: 'column', md: 'row' }}
+            gap={{ base: 4, md: 0 }}
+          >
+            <Box flex="1">
+              <Heading as="h2" size="lg" color={textColor} mb={2} mt={8}>
+                Edit Service
+              </Heading>
+              <Text color={textSecondaryColor} fontSize="lg">
+                Update your worship service details
+              </Text>
+            </Box>
+            
+            <HStack spacing={3}>
+              <Button
+                variant="outline"
+                colorScheme="gray"
                 onClick={handleCancel}
-                className="btn btn-secondary"
+                size="md"
               >
                 Cancel
-              </button>
-            </div>
-          </div>
+              </Button>
+            </HStack>
+          </Flex>
 
+          {/* Messages */}
           {error && (
-            <div className="error-message">
+            <Alert status="error" borderRadius="md" mb={6}>
+              <AlertIcon />
               {error}
-            </div>
+            </Alert>
           )}
 
           {success && (
-            <div className="success-message">
+            <Alert status="success" borderRadius="md" mb={6}>
+              <AlertIcon />
               {success}
-            </div>
+            </Alert>
           )}
 
-          <div className="service-content">
-            <form onSubmit={handleSubmit} className="edit-service-form">
-              <div className="form-group">
-                <label htmlFor="title">Service Title *</label>
-                <input
-                  type="text"
-                  id="title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  required
-                  className="form-input"
-                  placeholder="e.g., Sunday Morning Service"
-                />
-              </div>
+          {/* Form */}
+          <Box
+            bg={cardBg}
+            borderRadius="lg"
+            boxShadow="sm"
+            border="1px"
+            borderColor={cardBorderColor}
+            overflow="hidden"
+          >
+            <Box p={8}>
+              <form onSubmit={handleSubmit}>
+                <VStack spacing={6} align="stretch">
+                  {/* Service Title */}
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                      Service Title *
+                    </FormLabel>
+                    <Input
+                      type="text"
+                      name="title"
+                      value={formData.title}
+                      onChange={handleInputChange}
+                      placeholder="e.g., Sunday Morning Service"
+                      size="md"
+                    />
+                  </FormControl>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="service_date">Service Date *</label>
-                  <input
-                    type="date"
-                    id="service_date"
-                    name="service_date"
-                    value={formData.service_date}
-                    onChange={handleInputChange}
-                    required
-                    className="form-input"
-                  />
-                </div>
+                  {/* Service Date and Time */}
+                  <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={6}>
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Service Date *
+                      </FormLabel>
+                      <Input
+                        type="date"
+                        name="service_date"
+                        value={formData.service_date}
+                        onChange={handleInputChange}
+                        size="md"
+                      />
+                    </FormControl>
 
-                <div className="form-group">
-                  <label htmlFor="service_time">Service Time</label>
-                  <input
-                    type="time"
-                    id="service_time"
-                    name="service_time"
-                    value={formData.service_time}
-                    onChange={handleInputChange}
-                    className="form-input"
-                  />
-                </div>
-              </div>
+                    <FormControl>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Service Time
+                      </FormLabel>
+                      <Input
+                        type="time"
+                        name="service_time"
+                        value={formData.service_time}
+                        onChange={handleInputChange}
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
 
-              <div className="form-group">
-                <label htmlFor="status">Status</label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                  className="form-select"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
+                  {/* Status */}
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                      Status
+                    </FormLabel>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleInputChange}
+                      size="md"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                      <option value="completed">Completed</option>
+                    </Select>
+                  </FormControl>
 
-              <div className="form-group">
-                <label htmlFor="description">Description</label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  className="form-textarea"
-                  rows={4}
-                  placeholder="Add any additional details about this service..."
-                />
-              </div>
+                  {/* Description */}
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                      Description
+                    </FormLabel>
+                    <Textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      rows={4}
+                      placeholder="Add any additional details about this service..."
+                      resize="vertical"
+                      minH="100px"
+                      size="md"
+                    />
+                  </FormControl>
 
-              <div className="form-actions">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="btn btn-secondary"
-                  disabled={saving}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={saving}
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </main>
-    </div>
+                  {/* Form Actions */}
+                  <Box
+                    pt={6}
+                    mt={8}
+                    borderTop="1px"
+                    borderColor={cardBorderColor}
+                  >
+                    <Flex 
+                      justify="flex-end" 
+                      gap={3}
+                      direction={{ base: 'column-reverse', md: 'row' }}
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        colorScheme="gray"
+                        onClick={handleCancel}
+                        disabled={saving}
+                        size="md"
+                        w={{ base: 'full', md: 'auto' }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        colorScheme="blue"
+                        isLoading={saving}
+                        loadingText="Saving..."
+                        disabled={saving}
+                        size="md"
+                        w={{ base: 'full', md: 'auto' }}
+                      >
+                        Save Changes
+                      </Button>
+                    </Flex>
+                  </Box>
+                </VStack>
+              </form>
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+    </Box>
   )
 } 
