@@ -15,7 +15,6 @@ import {
   MenuItem,
   MenuDivider,
   Avatar,
-  Icon,
   Drawer,
   DrawerBody,
   DrawerHeader,
@@ -23,7 +22,6 @@ import {
   DrawerContent,
   DrawerCloseButton,
   VStack,
-  HStack,
   Divider,
   useDisclosure
 } from '@chakra-ui/react'
@@ -88,13 +86,6 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
   const handleNavigation = (path: string) => {
     navigate(path)
     onClose()
-  }
-
-  const getUserInitials = (user: User | null): string => {
-    if (!user?.user_metadata?.first_name || !user?.user_metadata?.last_name) {
-      return user?.email?.charAt(0).toUpperCase() || 'U'
-    }
-    return `${user.user_metadata.first_name.charAt(0)}${user.user_metadata.last_name.charAt(0)}`.toUpperCase()
   }
 
   return (
