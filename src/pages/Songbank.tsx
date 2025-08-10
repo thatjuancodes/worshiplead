@@ -5,11 +5,11 @@ import { getCurrentUser } from '../lib/auth'
 import { getUserPrimaryOrganization } from '../lib/auth'
 import {
   Box,
+  Button,
+  Text,
+  Heading,
   VStack,
   HStack,
-  Heading,
-  Text,
-  Button,
   Grid,
   SimpleGrid,
   useColorModeValue,
@@ -29,7 +29,14 @@ import {
   Tbody,
   Tr,
   Th,
-  Td
+  Td,
+  useDisclosure,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
 } from '@chakra-ui/react'
 import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
@@ -70,8 +77,8 @@ export function Songbank() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedKey, setSelectedKey] = useState('')
   const [selectedTag, setSelectedTag] = useState('')
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [showEditForm, setShowEditForm] = useState(false)
+  const { isOpen: isAddDrawerOpen, onOpen: onAddDrawerOpen, onClose: onAddDrawerClose } = useDisclosure()
+  const { isOpen: isEditDrawerOpen, onOpen: onEditDrawerOpen, onClose: onEditDrawerClose } = useDisclosure()
   const [editingSong, setEditingSong] = useState<Song | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [formData, setFormData] = useState({
@@ -182,7 +189,7 @@ export function Songbank() {
         tags: '',
         lyrics: ''
       })
-      setShowAddForm(false)
+      onAddDrawerClose()
       await loadSongs(organization.organization_id)
       toast({
         title: 'Success',
@@ -293,7 +300,7 @@ export function Songbank() {
         tags: '',
         lyrics: ''
       })
-      setShowEditForm(false)
+      onEditDrawerClose()
       setEditingSong(null)
       await loadSongs(organization.organization_id)
       toast({
@@ -328,7 +335,7 @@ export function Songbank() {
       tags: song.tags.join(', '),
       lyrics: song.lyrics || ''
     })
-    setShowEditForm(true)
+    onEditDrawerOpen()
   }
 
   const filteredSongs = songs.filter(song => {
@@ -390,50 +397,402 @@ export function Songbank() {
       <DashboardHeader user={user} organization={organization} />
 
       <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
-        {/* Header Section */}
+        {/* Back Button - Top Left */}
+        <Box mb={4}>
+          <Button
+            variant="ghost"
+            colorScheme="gray"
+            onClick={() => navigate('/dashboard')}
+            leftIcon={<Text>←</Text>}
+            size="sm"
+          >
+            Back to Dashboard
+          </Button>
+        </Box>
+
+        {/* Compact Header Section */}
         <Box
           bg={cardBg}
-          p={6}
+          p={4}
           borderRadius="lg"
           boxShadow="sm"
           border="1px"
           borderColor={cardBorderColor}
-          mb={8}
+          mb={3}
+        >
+          <Flex
+            direction={{ base: 'column', md: 'row' }}
+            justify="space-between"
+            align={{ base: 'stretch', md: 'center' }}
+            gap={4}
+          >
+            {/* Title - Compact */}
+            <Box>
+              <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
+                🎵 Songbank
+              </Heading>
+            </Box>
+
+            {/* Add Song Button - Green */}
+            <Button
+              colorScheme="green"
+              onClick={onAddDrawerOpen}
+              size="md"
+            >
+                              + Add Song
+            </Button>
+          </Flex>
+        </Box>
+
+        {/* Add Song Drawer */}
+        <Drawer
+          isOpen={isAddDrawerOpen}
+          placement="right"
+          onClose={onAddDrawerClose}
+          size={{ base: 'full', md: 'md', lg: 'lg' }}
+        >
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+              <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
+                Add New Song
+              </Heading>
+            </DrawerHeader>
+            
+            <DrawerBody bg={bgColor} p={6}>
+              <Box as="form" onSubmit={handleAddSong}>
+                <VStack spacing={6} align="stretch">
+                  <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
+                    <FormControl isRequired>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Title</FormLabel>
+                      <Input
+                        value={formData.title}
+                        onChange={(e) => setFormData({...formData, title: e.target.value})}
+                        placeholder="Song title"
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl isRequired>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Artist</FormLabel>
+                      <Input
+                        value={formData.artist}
+                        onChange={(e) => setFormData({...formData, artist: e.target.value})}
+                        placeholder="Artist name"
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">YouTube URL</FormLabel>
+                      <Input
+                        type="url"
+                        value={formData.youtube_url}
+                        onChange={(e) => setFormData({...formData, youtube_url: e.target.value})}
+                        placeholder="https://youtube.com/watch?v=..."
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Spotify URL</FormLabel>
+                      <Input
+                        type="url"
+                        value={formData.spotify_url}
+                        onChange={(e) => setFormData({...formData, spotify_url: e.target.value})}
+                        placeholder="https://open.spotify.com/track/..."
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={4}>
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Key</FormLabel>
+                      <Input
+                        value={formData.key}
+                        onChange={(e) => setFormData({...formData, key: e.target.value})}
+                        placeholder="C, G, D, etc."
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">BPM</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.bpm}
+                        onChange={(e) => setFormData({...formData, bpm: e.target.value})}
+                        placeholder="120"
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">CCLI Number</FormLabel>
+                      <Input
+                        value={formData.ccli_number}
+                        onChange={(e) => setFormData({...formData, ccli_number: e.target.value})}
+                        placeholder="CCLI-123456"
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <FormControl>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">Tags</FormLabel>
+                    <Input
+                      value={formData.tags}
+                      onChange={(e) => setFormData({...formData, tags: e.target.value})}
+                      placeholder="worship, contemporary, gospel (comma separated)"
+                      size="md"
+                    />
+                  </FormControl>
+                  
+                  <FormControl>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">Lyrics</FormLabel>
+                    <Textarea
+                      value={formData.lyrics}
+                      onChange={(e) => setFormData({...formData, lyrics: e.target.value})}
+                      placeholder="Enter song lyrics..."
+                      size="md"
+                      rows={4}
+                    />
+                  </FormControl>
+
+                  <Flex gap={4} justify="flex-end" pt={4}>
+                    <Button
+                      variant="outline"
+                      onClick={onAddDrawerClose}
+                      size="md"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      colorScheme="green"
+                      size="md"
+                      isLoading={loading}
+                    >
+                      Add Song
+                    </Button>
+                  </Flex>
+                </VStack>
+              </Box>
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
+
+        {/* Edit Song Drawer */}
+        <Drawer
+          isOpen={isEditDrawerOpen}
+          placement="right"
+          onClose={onEditDrawerClose}
+          size={{ base: 'full', md: 'md', lg: 'lg' }}
+        >
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+              <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
+                Edit Song
+              </Heading>
+            </DrawerHeader>
+            
+            <DrawerBody bg={bgColor} p={6}>
+              <Box as="form" onSubmit={handleEditSong}>
+                <VStack spacing={6} align="stretch">
+                  <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
+                    <FormControl isRequired>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Title</FormLabel>
+                      <Input
+                        value={formData.title}
+                        onChange={(e) => setFormData({...formData, title: e.target.value})}
+                        placeholder="Song title"
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl isRequired>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Artist</FormLabel>
+                      <Input
+                        value={formData.artist}
+                        onChange={(e) => setFormData({...formData, artist: e.target.value})}
+                        placeholder="Artist name"
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">YouTube URL</FormLabel>
+                      <Input
+                        type="url"
+                        value={formData.youtube_url}
+                        onChange={(e) => setFormData({...formData, youtube_url: e.target.value})}
+                        placeholder="https://youtube.com/watch?v=..."
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Spotify URL</FormLabel>
+                      <Input
+                        type="url"
+                        value={formData.spotify_url}
+                        onChange={(e) => setFormData({...formData, spotify_url: e.target.value})}
+                        placeholder="https://open.spotify.com/track/..."
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={4}>
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Key</FormLabel>
+                      <Input
+                        value={formData.key}
+                        onChange={(e) => setFormData({...formData, key: e.target.value})}
+                        placeholder="C, G, D, etc."
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">BPM</FormLabel>
+                      <Input
+                        type="number"
+                        value={formData.bpm}
+                        onChange={(e) => setFormData({...formData, bpm: e.target.value})}
+                        placeholder="120"
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">CCLI Number</FormLabel>
+                      <Input
+                        value={formData.ccli_number}
+                        onChange={(e) => setFormData({...formData, ccli_number: e.target.value})}
+                        placeholder="CCLI-123456"
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <FormControl>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">Tags</FormLabel>
+                    <Input
+                      value={formData.tags}
+                      onChange={(e) => setFormData({...formData, tags: e.target.value})}
+                      placeholder="worship, contemporary, gospel (comma separated)"
+                      size="md"
+                    />
+                  </FormControl>
+                  
+                  <FormControl>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">Lyrics</FormLabel>
+                    <Textarea
+                      value={formData.lyrics}
+                      onChange={(e) => setFormData({...formData, lyrics: e.target.value})}
+                      placeholder="Enter song lyrics..."
+                      size="md"
+                      rows={4}
+                    />
+                  </FormControl>
+
+                  <Flex gap={4} justify="flex-end" pt={4}>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        onEditDrawerClose()
+                        setEditingSong(null)
+                      }}
+                      size="md"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      colorScheme="blue"
+                      size="md"
+                      isLoading={loading}
+                    >
+                      Update Song
+                    </Button>
+                  </Flex>
+                </VStack>
+              </Box>
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
+
+        {/* Search, Filters, and View Toggle - All in One Line */}
+        <Box
+          bg={cardBg}
+          p={4}
+          borderRadius="lg"
+          boxShadow="sm"
+          border="1px"
+          borderColor={cardBorderColor}
+          mb={2}
         >
           <Flex
             direction={{ base: 'column', lg: 'row' }}
-            justify="space-between"
-            align={{ base: 'stretch', lg: 'flex-start' }}
-            gap={6}
+            gap={4}
+            align={{ base: 'stretch', lg: 'center' }}
+            w="full"
           >
-            {/* Title */}
-            <Box flex="1" minW="300px">
-              <VStack spacing={2} align="start">
-                <Heading as="h2" size="xl" color={titleColor} m={0} fontWeight="600">
-                  🎵 Songbank
-                </Heading>
-                <Text color={subtitleColor} fontSize="md" m={0}>
-                  Manage your organization's worship song library
-                </Text>
-              </VStack>
+            {/* Search */}
+            <Box flex="1" minW="200px">
+              <Input
+                placeholder="Search songs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="md"
+              />
             </Box>
 
-            {/* Actions */}
-            <VStack spacing={4} align="stretch" minW="auto">
-              <Button
-                variant="outline"
-                colorScheme="gray"
-                onClick={() => navigate('/dashboard')}
-                leftIcon={<Text>←</Text>}
+            {/* Key Filter */}
+            <Box flex="0 0 auto">
+              <Select
+                value={selectedKey}
+                onChange={(e) => setSelectedKey(e.target.value)}
+                size="md"
+                minW="100px"
               >
-                Back to Dashboard
-              </Button>
+                <option value="">All Keys</option>
+                {uniqueKeys.map(key => (
+                  <option key={key} value={key}>{key}</option>
+                ))}
+              </Select>
+            </Box>
 
-              {/* View Toggle */}
+            {/* Tag Filter */}
+            <Box flex="0 0 auto">
+              <Select
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+                size="md"
+                minW="100px"
+              >
+                <option value="">All Tags</option>
+                {uniqueTags.map(tag => (
+                  <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </Select>
+            </Box>
+
+            {/* View Toggle */}
+            <Box flex="0 0 auto">
               <HStack spacing={1} bg="gray.100" p={1} borderRadius="md">
                 <IconButton
                   aria-label="Card View"
-                  icon={<Box as="svg" w="5" h="5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="3" width="7" height="7"></rect>
                     <rect x="14" y="3" width="7" height="7"></rect>
                     <rect x="14" y="14" width="7" height="7"></rect>
@@ -446,7 +805,7 @@ export function Songbank() {
                 />
                 <IconButton
                   aria-label="Table View"
-                  icon={<Box as="svg" w="5" h="5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M3 3h18v18H3zM21 9H3M21 15H3M9 3v18"></path>
                   </Box>}
                   size="sm"
@@ -455,338 +814,7 @@ export function Songbank() {
                   onClick={() => setViewMode('table')}
                 />
               </HStack>
-
-              <Button
-                colorScheme="blue"
-                onClick={() => setShowAddForm(!showAddForm)}
-                size="md"
-              >
-                {showAddForm ? 'Cancel' : '+ Add Song'}
-              </Button>
-            </VStack>
-          </Flex>
-        </Box>
-
-        {/* Add Song Form */}
-        {showAddForm && (
-          <Box
-            bg={cardBg}
-            p={6}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            mb={8}
-          >
-            <Heading as="h3" size="lg" color={titleColor} mb={6} fontWeight="600">
-              Add New Song
-            </Heading>
-            
-            <Box as="form" onSubmit={handleAddSong}>
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4} mb={4}>
-                <FormControl isRequired>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Title</FormLabel>
-                  <Input
-                    value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                    placeholder="Song title"
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Artist</FormLabel>
-                  <Input
-                    value={formData.artist}
-                    onChange={(e) => setFormData({...formData, artist: e.target.value})}
-                    placeholder="Artist name"
-                    size="md"
-                  />
-                </FormControl>
-              </Grid>
-
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4} mb={4}>
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">YouTube URL</FormLabel>
-                  <Input
-                    type="url"
-                    value={formData.youtube_url}
-                    onChange={(e) => setFormData({...formData, youtube_url: e.target.value})}
-                    placeholder="https://youtube.com/watch?v=..."
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Spotify URL</FormLabel>
-                  <Input
-                    type="url"
-                    value={formData.spotify_url}
-                    onChange={(e) => setFormData({...formData, spotify_url: e.target.value})}
-                    placeholder="https://open.spotify.com/track/..."
-                    size="md"
-                  />
-                </FormControl>
-              </Grid>
-
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={4} mb={4}>
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Key</FormLabel>
-                  <Input
-                    value={formData.key}
-                    onChange={(e) => setFormData({...formData, key: e.target.value})}
-                    placeholder="C, G, D, etc."
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">BPM</FormLabel>
-                  <Input
-                    type="number"
-                    value={formData.bpm}
-                    onChange={(e) => setFormData({...formData, bpm: e.target.value})}
-                    placeholder="120"
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">CCLI Number</FormLabel>
-                  <Input
-                    value={formData.ccli_number}
-                    onChange={(e) => setFormData({...formData, ccli_number: e.target.value})}
-                    placeholder="123456"
-                    size="md"
-                  />
-                </FormControl>
-              </Grid>
-
-              <FormControl mb={4}>
-                <FormLabel fontWeight="600" color={textColor} fontSize="sm">Tags</FormLabel>
-                <Input
-                  value={formData.tags}
-                  onChange={(e) => setFormData({...formData, tags: e.target.value})}
-                  placeholder="praise, reflection, communion (comma-separated)"
-                  size="md"
-                />
-              </FormControl>
-
-              <FormControl mb={6}>
-                <FormLabel fontWeight="600" color={textColor} fontSize="sm">Lyrics</FormLabel>
-                <Textarea
-                  value={formData.lyrics}
-                  onChange={(e) => setFormData({...formData, lyrics: e.target.value})}
-                  placeholder="Enter song lyrics (markdown supported)"
-                  rows={6}
-                  resize="vertical"
-                />
-              </FormControl>
-
-              <HStack spacing={4}>
-                <Button type="submit" colorScheme="blue" size="md">
-                  Add Song
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  colorScheme="gray"
-                  onClick={() => setShowAddForm(false)}
-                  size="md"
-                >
-                  Cancel
-                </Button>
-              </HStack>
             </Box>
-          </Box>
-        )}
-
-        {/* Edit Song Form */}
-        {showEditForm && (
-          <Box
-            bg={cardBg}
-            p={6}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            mb={8}
-          >
-            <Heading as="h3" size="lg" color={titleColor} mb={6} fontWeight="600">
-              Edit Song
-            </Heading>
-            
-            <Box as="form" onSubmit={handleEditSong}>
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4} mb={4}>
-                <FormControl isRequired>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Title</FormLabel>
-                  <Input
-                    value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                    placeholder="Song title"
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Artist</FormLabel>
-                  <Input
-                    value={formData.artist}
-                    onChange={(e) => setFormData({...formData, artist: e.target.value})}
-                    placeholder="Artist name"
-                    size="md"
-                  />
-                </FormControl>
-              </Grid>
-
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4} mb={4}>
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">YouTube URL</FormLabel>
-                  <Input
-                    type="url"
-                    value={formData.youtube_url}
-                    onChange={(e) => setFormData({...formData, youtube_url: e.target.value})}
-                    placeholder="https://youtube.com/watch?v=..."
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Spotify URL</FormLabel>
-                  <Input
-                    type="url"
-                    value={formData.spotify_url}
-                    onChange={(e) => setFormData({...formData, spotify_url: e.target.value})}
-                    placeholder="https://open.spotify.com/track/..."
-                    size="md"
-                  />
-                </FormControl>
-              </Grid>
-
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={4} mb={4}>
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Key</FormLabel>
-                  <Input
-                    value={formData.key}
-                    onChange={(e) => setFormData({...formData, key: e.target.value})}
-                    placeholder="C, G, D, etc."
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">BPM</FormLabel>
-                  <Input
-                    type="number"
-                    value={formData.bpm}
-                    onChange={(e) => setFormData({...formData, bpm: e.target.value})}
-                    placeholder="120"
-                    size="md"
-                  />
-                </FormControl>
-                
-                <FormControl>
-                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">CCLI Number</FormLabel>
-                  <Input
-                    value={formData.ccli_number}
-                    onChange={(e) => setFormData({...formData, ccli_number: e.target.value})}
-                    placeholder="123456"
-                    size="md"
-                  />
-                </FormControl>
-              </Grid>
-
-              <FormControl mb={4}>
-                <FormLabel fontWeight="600" color={textColor} fontSize="sm">Tags</FormLabel>
-                <Input
-                  value={formData.tags}
-                  onChange={(e) => setFormData({...formData, tags: e.target.value})}
-                  placeholder="praise, reflection, communion (comma-separated)"
-                  size="md"
-                />
-              </FormControl>
-
-              <FormControl mb={6}>
-                <FormLabel fontWeight="600" color={textColor} fontSize="sm">Lyrics</FormLabel>
-                <Textarea
-                  value={formData.lyrics}
-                  onChange={(e) => setFormData({...formData, lyrics: e.target.value})}
-                  placeholder="Enter song lyrics (markdown supported)"
-                  rows={6}
-                  resize="vertical"
-                />
-              </FormControl>
-
-              <HStack spacing={4}>
-                <Button type="submit" colorScheme="blue" size="md">
-                  Update Song
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  colorScheme="gray"
-                  onClick={() => {
-                    setShowEditForm(false)
-                    setEditingSong(null)
-                  }}
-                  size="md"
-                >
-                  Cancel
-                </Button>
-              </HStack>
-            </Box>
-          </Box>
-        )}
-
-        {/* Filters */}
-        <Box
-          bg={cardBg}
-          p={6}
-          borderRadius="lg"
-          boxShadow="sm"
-          border="1px"
-          borderColor={cardBorderColor}
-          mb={8}
-        >
-          <Flex
-            direction={{ base: 'column', lg: 'row' }}
-            gap={4}
-            align={{ base: 'stretch', lg: 'center' }}
-          >
-            <Box flex="1" minW="300px">
-              <Input
-                placeholder="Search songs by title or artist..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="md"
-              />
-            </Box>
-
-            <HStack spacing={4} flexWrap="wrap">
-              <Select
-                value={selectedKey}
-                onChange={(e) => setSelectedKey(e.target.value)}
-                size="md"
-                minW="120px"
-              >
-                <option value="">All Keys</option>
-                {uniqueKeys.map(key => (
-                  <option key={key} value={key}>{key}</option>
-                ))}
-              </Select>
-
-              <Select
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-                size="md"
-                minW="120px"
-              >
-                <option value="">All Tags</option>
-                {uniqueTags.map(tag => (
-                  <option key={tag} value={tag}>{tag}</option>
-                ))}
-              </Select>
-            </HStack>
           </Flex>
         </Box>
 
@@ -812,7 +840,7 @@ export function Songbank() {
               <Box
                 key={song.id}
                 bg={cardBg}
-                p={5}
+                p={3}
                 borderRadius="lg"
                 boxShadow="sm"
                 border="1px"
@@ -823,17 +851,17 @@ export function Songbank() {
                   boxShadow: cardHoverShadow
                 }}
               >
-                <VStack spacing={3} align="stretch">
+                <VStack spacing={2} align="stretch">
                   <Box>
                     <Heading as="h3" size="md" color={titleColor} mb={1} fontWeight="600">
                       {song.title}
                     </Heading>
-                    <Text color={subtitleColor} fontSize="md" mb={3}>
+                    <Text color={subtitleColor} fontSize="md" mb={2}>
                       {song.artist}
                     </Text>
                     
                     {(song.key || song.bpm || song.ccli_number) && (
-                      <HStack spacing={2} mb={3} flexWrap="wrap">
+                      <HStack spacing={2} mb={2} flexWrap="wrap">
                         {song.key && (
                           <Badge colorScheme="gray" variant="subtle" fontSize="xs">
                             Key: {song.key}
@@ -853,7 +881,7 @@ export function Songbank() {
                     )}
 
                     {song.tags.length > 0 && (
-                      <HStack spacing={2} mb={3} flexWrap="wrap">
+                      <HStack spacing={2} mb={2} flexWrap="wrap">
                         {song.tags.map(tag => (
                           <Badge key={tag} colorScheme="blue" fontSize="xs">
                             {tag}
@@ -863,7 +891,7 @@ export function Songbank() {
                     )}
 
                     {(song.youtube_url || song.spotify_url) && (
-                      <HStack spacing={2} mb={4}>
+                      <HStack spacing={2} mb={3}>
                         {song.youtube_url && (
                           <Button
                             as="a"
@@ -890,9 +918,9 @@ export function Songbank() {
                     )}
                   </Box>
 
-                  <HStack spacing={2} justify="flex-end">
+                  <HStack spacing={1} justify="flex-end">
                     <Button
-                      size="sm"
+                      size="xs"
                       variant="outline"
                       colorScheme="gray"
                       onClick={() => openEditForm(song)}
@@ -900,7 +928,7 @@ export function Songbank() {
                       Edit
                     </Button>
                     <Button
-                      size="sm"
+                      size="xs"
                       colorScheme="red"
                       onClick={() => handleDeleteSong(song.id)}
                     >
@@ -921,89 +949,180 @@ export function Songbank() {
             borderColor={cardBorderColor}
             overflow="hidden"
           >
-            <Table variant="simple">
-              <Thead>
-                <Tr>
-                  <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600">Title</Th>
-                  <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600">Artist</Th>
-                  <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600">Key</Th>
-                  <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600">BPM</Th>
-                  <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600">Tags</Th>
-                  <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600">Links</Th>
-                  <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {filteredSongs.map(song => (
-                  <Tr key={song.id} _hover={{ bg: tableHoverBg }}>
-                    <Td fontWeight="500" color={titleColor}>
-                      {song.title}
-                    </Td>
-                    <Td>{song.artist}</Td>
-                    <Td>{song.key || '-'}</Td>
-                    <Td>{song.bpm || '-'}</Td>
-                    <Td>
-                      {song.tags.length > 0 ? (
-                        <HStack spacing={1} flexWrap="wrap">
-                          {song.tags.map(tag => (
-                            <Badge key={tag} colorScheme="blue" fontSize="xs" size="sm">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </HStack>
-                      ) : '-'}
-                    </Td>
-                    <Td>
-                      {(song.youtube_url || song.spotify_url) && (
-                        <HStack spacing={2}>
-                          {song.youtube_url && (
-                            <Button
-                              as="a"
-                              href={song.youtube_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              size="xs"
-                              colorScheme="red"
-                              leftIcon={<Text fontSize="xs">🎬</Text>}
-                            />
-                          )}
-                          {song.spotify_url && (
-                            <Button
-                              as="a"
-                              href={song.spotify_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              size="xs"
-                              colorScheme="green"
-                              leftIcon={<Text fontSize="xs">🎵</Text>}
-                            />
-                          )}
-                        </HStack>
-                      )}
-                    </Td>
-                    <Td>
-                      <HStack spacing={2}>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          colorScheme="gray"
-                          onClick={() => openEditForm(song)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="xs"
-                          colorScheme="red"
-                          onClick={() => handleDeleteSong(song.id)}
-                        >
-                          Delete
-                        </Button>
-                      </HStack>
-                    </Td>
+            {/* Mobile Responsive Table Container */}
+            <Box
+              overflowX="auto"
+              css={{
+                '&::-webkit-scrollbar': {
+                  height: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: 'transparent',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: useColorModeValue('gray.300', 'gray.600'),
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                  background: useColorModeValue('gray.400', 'gray.500'),
+                },
+              }}
+            >
+              <Table variant="simple" minW="800px">
+                <Thead>
+                  <Tr>
+                    <Th 
+                      bg={tableHeaderBg} 
+                      color={textColor} 
+                      fontSize="sm" 
+                      fontWeight="600"
+                      position="sticky"
+                      left="0"
+                      zIndex="1"
+                      minW="200px"
+                      maxW="250px"
+                    >
+                      Title
+                    </Th>
+                    <Th 
+                      bg={tableHeaderBg} 
+                      color={textColor} 
+                      fontSize="sm" 
+                      fontWeight="600"
+                      minW="150px"
+                    >
+                      Artist
+                    </Th>
+                    <Th 
+                      bg={tableHeaderBg} 
+                      color={textColor} 
+                      fontSize="sm" 
+                      fontWeight="600"
+                      minW="80px"
+                    >
+                      Key
+                    </Th>
+                    <Th 
+                      bg={tableHeaderBg} 
+                      color={textColor} 
+                      fontSize="sm" 
+                      fontWeight="600"
+                      minW="80px"
+                    >
+                      BPM
+                    </Th>
+                    <Th 
+                      bg={tableHeaderBg} 
+                      color={textColor} 
+                      fontSize="sm" 
+                      fontWeight="600"
+                      minW="120px"
+                    >
+                      Tags
+                    </Th>
+                    <Th 
+                      bg={tableHeaderBg} 
+                      color={textColor} 
+                      fontSize="sm" 
+                      fontWeight="600"
+                      minW="120px"
+                    >
+                      Links
+                    </Th>
+                    <Th 
+                      bg={tableHeaderBg} 
+                      color={textColor} 
+                      fontSize="sm" 
+                      fontWeight="600"
+                      minW="120px"
+                    >
+                      Actions
+                    </Th>
                   </Tr>
-                ))}
-              </Tbody>
-            </Table>
+                </Thead>
+                <Tbody>
+                  {filteredSongs.map(song => (
+                    <Tr key={song.id} _hover={{ bg: tableHoverBg }}>
+                      <Td 
+                        fontWeight="500" 
+                        color={titleColor}
+                        position="sticky"
+                        left="0"
+                        bg={cardBg}
+                        zIndex="1"
+                        minW="200px"
+                        maxW="250px"
+                        borderRight="1px"
+                        borderColor={cardBorderColor}
+                      >
+                        {song.title}
+                      </Td>
+                      <Td minW="150px">{song.artist}</Td>
+                      <Td minW="80px">{song.key || '-'}</Td>
+                      <Td minW="80px">{song.bpm || '-'}</Td>
+                      <Td minW="120px">
+                        {song.tags.length > 0 ? (
+                          <HStack spacing={1} flexWrap="wrap">
+                            {song.tags.map(tag => (
+                              <Badge key={tag} colorScheme="blue" fontSize="xs" size="sm">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </HStack>
+                        ) : '-'}
+                      </Td>
+                      <Td minW="120px">
+                        {(song.youtube_url || song.spotify_url) && (
+                          <HStack spacing={2}>
+                            {song.youtube_url && (
+                              <Button
+                                as="a"
+                                href={song.youtube_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                size="xs"
+                                colorScheme="red"
+                                leftIcon={<Text fontSize="xs">🎬</Text>}
+                              />
+                            )}
+                            {song.spotify_url && (
+                              <Button
+                                as="a"
+                                href={song.spotify_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                size="xs"
+                                colorScheme="green"
+                                leftIcon={<Text fontSize="xs">🎵</Text>}
+                              />
+                            )}
+                          </HStack>
+                        )}
+                      </Td>
+                      <Td minW="120px">
+                        <HStack spacing={2}>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            colorScheme="gray"
+                            onClick={() => openEditForm(song)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="xs"
+                            colorScheme="red"
+                            onClick={() => handleDeleteSong(song.id)}
+                          >
+                            Delete
+                          </Button>
+                        </HStack>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
           </Box>
         )}
       </Box>
