@@ -14,7 +14,7 @@ import {
   SimpleGrid,
   useColorModeValue,
   useToast,
-  Spinner,
+  Skeleton,
   Input,
   FormControl,
   FormLabel,
@@ -22,7 +22,6 @@ import {
   Select,
   Badge,
   Flex,
-  Center,
   IconButton,
   Table,
   Thead,
@@ -367,27 +366,201 @@ export function Songbank() {
 
   if (loading) {
     return (
-      <Box
-        minH="100vh"
-        bg={bgColor}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <Center>
-          <VStack spacing={4}>
-            <Spinner
-              thickness="4px"
-              speed="0.65s"
-              emptyColor="gray.200"
-              color="blue.500"
-              size="xl"
-            />
-            <Text color={subtitleColor} fontSize="md" m={0}>
-              Loading your songbank...
-            </Text>
-          </VStack>
-        </Center>
+      <Box minH="100vh" bg={bgColor}>
+        <DashboardHeader user={user} organization={organization} />
+
+        <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+          {/* Back Button */}
+          <Box mb={4}>
+            <Button
+              variant="ghost"
+              colorScheme="gray"
+              onClick={() => navigate('/dashboard')}
+              leftIcon={<Text>←</Text>}
+              size="sm"
+            >
+              Back to Dashboard
+            </Button>
+          </Box>
+
+          {/* Header Section */}
+          <Box
+            bg={cardBg}
+            p={4}
+            borderRadius="lg"
+            boxShadow="sm"
+            border="1px"
+            borderColor={cardBorderColor}
+            mb={3}
+          >
+            <Flex
+              direction={{ base: 'column', md: 'row' }}
+              justify="space-between"
+              align={{ base: 'stretch', md: 'center' }}
+              gap={4}
+            >
+              <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
+                🎵 Songbank
+              </Heading>
+              <Button
+                colorScheme="green"
+                onClick={onAddDrawerOpen}
+                size="md"
+                isDisabled={true}
+              >
+                + Add Song
+              </Button>
+            </Flex>
+          </Box>
+
+          {/* Search, Filters, and View Toggle - Always Visible */}
+          <Box
+            bg={cardBg}
+            p={4}
+            borderRadius="lg"
+            boxShadow="sm"
+            border="1px"
+            borderColor={cardBorderColor}
+            mb={4}
+          >
+            <Flex
+              direction={{ base: 'column', lg: 'row' }}
+              gap={4}
+              align={{ base: 'stretch', lg: 'center' }}
+              w="full"
+              flexWrap="wrap"
+              justify="space-between"
+            >
+              {/* Search */}
+              <Box flex="6" minW="200px">
+                <Input
+                  placeholder="Loading songs..."
+                  value=""
+                  size="md"
+                  w="full"
+                  isDisabled={true}
+                />
+              </Box>
+
+              {/* Key Filter */}
+              <Box flex="3" minW="120px" maxW="200px">
+                <Select
+                  value=""
+                  size="md"
+                  minW="100px"
+                  w="full"
+                  isDisabled={true}
+                >
+                  <option value="">Loading...</option>
+                </Select>
+              </Box>
+
+              {/* Tag Filter */}
+              <Box flex="3" minW="120px" maxW="200px">
+                <Select
+                  value=""
+                  size="md"
+                  minW="100px"
+                  w="full"
+                  isDisabled={true}
+                >
+                  <option value="">Loading...</option>
+                </Select>
+              </Box>
+
+              {/* View Toggle */}
+              <Box flex="0 0 auto" minW="80px">
+                <HStack spacing={1} bg="gray.100" p="1" borderRadius="md">
+                  <IconButton
+                    aria-label="Card View"
+                    icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </Box>}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="gray"
+                    isDisabled={true}
+                  />
+                  <IconButton
+                    aria-label="Table View"
+                    icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 3h18v18H3zM21 9H3M21 15H3M9 3v18"></path>
+                    </Box>}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="gray"
+                    isDisabled={true}
+                  />
+                </HStack>
+              </Box>
+            </Flex>
+          </Box>
+
+          {/* Songs Table Skeleton - Only the data content */}
+          <Box
+            bg={cardBg}
+            borderRadius="lg"
+            boxShadow="sm"
+            border="1px"
+            borderColor={cardBorderColor}
+            overflow="hidden"
+          >
+            <Box overflowX="auto">
+              <Table variant="simple" minW="800px">
+                <Thead>
+                  <Tr>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px" maxW="250px">Title</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Artist</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="80px">Key</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="80px">BPM</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Tags</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Links</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Actions</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {[1, 2, 3, 4, 5].map((index) => (
+                    <Tr key={index}>
+                      <Td minW="200px" maxW="250px">
+                        <Skeleton height="16px" width="80%" />
+                      </Td>
+                      <Td minW="150px">
+                        <Skeleton height="16px" width="70%" />
+                      </Td>
+                      <Td minW="80px">
+                        <Skeleton height="16px" width="40px" />
+                      </Td>
+                      <Td minW="80px">
+                        <Skeleton height="16px" width="30px" />
+                      </Td>
+                      <Td minW="120px">
+                        <HStack spacing={1}>
+                          <Skeleton height="16px" width="50px" />
+                          <Skeleton height="16px" width="60px" />
+                        </HStack>
+                      </Td>
+                      <Td minW="120px">
+                        <HStack spacing={2}>
+                          <Skeleton height="24px" width="24px" />
+                          <Skeleton height="24px" width="24px" />
+                        </HStack>
+                      </Td>
+                      <Td minW="120px">
+                        <HStack spacing={2}>
+                          <Skeleton height="24px" width="40px" />
+                          <Skeleton height="24px" width="50px" />
+                        </HStack>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
+          </Box>
+        </Box>
       </Box>
     )
   }
@@ -438,8 +611,27 @@ export function Songbank() {
               colorScheme="green"
               onClick={onAddDrawerOpen}
               size="md"
+              position="relative"
+              overflow="hidden"
+              _before={{
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                animation: 'shimmer 4.5s infinite',
+              }}
+                              sx={{
+                  '@keyframes shimmer': {
+                    '0%': { left: '-100%' },
+                    '33.33%': { left: '100%' },
+                    '100%': { left: '100%' },
+                  },
+                }}
             >
-                              + Add Song
+              + Add Song
             </Button>
           </Flex>
         </Box>
@@ -746,50 +938,58 @@ export function Songbank() {
             gap={4}
             align={{ base: 'stretch', lg: 'center' }}
             w="full"
+            flexWrap="wrap"
+            justify="space-between"
           >
             {/* Search */}
-            <Box flex="1" minW="200px">
+            <Box flex="6" minW="200px">
               <Input
-                placeholder="Search songs..."
+                placeholder={loading ? "Loading songs..." : "Search songs..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 size="md"
+                w="full"
+                isDisabled={loading}
               />
             </Box>
 
             {/* Key Filter */}
-            <Box flex="0 0 auto">
+            <Box flex="3" minW="120px" maxW="200px">
               <Select
                 value={selectedKey}
                 onChange={(e) => setSelectedKey(e.target.value)}
                 size="md"
                 minW="100px"
+                w="full"
+                isDisabled={loading}
               >
-                <option value="">All Keys</option>
-                {uniqueKeys.map(key => (
+                <option value="">{loading ? 'Loading...' : 'All Keys'}</option>
+                {!loading && uniqueKeys.map(key => (
                   <option key={key} value={key}>{key}</option>
                 ))}
               </Select>
             </Box>
 
             {/* Tag Filter */}
-            <Box flex="0 0 auto">
+            <Box flex="3" minW="120px" maxW="200px">
               <Select
                 value={selectedTag}
                 onChange={(e) => setSelectedTag(e.target.value)}
                 size="md"
                 minW="100px"
+                w="full"
+                isDisabled={loading}
               >
-                <option value="">All Tags</option>
-                {uniqueTags.map(tag => (
+                <option value="">{loading ? 'Loading...' : 'All Tags'}</option>
+                {!loading && uniqueTags.map(tag => (
                   <option key={tag} value={tag}>{tag}</option>
                 ))}
               </Select>
             </Box>
 
             {/* View Toggle */}
-            <Box flex="0 0 auto">
-              <HStack spacing={1} bg="gray.100" p={1} borderRadius="md">
+            <Box flex="0 0 auto" minW="80px">
+              <HStack spacing={1} bg="gray.100" p="1" borderRadius="md">
                 <IconButton
                   aria-label="Card View"
                   icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
