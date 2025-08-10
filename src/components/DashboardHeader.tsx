@@ -8,8 +8,26 @@ import {
   Text, 
   Button, 
   useColorModeValue,
-  Container
+  Container,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  MenuDivider,
+  Avatar,
+  Icon,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  VStack,
+  HStack,
+  Divider,
+  useDisclosure
 } from '@chakra-ui/react'
+import { ChevronDownIcon, HamburgerIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 
 interface OrganizationData {
@@ -42,6 +60,7 @@ const getOrganizationName = (organization: OrganizationData | null): string => {
 
 export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
   const navigate = useNavigate()
+  const { isOpen, onOpen, onClose } = useDisclosure()
 
   // Color mode values
   const headerBg = useColorModeValue('white', 'gray.800')
@@ -50,84 +69,298 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
   const userNameColor = useColorModeValue('gray.700', 'gray.200')
   const orgNameBg = useColorModeValue('blue.50', 'blue.900')
   const orgNameColor = useColorModeValue('blue.700', 'blue.200')
+  const menuBg = useColorModeValue('white', 'gray.800')
+  const menuBorderColor = useColorModeValue('gray.200', 'gray.600')
+  const drawerBg = useColorModeValue('white', 'gray.900')
+  const drawerHeaderBg = useColorModeValue('blue.500', 'blue.600')
+  const drawerHeaderColor = 'white'
 
   const handleSignOut = async () => {
     try {
       await signOut()
       navigate('/')
+      onClose()
     } catch (error) {
       console.error('Error signing out:', error)
     }
   }
 
+  const handleNavigation = (path: string) => {
+    navigate(path)
+    onClose()
+  }
+
+  const getUserInitials = (user: User | null): string => {
+    if (!user?.user_metadata?.first_name || !user?.user_metadata?.last_name) {
+      return user?.email?.charAt(0).toUpperCase() || 'U'
+    }
+    return `${user.user_metadata.first_name.charAt(0)}${user.user_metadata.last_name.charAt(0)}`.toUpperCase()
+  }
+
   return (
-    <Box
-      as="header"
-      bg={headerBg}
-      borderBottom="1px"
-      borderColor={headerBorderColor}
-      py={4}
-      position="sticky"
-      top={0}
-      zIndex={10}
-    >
-      <Container maxW="1200px" px={6}>
-        <Flex justify="space-between" align="center">
-          {/* Logo */}
-          <Box>
-            <Link to="/dashboard" style={{ textDecoration: 'none' }}>
-              <Heading
-                as="h1"
-                size="lg"
-                color={logoColor}
-                fontWeight="700"
-                m={0}
-                _hover={{ color: 'blue.500' }}
-                transition="color 0.2s ease"
-              >
-                Worship Lead
-              </Heading>
-            </Link>
-          </Box>
-          
-          {/* User Info */}
-          <Flex align="center" gap={4} flexShrink={0}>
-            <Text
-              fontWeight="500"
-              color={userNameColor}
-              whiteSpace="nowrap"
-              fontSize="sm"
-            >
-              {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
-            </Text>
-            
-            <Box
-              bg={orgNameBg}
-              color={orgNameColor}
-              px={3}
-              py={1}
-              borderRadius="full"
-              fontSize="sm"
-              fontWeight="500"
-              whiteSpace="nowrap"
-            >
-              {getOrganizationName(organization)}
+    <>
+      <Box
+        as="header"
+        bg={headerBg}
+        borderBottom="1px"
+        borderColor={headerBorderColor}
+        py={4}
+        position="sticky"
+        top={0}
+        zIndex={10}
+      >
+        <Container maxW="1200px" px={6}>
+          <Flex justify="space-between" align="center">
+            {/* Logo */}
+            <Box>
+              <Link to="/dashboard" style={{ textDecoration: 'none' }}>
+                <Heading
+                  as="h1"
+                  size="lg"
+                  color={logoColor}
+                  fontWeight="700"
+                  m={0}
+                  _hover={{ color: 'blue.500' }}
+                  transition="color 0.2s ease"
+                >
+                  Worship Lead
+                </Heading>
+              </Link>
             </Box>
             
-            <Button
-              variant="outline"
-              colorScheme="gray"
-              size="sm"
-              onClick={handleSignOut}
-              fontSize="sm"
-              px={4}
-              py={2}
-            >
-              Sign Out
-            </Button>
+            {/* User Info and Menu */}
+            <Flex align="center" gap={4} flexShrink={0}>
+              {/* Organization name - hidden on mobile, shown in dropdown instead */}
+              <Box
+                bg={orgNameBg}
+                color={orgNameColor}
+                px={3}
+                py={1}
+                borderRadius="full"
+                fontSize="sm"
+                fontWeight="500"
+                whiteSpace="nowrap"
+                display={{ base: 'none', md: 'block' }}
+              >
+                {getOrganizationName(organization)}
+              </Box>
+              
+              {/* Mobile Menu Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                px={3}
+                py={2}
+                display={{ base: 'flex', md: 'none' }}
+                onClick={onOpen}
+                _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                _active={{ bg: useColorModeValue('gray.200', 'gray.600') }}
+              >
+                <HamburgerIcon />
+              </Button>
+              
+              {/* Desktop Dropdown Menu */}
+              <Box display={{ base: 'none', md: 'block' }}>
+                <Menu>
+                  <MenuButton
+                    as={Button}
+                    variant="ghost"
+                    size="sm"
+                    px={3}
+                    py={2}
+                    _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                    _active={{ bg: useColorModeValue('gray.200', 'gray.600') }}
+                    rightIcon={<ChevronDownIcon />}
+                  >
+                    <Flex align="center" gap={2}>
+                      <Avatar
+                        size="sm"
+                        name={user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name}
+                        bg="blue.500"
+                        color="white"
+                        fontSize="xs"
+                      />
+                      <Text
+                        fontWeight="500"
+                        color={userNameColor}
+                        whiteSpace="nowrap"
+                        fontSize="sm"
+                      >
+                        {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
+                      </Text>
+                    </Flex>
+                  </MenuButton>
+                  
+                  <MenuList
+                    bg={menuBg}
+                    border="1px"
+                    borderColor={menuBorderColor}
+                    boxShadow="lg"
+                    py={2}
+                  >
+                    <MenuItem
+                      onClick={() => navigate('/dashboard')}
+                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                    >
+                      Dashboard
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => navigate('/songbank')}
+                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                    >
+                      Songbank
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => navigate('/team')}
+                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                    >
+                      Team Management
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => navigate('/schedule')}
+                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                    >
+                      Schedule Service
+                    </MenuItem>
+                    <MenuDivider />
+                    <MenuItem
+                      onClick={handleSignOut}
+                      _hover={{ bg: useColorModeValue('red.50', 'red.900') }}
+                      color="red.500"
+                    >
+                      Sign Out
+                    </MenuItem>
+                  </MenuList>
+                </Menu>
+              </Box>
+            </Flex>
           </Flex>
-        </Flex>
-      </Container>
-    </Box>
+        </Container>
+      </Box>
+
+      {/* Mobile Full-Page Menu Overlay */}
+      <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="full">
+        <DrawerOverlay />
+        <DrawerContent bg={drawerBg}>
+          <DrawerCloseButton color={drawerHeaderColor} size="lg" />
+          
+          {/* Header Section */}
+          <DrawerHeader bg={drawerHeaderBg} color={drawerHeaderColor} py={8}>
+            <VStack spacing={4} align="center">
+              <Avatar
+                size="xl"
+                name={user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name}
+                bg="white"
+                color="blue.500"
+                fontSize="2xl"
+                fontWeight="bold"
+              />
+              <VStack spacing={1}>
+                <Text fontSize="lg" fontWeight="600">
+                  {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
+                </Text>
+                <Text fontSize="sm" opacity={0.9}>
+                  {user?.email}
+                </Text>
+              </VStack>
+              <Box
+                bg="white"
+                color={drawerHeaderBg}
+                px={4}
+                py={2}
+                borderRadius="full"
+                fontSize="sm"
+                fontWeight="600"
+              >
+                {getOrganizationName(organization)}
+              </Box>
+            </VStack>
+          </DrawerHeader>
+          
+          {/* Navigation Menu */}
+          <DrawerBody py={0}>
+            <VStack spacing={0} align="stretch">
+              <Button
+                variant="ghost"
+                size="lg"
+                justifyContent="flex-start"
+                py={6}
+                px={6}
+                onClick={() => handleNavigation('/dashboard')}
+                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+              >
+                <Text fontSize="lg" fontWeight="500">
+                  Dashboard
+                </Text>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="lg"
+                justifyContent="flex-start"
+                py={6}
+                px={6}
+                onClick={() => handleNavigation('/songbank')}
+                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+              >
+                <Text fontSize="lg" fontWeight="500">
+                  Songbank
+                </Text>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="lg"
+                justifyContent="flex-start"
+                py={6}
+                px={6}
+                onClick={() => handleNavigation('/team')}
+                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+              >
+                <Text fontSize="lg" fontWeight="500">
+                  Team Management
+                </Text>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="lg"
+                justifyContent="flex-start"
+                py={6}
+                px={6}
+                onClick={() => handleNavigation('/schedule')}
+                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+              >
+                <Text fontSize="lg" fontWeight="500">
+                  Schedule Service
+                </Text>
+              </Button>
+              
+              <Divider my={4} />
+              
+              <Button
+                variant="ghost"
+                size="lg"
+                justifyContent="flex-start"
+                py={6}
+                px={6}
+                onClick={handleSignOut}
+                color="red.500"
+                _hover={{ bg: useColorModeValue('red.50', 'red.900') }}
+                _active={{ bg: useColorModeValue('red.100', 'red.800') }}
+              >
+                <Text fontSize="lg" fontWeight="500">
+                  Sign Out
+                </Text>
+              </Button>
+            </VStack>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+    </>
   )
 } 
