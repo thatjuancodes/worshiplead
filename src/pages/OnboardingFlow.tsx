@@ -2,7 +2,24 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
-import './OnboardingFlow.css'
+import {
+  Box,
+  VStack,
+  HStack,
+  Heading,
+  Text,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  Container,
+  Spinner,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
+  useToast
+} from '@chakra-ui/react'
 
 interface ProfileData {
   firstName: string
@@ -13,6 +30,7 @@ interface ProfileData {
 
 export function OnboardingFlow() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState<'checking' | 'profile' | 'processing' | 'complete'>('checking')
   const [error, setError] = useState<string | null>(null)
@@ -295,125 +313,176 @@ export function OnboardingFlow() {
 
   if (loading) {
     return (
-      <div className="onboarding-flow">
-        <div className="onboarding-container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <h2>Setting up your account...</h2>
-            <p>Please wait while we check your account status.</p>
-          </div>
-        </div>
-      </div>
+      <Box minH="100vh" bg="gray.50" display="flex" alignItems="center" justifyContent="center">
+        <Container maxW="container.sm">
+          <VStack spacing={8} textAlign="center">
+            <Spinner size="xl" color="blue.500" thickness="4px" />
+            <VStack spacing={4}>
+              <Heading as="h2" size="lg" color="gray.700">
+                Setting up your account...
+              </Heading>
+              <Text color="gray.600" fontSize="lg">
+                Please wait while we check your account status.
+              </Text>
+            </VStack>
+          </VStack>
+        </Container>
+      </Box>
     )
   }
 
   if (step === 'profile') {
     return (
-      <div className="onboarding-flow">
-        <div className="onboarding-container">
-          <div className="profile-form">
-            <h2>Complete Your Profile</h2>
-            <p>Please provide your information to complete your account setup.</p>
+      <Box minH="100vh" bg="gray.50" py={8}>
+        <Container maxW="container.sm">
+          <VStack spacing={8} align="stretch">
+            <Box textAlign="center">
+              <Heading as="h2" size="xl" color="gray.700" mb={4}>
+                Complete Your Profile
+              </Heading>
+              <Text color="gray.600" fontSize="lg">
+                Please provide your information to complete your account setup.
+              </Text>
+            </Box>
             
-            <form onSubmit={handleProfileSubmit}>
-              <div className="form-group">
-                <label htmlFor="firstName">First Name</label>
-                <input
-                  type="text"
-                  id="firstName"
-                  name="firstName"
-                  value={profileData.firstName}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
+            <Box bg="white" p={8} borderRadius="lg" shadow="md">
+              <form onSubmit={handleProfileSubmit}>
+                <VStack spacing={6} align="stretch">
+                  <FormControl isRequired>
+                    <FormLabel htmlFor="firstName">First Name</FormLabel>
+                    <Input
+                      type="text"
+                      id="firstName"
+                      name="firstName"
+                      value={profileData.firstName}
+                      onChange={handleInputChange}
+                      size="lg"
+                      placeholder="Enter your first name"
+                    />
+                  </FormControl>
 
-              <div className="form-group">
-                <label htmlFor="lastName">Last Name</label>
-                <input
-                  type="text"
-                  id="lastName"
-                  name="lastName"
-                  value={profileData.lastName}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
+                  <FormControl isRequired>
+                    <FormLabel htmlFor="lastName">Last Name</FormLabel>
+                    <Input
+                      type="text"
+                      id="lastName"
+                      name="lastName"
+                      value={profileData.lastName}
+                      onChange={handleInputChange}
+                      size="lg"
+                      placeholder="Enter your last name"
+                    />
+                  </FormControl>
 
-              <div className="form-group">
-                <label htmlFor="password">Password</label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  value={profileData.password}
-                  onChange={handleInputChange}
-                  placeholder="Create a password for your account"
-                  required
-                />
-              </div>
+                  <FormControl isRequired>
+                    <FormLabel htmlFor="password">Password</FormLabel>
+                    <Input
+                      type="password"
+                      id="password"
+                      name="password"
+                      value={profileData.password}
+                      onChange={handleInputChange}
+                      placeholder="Create a password for your account"
+                      size="lg"
+                    />
+                  </FormControl>
 
-              <div className="form-group">
-                <label htmlFor="confirmPassword">Confirm Password</label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={profileData.confirmPassword}
-                  onChange={handleInputChange}
-                  placeholder="Confirm your password"
-                  required
-                />
-              </div>
+                  <FormControl isRequired>
+                    <FormLabel htmlFor="confirmPassword">Confirm Password</FormLabel>
+                    <Input
+                      type="password"
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      value={profileData.confirmPassword}
+                      onChange={handleInputChange}
+                      placeholder="Confirm your password"
+                      size="lg"
+                    />
+                  </FormControl>
 
-              {error && (
-                <div className="error-message">
-                  {error}
-                </div>
-              )}
+                  {error && (
+                    <Alert status="error" borderRadius="md">
+                      <AlertIcon />
+                      <Box>
+                        <AlertTitle>Error!</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                      </Box>
+                    </Alert>
+                  )}
 
-              {success && (
-                <div className="success-message">
-                  {success}
-                </div>
-              )}
+                  {success && (
+                    <Alert status="success" borderRadius="md">
+                      <AlertIcon />
+                      <Box>
+                        <AlertTitle>Success!</AlertTitle>
+                        <AlertDescription>{success}</AlertDescription>
+                      </Box>
+                    </Alert>
+                  )}
 
-              <button type="submit" className="btn btn-primary">
-                Complete Setup
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
+                  <Button
+                    type="submit"
+                    colorScheme="blue"
+                    size="lg"
+                    w="full"
+                  >
+                    Complete Setup
+                  </Button>
+                </VStack>
+              </form>
+            </Box>
+          </VStack>
+        </Container>
+      </Box>
     )
   }
 
   if (step === 'processing') {
     return (
-      <div className="onboarding-flow">
-        <div className="onboarding-container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <h2>Processing...</h2>
-            <p>Please wait while we complete your account setup.</p>
-          </div>
-        </div>
-      </div>
+      <Box minH="100vh" bg="gray.50" display="flex" alignItems="center" justifyContent="center">
+        <Container maxW="container.sm">
+          <VStack spacing={8} textAlign="center">
+            <Spinner size="xl" color="blue.500" thickness="4px" />
+            <VStack spacing={4}>
+              <Heading as="h2" size="lg" color="gray.700">
+                Processing...
+              </Heading>
+              <Text color="gray.600" fontSize="lg">
+                Please wait while we complete your account setup.
+              </Text>
+            </VStack>
+          </VStack>
+        </Container>
+      </Box>
     )
   }
 
   if (step === 'complete') {
     return (
-      <div className="onboarding-flow">
-        <div className="onboarding-container">
-          <div className="success-message">
-            <h2>Welcome!</h2>
-            <p>Your account has been successfully set up.</p>
-            {success && <p>{success}</p>}
-            <p>Redirecting you to the dashboard...</p>
-          </div>
-        </div>
-      </div>
+      <Box minH="100vh" bg="gray.50" display="flex" alignItems="center" justifyContent="center">
+        <Container maxW="container.sm">
+          <VStack spacing={8} textAlign="center">
+            <Box bg="white" p={8} borderRadius="lg" shadow="md" textAlign="center">
+              <VStack spacing={4}>
+                <Heading as="h2" size="xl" color="green.600">
+                  Welcome!
+                </Heading>
+                <Text color="gray.700" fontSize="lg">
+                  Your account has been successfully set up.
+                </Text>
+                {success && (
+                  <Text color="green.600" fontSize="md">
+                    {success}
+                  </Text>
+                )}
+                <Text color="gray.600">
+                  Redirecting you to the dashboard...
+                </Text>
+              </VStack>
+            </Box>
+          </VStack>
+        </Container>
+      </Box>
     )
   }
 
