@@ -36,6 +36,13 @@ import {
   DrawerOverlay,
   DrawerContent,
   DrawerCloseButton,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
 } from '@chakra-ui/react'
 import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
@@ -80,6 +87,10 @@ export function Songbank() {
   const { isOpen: isEditDrawerOpen, onOpen: onEditDrawerOpen, onClose: onEditDrawerClose } = useDisclosure()
   const [editingSong, setEditingSong] = useState<Song | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [deleteSong, setDeleteSong] = useState<Song | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [songServiceUsage, setSongServiceUsage] = useState<{ draft: number; published: number; total: number }>({ draft: 0, published: 0, total: 0 })
   const [formData, setFormData] = useState({
     title: '',
     artist: '',
@@ -209,14 +220,71 @@ export function Songbank() {
     }
   }
 
-  const handleDeleteSong = async (songId: string) => {
-    if (!confirm('Are you sure you want to delete this song?')) return
+  const checkSongServiceUsage = async (songId: string) => {
+    try {
+      // First get all service IDs that use this song
+      const { data: serviceSongs, error: serviceSongsError } = await supabase
+        .from('service_songs')
+        .select('service_id')
+        .eq('song_id', songId)
+
+      if (serviceSongsError) {
+        console.error('Error checking song service usage:', serviceSongsError)
+        return { draft: 0, published: 0, total: 0 }
+      }
+
+      if (!serviceSongs || serviceSongs.length === 0) {
+        return { draft: 0, published: 0, total: 0 }
+      }
+
+      // Get the service details for these service IDs
+      const serviceIds = serviceSongs.map(ss => ss.service_id)
+      const { data: services, error: servicesError } = await supabase
+        .from('worship_services')
+        .select('id, status')
+        .in('id', serviceIds)
+
+      if (servicesError) {
+        console.error('Error loading service details:', servicesError)
+        return { draft: 0, published: 0, total: 0 }
+      }
+
+      const draftCount = services?.filter(service => service.status === 'draft').length || 0
+      const publishedCount = services?.filter(service => service.status === 'published').length || 0
+      const totalCount = services?.length || 0
+
+      return { draft: draftCount, published: publishedCount, total: totalCount }
+    } catch (error) {
+      console.error('Error checking song service usage:', error)
+      return { draft: 0, published: 0, total: 0 }
+    }
+  }
+
+  const openDeleteModal = async (song: Song) => {
+    setDeleteSong(song)
+    setDeleteConfirmation('')
+    const usage = await checkSongServiceUsage(song.id)
+    setSongServiceUsage(usage)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleDeleteSong = async () => {
+    if (!deleteSong || deleteConfirmation !== deleteSong.title) {
+      toast({
+        title: 'Error',
+        description: 'Please type the exact song title to confirm deletion',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
 
     try {
       const { error } = await supabase
         .from('songs')
         .delete()
-        .eq('id', songId)
+        .eq('id', deleteSong.id)
 
       if (error) {
         console.error('Error deleting song:', error)
@@ -231,6 +299,9 @@ export function Songbank() {
       }
 
       await loadSongs(organization!.organization_id)
+      setIsDeleteModalOpen(false)
+      setDeleteSong(null)
+      setDeleteConfirmation('')
       toast({
         title: 'Success',
         description: 'Song deleted successfully',
@@ -923,6 +994,79 @@ export function Songbank() {
           </DrawerContent>
         </Drawer>
 
+        {/* Delete Confirmation Modal */}
+        <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader color="red.600">Delete Song</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4} align="stretch">
+                <Text>
+                  Are you sure you want to delete <strong>"{deleteSong?.title}"</strong> by <strong>{deleteSong?.artist}</strong>?
+                </Text>
+                
+                {songServiceUsage.total > 0 && (
+                  <Box
+                    bg="orange.50"
+                    border="1px"
+                    borderColor="orange.200"
+                    borderRadius="md"
+                    p={4}
+                  >
+                    <Text fontWeight="600" color="orange.800" mb={2}>
+                      ⚠️ This song is currently being used in services:
+                    </Text>
+                    <VStack spacing={1} align="start">
+                      {songServiceUsage.draft > 0 && (
+                        <Text color="orange.700">
+                          • {songServiceUsage.draft} draft service{songServiceUsage.draft > 1 ? 's' : ''}
+                        </Text>
+                      )}
+                      {songServiceUsage.published > 0 && (
+                        <Text color="orange.700">
+                          • {songServiceUsage.published} published service{songServiceUsage.published > 1 ? 's' : ''}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Box>
+                )}
+
+                <FormControl>
+                  <FormLabel>Type the song title to confirm deletion:</FormLabel>
+                  <Input
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    placeholder={deleteSong?.title}
+                    isDisabled={songServiceUsage.total > 0}
+                  />
+                </FormControl>
+              </VStack>
+            </ModalBody>
+
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={() => setIsDeleteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={handleDeleteSong}
+                isDisabled={
+                  deleteConfirmation !== deleteSong?.title || 
+                  songServiceUsage.total > 0
+                }
+                title={
+                  songServiceUsage.total > 0 
+                    ? `Assigned to ${songServiceUsage.total} service${songServiceUsage.total > 1 ? 's' : ''} - Cannot delete`
+                    : undefined
+                }
+              >
+                Delete Song
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
         {/* Search, Filters, and View Toggle - All in One Line */}
         <Box
           bg={cardBg}
@@ -1130,7 +1274,7 @@ export function Songbank() {
                     <Button
                       size="xs"
                       colorScheme="red"
-                      onClick={() => handleDeleteSong(song.id)}
+                                              onClick={() => openDeleteModal(song)}
                     >
                       Delete
                     </Button>
@@ -1312,7 +1456,7 @@ export function Songbank() {
                           <Button
                             size="xs"
                             colorScheme="red"
-                            onClick={() => handleDeleteSong(song.id)}
+                            onClick={() => openDeleteModal(song)}
                           >
                             Delete
                           </Button>
