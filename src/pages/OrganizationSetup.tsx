@@ -2,10 +2,31 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createOrganizationAndMembership, joinOrganizationViaInvite, checkSlugAvailability } from '../lib/auth'
 import type { OrganizationData } from '../lib/auth'
-import './OrganizationSetup.css'
+import {
+  Box,
+  VStack,
+  HStack,
+  Heading,
+  Text,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  FormErrorMessage,
+  Container,
+  Card,
+  CardBody,
+  CardHeader,
+  SimpleGrid,
+  useToast,
+  Spinner,
+  Flex,
+  Divider
+} from '@chakra-ui/react'
 
 export function OrganizationSetup() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [mode, setMode] = useState<'select' | 'create' | 'join'>('select')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -108,138 +129,226 @@ export function OrganizationSetup() {
   }
 
   return (
-    <div className="org-setup">
-      <div className="org-setup-container">
-        <div className="org-setup-header">
-          <h1>Worship Lead</h1>
-          <h2>Set Up Your Organization</h2>
-          <p>Choose how you'd like to get started with Worship Lead</p>
-        </div>
+    <Box minH="100vh" bg="gray.50" py={8}>
+      <Container maxW="container.md">
+        <VStack spacing={8} align="stretch">
+          {/* Header */}
+          <Box textAlign="center">
+            <Heading as="h1" size="xl" color="blue.600" mb={2}>
+              Worship Lead
+            </Heading>
+            <Heading as="h2" size="lg" mb={2}>
+              Set Up Your Organization
+            </Heading>
+            <Text color="gray.600" fontSize="lg">
+              Choose how you'd like to get started with Worship Lead
+            </Text>
+          </Box>
 
-        <div className="org-setup-content">
           {/* Error Display */}
           {error && (
-            <div className="error-message">
+            <Box
+              bg="red.50"
+              border="1px"
+              borderColor="red.200"
+              borderRadius="md"
+              p={4}
+              color="red.700"
+            >
               {error}
-            </div>
+            </Box>
           )}
 
           {/* Mode Selection */}
           {mode === 'select' && (
-            <div className="mode-selection">
-              <div className="mode-options">
-                <div className="mode-card" onClick={() => setMode('create')}>
-                  <h3>Create New Organization</h3>
-                  <p>Start a new church or ministry organization</p>
-                  <button className="btn btn-primary">Create New</button>
-                </div>
+            <VStack spacing={6}>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} w="full">
+                <Card
+                  cursor="pointer"
+                  onClick={() => setMode('create')}
+                  _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                  transition="all 0.2s"
+                >
+                  <CardHeader>
+                    <Heading size="md" color="blue.600">
+                      Create New Organization
+                    </Heading>
+                  </CardHeader>
+                  <CardBody>
+                    <Text color="gray.600" mb={4}>
+                      Start a new church or ministry organization
+                    </Text>
+                    <Button colorScheme="blue" w="full">
+                      Create New
+                    </Button>
+                  </CardBody>
+                </Card>
 
-                <div className="mode-card" onClick={() => setMode('join')}>
-                  <h3>Join Existing Organization</h3>
-                  <p>Join an organization you've been invited to</p>
-                  <button className="btn btn-secondary">Join Existing</button>
-                </div>
-              </div>
+                <Card
+                  cursor="pointer"
+                  onClick={() => setMode('join')}
+                  _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                  transition="all 0.2s"
+                >
+                  <CardHeader>
+                    <Heading size="md" color="blue.600">
+                      Join Existing Organization
+                    </Heading>
+                  </CardHeader>
+                  <CardBody>
+                    <Text color="gray.600" mb={4}>
+                      Join an organization you've been invited to
+                    </Text>
+                    <Button colorScheme="blue" variant="outline" w="full">
+                      Join Existing
+                    </Button>
+                  </CardBody>
+                </Card>
+              </SimpleGrid>
 
-              <div className="skip-section">
-                <p>Not ready to set up an organization?</p>
-                <button 
-                  className="btn btn-text"
+              <Divider />
+              
+              <Box textAlign="center">
+                <Text color="gray.600" mb={3}>
+                  Not ready to set up an organization?
+                </Text>
+                <Button
+                  variant="ghost"
+                  color="blue.600"
                   onClick={() => navigate('/dashboard')}
                 >
                   Skip for now
-                </button>
-              </div>
-            </div>
+                </Button>
+              </Box>
+            </VStack>
           )}
 
           {/* Create Organization */}
           {mode === 'create' && (
-            <form onSubmit={handleCreateOrganization} className="org-form">
-              <h3>Create Your Organization</h3>
-              <p>Set up your church or ministry organization</p>
+            <Card>
+              <CardHeader>
+                <VStack spacing={2} align="stretch">
+                  <Heading size="lg">Create Your Organization</Heading>
+                  <Text color="gray.600">
+                    Set up your church or ministry organization
+                  </Text>
+                </VStack>
+              </CardHeader>
+              <CardBody>
+                <form onSubmit={handleCreateOrganization}>
+                  <VStack spacing={6} align="stretch">
+                    <FormControl isRequired>
+                      <FormLabel htmlFor="orgName">Organization Name</FormLabel>
+                      <Input
+                        id="orgName"
+                        value={orgForm.name}
+                        onChange={(e) => handleOrgNameChange(e.target.value)}
+                        placeholder="e.g., Grace Community Church"
+                        size="lg"
+                      />
+                    </FormControl>
 
-              <div className="form-group">
-                <label htmlFor="orgName">Organization Name</label>
-                <input
-                  type="text"
-                  id="orgName"
-                  value={orgForm.name}
-                  onChange={(e) => handleOrgNameChange(e.target.value)}
-                  placeholder="e.g., Grace Community Church"
-                  required
-                />
-              </div>
+                    <FormControl isRequired>
+                      <FormLabel htmlFor="orgSlug">Organization URL</FormLabel>
+                      <HStack>
+                        <Text color="gray.500" fontSize="lg">
+                          worshiplead.com/
+                        </Text>
+                        <Input
+                          id="orgSlug"
+                          value={orgForm.slug}
+                          onChange={(e) => setOrgForm(prev => ({ ...prev, slug: e.target.value }))}
+                          placeholder="grace-community"
+                          size="lg"
+                        />
+                      </HStack>
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        This will be your unique organization URL
+                      </Text>
+                    </FormControl>
 
-              <div className="form-group">
-                <label htmlFor="orgSlug">Organization URL</label>
-                <div className="slug-input">
-                  <span className="slug-prefix">worshiplead.com/</span>
-                  <input
-                    type="text"
-                    id="orgSlug"
-                    value={orgForm.slug}
-                    onChange={(e) => setOrgForm(prev => ({ ...prev, slug: e.target.value }))}
-                    placeholder="grace-community"
-                    required
-                  />
-                </div>
-                <small>This will be your unique organization URL</small>
-              </div>
-
-              <div className="form-actions">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={() => setMode('select')}
-                >
-                  ← Back
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create Organization'}
-                </button>
-              </div>
-            </form>
+                    <HStack spacing={4} justify="flex-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => setMode('select')}
+                        size="lg"
+                      >
+                        ← Back
+                      </Button>
+                      <Button
+                        type="submit"
+                        colorScheme="blue"
+                        size="lg"
+                        isLoading={loading}
+                        loadingText="Creating..."
+                      >
+                        Create Organization
+                      </Button>
+                    </HStack>
+                  </VStack>
+                </form>
+              </CardBody>
+            </Card>
           )}
 
           {/* Join Organization */}
           {mode === 'join' && (
-            <form onSubmit={handleJoinOrganization} className="org-form">
-              <h3>Join Organization</h3>
-              <p>Enter the organization slug from your invite</p>
+            <Card>
+              <CardHeader>
+                <VStack spacing={2} align="stretch">
+                  <Heading size="lg">Join Organization</Heading>
+                  <Text color="gray.600">
+                    Enter the organization slug from your invite
+                  </Text>
+                </VStack>
+              </CardHeader>
+              <CardBody>
+                <form onSubmit={handleJoinOrganization}>
+                  <VStack spacing={6} align="stretch">
+                    <FormControl isRequired>
+                      <FormLabel htmlFor="joinSlug">Organization Slug</FormLabel>
+                      <HStack>
+                        <Text color="gray.500" fontSize="lg">
+                          worshiplead.com/
+                        </Text>
+                        <Input
+                          id="joinSlug"
+                          value={joinForm.organizationSlug}
+                          onChange={(e) => setJoinForm(prev => ({ ...prev, organizationSlug: e.target.value }))}
+                          placeholder="organization-slug"
+                          size="lg"
+                        />
+                      </HStack>
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        Enter the organization slug from your invitation email
+                      </Text>
+                    </FormControl>
 
-              <div className="form-group">
-                <label htmlFor="joinSlug">Organization Slug</label>
-                <div className="slug-input">
-                  <span className="slug-prefix">worshiplead.com/</span>
-                  <input
-                    type="text"
-                    id="joinSlug"
-                    value={joinForm.organizationSlug}
-                    onChange={(e) => setJoinForm(prev => ({ ...prev, organizationSlug: e.target.value }))}
-                    placeholder="organization-slug"
-                    required
-                  />
-                </div>
-                <small>Enter the organization slug from your invitation email</small>
-              </div>
-
-              <div className="form-actions">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={() => setMode('select')}
-                >
-                  ← Back
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? 'Joining...' : 'Join Organization'}
-                </button>
-              </div>
-            </form>
+                    <HStack spacing={4} justify="flex-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => setMode('select')}
+                        size="lg"
+                      >
+                        ← Back
+                      </Button>
+                      <Button
+                        type="submit"
+                        colorScheme="blue"
+                        size="lg"
+                        isLoading={loading}
+                        loadingText="Joining..."
+                      >
+                        Join Organization
+                      </Button>
+                    </HStack>
+                  </VStack>
+                </form>
+              </CardBody>
+            </Card>
           )}
-        </div>
-      </div>
-    </div>
+        </VStack>
+      </Container>
+    </Box>
   )
 } 
