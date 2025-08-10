@@ -1,8 +1,24 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { 
+  Box, 
+  VStack, 
+  HStack, 
+  Heading, 
+  Text, 
+  FormControl, 
+  FormLabel, 
+  Input, 
+  Button, 
+  Alert, 
+  AlertIcon,
+  Spinner,
+  useColorModeValue,
+  Center,
+  FormHelperText
+} from '@chakra-ui/react'
 import { createUserAccount } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import './SignupPage.css'
 
 export function SignupPage() {
   const navigate = useNavigate()
@@ -213,144 +229,320 @@ export function SignupPage() {
     }
   }
 
+  const bgGradient = useColorModeValue(
+    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'linear-gradient(135deg, #4c51bf 0%, #553c9a 100%)'
+  )
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const cardShadow = useColorModeValue(
+    '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+  )
+  const titleColor = useColorModeValue('gray.800', 'white')
+  const subtitleColor = useColorModeValue('gray.600', 'gray.300')
+  const borderColor = useColorModeValue('gray.200', 'gray.600')
+  const linkColor = useColorModeValue('blue.500', 'blue.300')
+  const linkHoverColor = useColorModeValue('blue.600', 'blue.200')
+  const copyrightColor = useColorModeValue('rgba(255, 255, 255, 0.7)', 'rgba(255, 255, 255, 0.5)')
+  const disabledBg = useColorModeValue('gray.50', 'gray.700')
+  const disabledColor = useColorModeValue('gray.500', 'gray.400')
+
   if (invitationLoading) {
     return (
-      <div className="signup-page">
-        <div className="signup-header-top">
-          <Link to="/" className="logo-link">
-            <h1>Worship Lead</h1>
+      <Box
+        minH="100vh"
+        bgGradient={bgGradient}
+        p={{ base: 4, md: 8 }}
+        position="relative"
+      >
+        {/* Top Logo */}
+        <Box
+          position="absolute"
+          top={{ base: 4, md: 8 }}
+          left={{ base: 4, md: 8 }}
+          zIndex={10}
+        >
+          <Link to="/" style={{ textDecoration: 'none' }}>
+            <Heading
+              as="h1"
+              size={{ base: 'md', md: 'lg' }}
+              fontWeight="700"
+              color="white"
+              m={0}
+              _hover={{ color: 'rgba(255, 255, 255, 0.8)' }}
+              transition="color 0.2s ease"
+            >
+              Worship Lead
+            </Heading>
           </Link>
-        </div>
-        <div className="signup-container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Verifying invitation...</p>
-          </div>
-        </div>
-      </div>
+        </Box>
+
+        {/* Loading Container */}
+        <Center minH="100vh">
+          <Box
+            bg={cardBg}
+            borderRadius="xl"
+            boxShadow={cardShadow}
+            p={{ base: 8, md: 10 }}
+            w="100%"
+            maxW="450px"
+            mx="auto"
+            textAlign="center"
+            py={12}
+          >
+            <VStack spacing={4}>
+              <Spinner
+                thickness="4px"
+                speed="0.65s"
+                emptyColor="gray.200"
+                color="blue.500"
+                size="xl"
+              />
+              <Text color={subtitleColor}>Verifying invitation...</Text>
+            </VStack>
+          </Box>
+        </Center>
+      </Box>
     )
   }
 
   return (
-    <div className="signup-page">
-      <div className="signup-header-top">
-        <Link to="/" className="logo-link">
-          <h1>Worship Lead</h1>
-        </Link>
-      </div>
-
-      <div className="signup-container">
-        <div className="signup-header">
-          <h2>Create your account</h2>
-          {invitation ? (
-            <p>You've been invited to join <strong>{invitation.organizations?.name}</strong></p>
-          ) : (
-            <p>Join Worship Lead and start organizing your worship team</p>
-          )}
-        </div>
-
-        <form className="signup-form" onSubmit={handleSubmit}>
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="firstName">First Name</label>
-              <input
-                type="text"
-                id="firstName"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your first name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="lastName">Last Name</label>
-              <input
-                type="text"
-                id="lastName"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your last name"
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-              placeholder="Enter your email"
-              disabled={!!invitation}
-            />
-            {invitation && (
-              <small className="form-help">
-                Email is pre-filled from your invitation
-              </small>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-              placeholder="Create a password"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              required
-              placeholder="Confirm your password"
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary btn-full"
-            disabled={isLoading}
+    <Box
+      minH="100vh"
+      bgGradient={bgGradient}
+      p={{ base: 4, md: 8 }}
+      position="relative"
+    >
+      {/* Top Logo */}
+      <Box
+        position="absolute"
+        top={{ base: 4, md: 8 }}
+        left={{ base: 4, md: 8 }}
+        zIndex={10}
+      >
+        <Link to="/" style={{ textDecoration: 'none' }}>
+          <Heading
+            as="h1"
+            size={{ base: 'md', md: 'lg' }}
+            fontWeight="700"
+            color="white"
+            m={0}
+            _hover={{ color: 'rgba(255, 255, 255, 0.8)' }}
+            transition="color 0.2s ease"
           >
-            {isLoading ? 'Creating account...' : 'Create account'}
-          </button>
-        </form>
+            Worship Lead
+          </Heading>
+        </Link>
+      </Box>
 
-        <div className="signup-footer">
-          <p>
-            Already have an account?{' '}
-            <Link to="/login" className="link">
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </div>
+      {/* Signup Container */}
+      <Center minH="100vh">
+        <Box
+          bg={cardBg}
+          borderRadius="xl"
+          boxShadow={cardShadow}
+          p={{ base: 8, md: 10 }}
+          w="100%"
+          maxW="450px"
+          mx="auto"
+        >
+          {/* Signup Header */}
+          <VStack spacing={3} mb={8} textAlign="center">
+            <Heading
+              as="h2"
+              size={'xl'}
+              fontWeight="600"
+              color={titleColor}
+            >
+              Create your account
+            </Heading>
+            {invitation ? (
+              <Text
+                fontSize={{ base: 'md', md: 'lg' }}
+                color={subtitleColor}
+              >
+                You've been invited to join <strong>{invitation.organizations?.name}</strong>
+              </Text>
+            ) : (
+              <Text
+                fontSize={{ base: 'md', md: 'lg' }}
+                color={subtitleColor}
+              >
+                Join Worship Lead and start organizing your worship team
+              </Text>
+            )}
+          </VStack>
 
-      <div className="signup-copyright">
-        <p>&copy; {new Date().getFullYear()} Worship Lead. All rights reserved.</p>
-      </div>
-    </div>
+          {/* Signup Form */}
+          <Box as="form" onSubmit={handleSubmit} mb={6}>
+            {error && (
+              <Alert status="error" mb={4} borderRadius="md">
+                <AlertIcon />
+                {error}
+              </Alert>
+            )}
+
+            <VStack spacing={6}>
+              {/* Name Row */}
+              <HStack spacing={4} w="100%" align="start">
+                <FormControl isRequired>
+                  <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
+                    First Name
+                  </FormLabel>
+                  <Input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    placeholder="Enter your first name"
+                    size="lg"
+                    _focus={{
+                      borderColor: 'blue.500',
+                      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
+                    Last Name
+                  </FormLabel>
+                  <Input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    placeholder="Enter your last name"
+                    size="lg"
+                    _focus={{
+                      borderColor: 'blue.500',
+                      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                  />
+                </FormControl>
+              </HStack>
+
+              {/* Email */}
+              <FormControl isRequired>
+                <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
+                  Email
+                </FormLabel>
+                <Input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="Enter your email"
+                  size="lg"
+                  disabled={!!invitation}
+                  bg={invitation ? disabledBg : undefined}
+                  color={invitation ? disabledColor : undefined}
+                  _focus={{
+                    borderColor: 'blue.500',
+                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  }}
+                />
+                {invitation && (
+                  <FormHelperText color={subtitleColor} fontSize="xs">
+                    Email is pre-filled from your invitation
+                  </FormHelperText>
+                )}
+              </FormControl>
+
+              {/* Password */}
+              <FormControl isRequired>
+                <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
+                  Password
+                </FormLabel>
+                <Input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="Create a password"
+                  size="lg"
+                  _focus={{
+                    borderColor: 'blue.500',
+                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  }}
+                />
+              </FormControl>
+
+              {/* Confirm Password */}
+              <FormControl isRequired>
+                <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
+                  Confirm Password
+                </FormLabel>
+                <Input
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  placeholder="Confirm your password"
+                  size="lg"
+                  _focus={{
+                    borderColor: 'blue.500',
+                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  }}
+                />
+              </FormControl>
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                colorScheme="blue"
+                size="lg"
+                w="100%"
+                isLoading={isLoading}
+                loadingText="Creating account..."
+                fontWeight="500"
+                fontSize="md"
+                py={3}
+              >
+                Create account
+              </Button>
+            </VStack>
+          </Box>
+
+          {/* Signup Footer */}
+          <Box
+            textAlign="center"
+            pt={6}
+            borderTop="1px"
+            borderColor={borderColor}
+          >
+            <Text color={subtitleColor} fontSize="sm">
+              Already have an account?{' '}
+              <Box
+                as={Link}
+                to="/login"
+                color={linkColor}
+                fontWeight="500"
+                _hover={{
+                  color: linkHoverColor,
+                  textDecoration: 'underline'
+                }}
+                transition="color 0.2s ease"
+              >
+                Sign in
+              </Box>
+            </Text>
+          </Box>
+        </Box>
+      </Center>
+
+      {/* Copyright */}
+      <Box
+        position="absolute"
+        bottom={4}
+        left="50%"
+        transform="translateX(-50%)"
+        textAlign="center"
+      >
+        <Text color={copyrightColor} fontSize="sm" m={0}>
+          &copy; {new Date().getFullYear()} Worship Lead. All rights reserved.
+        </Text>
+      </Box>
+    </Box>
   )
 } 
