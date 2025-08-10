@@ -3,8 +3,27 @@ import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import { supabase } from '../lib/supabase'
+import { 
+  Box, 
+  VStack, 
+  HStack, 
+  Heading, 
+  Text, 
+  Button, 
+  Spinner, 
+  SimpleGrid, 
+  useColorModeValue,
+  Container,
+  FormControl,
+  FormLabel,
+  Input,
+  Alert,
+  AlertIcon,
+  Badge,
+  Flex,
+  Center,
+} from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
-import './TeamManagement.css'
 
 interface OrganizationData {
   organization_id: string
@@ -17,8 +36,6 @@ interface OrganizationData {
     slug: string
   }[]
 }
-
-
 
 interface OrganizationInvite {
   id: string
@@ -54,6 +71,14 @@ export function TeamManagement() {
   const [inviting, setInviting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Color mode values
+  const bgColor = useColorModeValue('gray.50', 'gray.900')
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
+  const textColor = useColorModeValue('gray.800', 'white')
+  const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
+  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -256,8 +281,6 @@ export function TeamManagement() {
     }
   }
 
-
-
   const handleCancelInvite = async (inviteId: string) => {
     if (!confirm('Are you sure you want to cancel this invitation?')) return
 
@@ -295,172 +318,269 @@ export function TeamManagement() {
     }
   }
 
-
-
   if (loading) {
     return (
-      <div className="team-loading">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Loading team management...</p>
-        </div>
-      </div>
+      <Box minH="100vh" bg={bgColor}>
+        <Center h="100vh">
+          <VStack spacing={4}>
+            <Spinner size="xl" color="blue.500" />
+            <Text color={textColor}>Loading team management...</Text>
+          </VStack>
+        </Center>
+      </Box>
     )
   }
 
   return (
-    <div className="team">
+    <Box minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <main className="team-main">
-        <div className="team-container">
-          <div className="team-header-section">
-            <div className="team-title">
-              <h2>Team Management</h2>
-              <p>Invite team members to collaborate on your worship planning</p>
-            </div>
-            <div className="team-actions">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="btn btn-secondary"
-              >
-                Back to Dashboard
-              </button>
-            </div>
-          </div>
+      <Box as="main" py={8}>
+        <Container maxW="1200px" px={6}>
+          {/* Header Section */}
+          <Flex 
+            justify="space-between" 
+            align="flex-start" 
+            mb={8}
+            direction={{ base: 'column', md: 'row' }}
+            gap={{ base: 4, md: 0 }}
+          >
+            <Box>
+              <Heading as="h2" size="lg" color={textColor} mb={2}>
+                Team Management
+              </Heading>
+              <Text color={textSecondaryColor} fontSize="lg">
+                Invite team members to collaborate on your worship planning
+              </Text>
+            </Box>
+            
+            <Button
+              variant="outline"
+              colorScheme="gray"
+              onClick={() => navigate('/dashboard')}
+              size="md"
+            >
+              Back to Dashboard
+            </Button>
+          </Flex>
 
-          <div className="team-content">
-            <div className="team-sections-grid">
-              <div className="team-section">
-                <h3>Team Members ({members.length})</h3>
-                {members.length === 0 ? (
-                  <div className="no-members">
-                    <p>No members found</p>
-                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
-                      Debug: Members data: {JSON.stringify(members, null, 2)}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="members-list">
-                    {members.map(member => (
-                      <div key={member.id} className="member-item">
-                        <div className="member-info">
-                          <div className="member-name">
+          {/* Content Grid */}
+          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8} align="start">
+            {/* Team Members Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Heading as="h3" size="md" color={textColor} mb={5}>
+                Team Members ({members.length})
+              </Heading>
+              
+              {members.length === 0 ? (
+                <Box textAlign="center" py={8}>
+                  <Text color={textMutedColor}>No members found</Text>
+                  <Text fontSize="xs" color={textMutedColor} mt={2}>
+                    Debug: Members data: {JSON.stringify(members, null, 2)}
+                  </Text>
+                </Box>
+              ) : (
+                <VStack spacing={3} align="stretch">
+                  {members.map(member => (
+                    <Box
+                      key={member.id}
+                      bg={useColorModeValue('gray.50', 'gray.700')}
+                      borderRadius="md"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      p={4}
+                    >
+                      <Flex justify="space-between" align="center">
+                        <Box flex="1">
+                          <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
                             {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
-                          </div>
-                          <div className="member-details">
-                            <span className="member-email">{member.profiles?.email || 'No email'}</span>
-                            <span className="member-joined">
+                          </Text>
+                          <HStack spacing={4} fontSize="sm">
+                            <Text color={textMutedColor}>
+                              {member.profiles?.email || 'No email'}
+                            </Text>
+                            <Text color={textMutedColor}>
                               Joined {new Date(member.joined_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="member-role">
-                          <span className={`role-badge role-${member.role}`}>
-                            {member.role}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                            </Text>
+                          </HStack>
+                        </Box>
+                        
+                        <Badge
+                          colorScheme={
+                            member.role === 'owner' ? 'yellow' : 
+                            member.role === 'admin' ? 'blue' : 'gray'
+                          }
+                          variant="subtle"
+                          textTransform="capitalize"
+                          fontSize="xs"
+                          px={3}
+                          py={1}
+                        >
+                          {member.role}
+                        </Badge>
+                      </Flex>
+                    </Box>
+                  ))}
+                </VStack>
+              )}
+            </Box>
 
-              <div className="team-section">
-                <h3>Invite Team Members</h3>
-                <form onSubmit={handleInviteUser} className="invite-form">
-                  <div className="form-group">
-                    <label htmlFor="email">Email Address</label>
-                    <input
+            {/* Invite Team Members Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Heading as="h3" size="md" color={textColor} mb={5}>
+                Invite Team Members
+              </Heading>
+              
+              <form onSubmit={handleInviteUser}>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                      Email Address
+                    </FormLabel>
+                    <Input
                       type="email"
-                      id="email"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
                       placeholder="Enter email address"
                       required
+                      size="md"
                     />
-                  </div>
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary"
-                    disabled={inviting || !inviteEmail.trim()}
+                  </FormControl>
+                  
+                  <Button
+                    type="submit"
+                    colorScheme="blue"
+                    isLoading={inviting}
+                    loadingText="Sending..."
+                    disabled={!inviteEmail.trim()}
+                    size="md"
+                    h="40px"
                   >
-                    {inviting ? 'Sending Invitation...' : 'Send Invitation'}
-                  </button>
-                </form>
+                    Send Invitation
+                  </Button>
+                </SimpleGrid>
+              </form>
 
-                {error && (
-                  <div className="error-message">
-                    {error}
-                  </div>
-                )}
+              {error && (
+                <Alert status="error" borderRadius="md" mt={4}>
+                  <AlertIcon />
+                  {error}
+                </Alert>
+              )}
 
-                {success && (
-                  <div className="success-message">
-                    <div className="success-content">
-                      <span>{success}</span>
-                      {success.includes('Copy and share this link:') && (
-                        <button
-                          onClick={() => {
-                            const url = success.split('Copy and share this link: ')[1]
-                            navigator.clipboard.writeText(url)
-                            setSuccess('Link copied to clipboard!')
-                          }}
-                          className="btn btn-secondary btn-small"
-                          style={{ marginLeft: '12px' }}
-                        >
-                          Copy Link
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
+              {success && (
+                <Alert status="success" borderRadius="md" mt={4}>
+                  <AlertIcon />
+                  <Box flex="1">
+                    <Text>{success}</Text>
+                    {success.includes('Copy and share this link:') && (
+                      <Button
+                        variant="outline"
+                        colorScheme="gray"
+                        size="sm"
+                        onClick={() => {
+                          const url = success.split('Copy and share this link: ')[1]
+                          navigator.clipboard.writeText(url)
+                          setSuccess('Link copied to clipboard!')
+                        }}
+                        ml={3}
+                        mt={2}
+                      >
+                        Copy Link
+                      </Button>
+                    )}
+                  </Box>
+                </Alert>
+              )}
 
-                <div className="pending-invites-section">
-                  <h4>Pending Invitations</h4>
-                  {invites.length === 0 ? (
-                    <div className="no-invites">
-                      <p>No pending invitations</p>
-                    </div>
-                  ) : (
-                    <div className="invites-list">
-                      {invites.map(invite => (
-                        <div key={invite.id} className="invite-item">
-                          <div className="invite-info">
-                            <span className="invite-email">{invite.email}</span>
-                            <div className="invite-details">
-                              <span className="invite-date">
+              {/* Pending Invitations */}
+              <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
+                <Heading as="h4" size="sm" color={textColor} mb={4}>
+                  Pending Invitations
+                </Heading>
+                
+                {invites.length === 0 ? (
+                  <Box textAlign="center" py={8}>
+                    <Text color={textMutedColor}>No pending invitations</Text>
+                  </Box>
+                ) : (
+                  <VStack spacing={3} align="stretch">
+                    {invites.map(invite => (
+                      <Box
+                        key={invite.id}
+                        bg={useColorModeValue('gray.50', 'gray.700')}
+                        borderRadius="md"
+                        border="1px"
+                        borderColor={cardBorderColor}
+                        p={4}
+                      >
+                        <Flex justify="space-between" align="center">
+                          <Box flex="1">
+                            <Text fontWeight="500" color={textColor} fontSize="md" mb={1}>
+                              {invite.email}
+                            </Text>
+                            <HStack spacing={3} fontSize="sm">
+                              <Text color={textMutedColor}>
                                 Sent {new Date(invite.created_at).toLocaleDateString()}
-                              </span>
-                              <span className={`invite-status invite-status-${invite.status}`}>
+                              </Text>
+                              <Badge
+                                colorScheme={
+                                  invite.status === 'pending' ? 'yellow' : 
+                                  invite.status === 'accepted' ? 'green' : 'red'
+                                }
+                                variant="subtle"
+                                textTransform="capitalize"
+                                fontSize="xs"
+                                px={2}
+                                py={1}
+                              >
                                 {invite.status}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="invite-actions">
-                            <button
+                              </Badge>
+                            </HStack>
+                          </Box>
+                          
+                          <HStack spacing={2}>
+                            <Button
+                              variant="outline"
+                              colorScheme="gray"
+                              size="sm"
                               onClick={() => handleCopyInviteLink(invite.id)}
-                              className="btn btn-secondary btn-small"
                             >
                               Copy Link
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="outline"
+                              colorScheme="red"
+                              size="sm"
                               onClick={() => handleCancelInvite(invite.id)}
-                              className="btn btn-danger btn-small"
                             >
                               Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+                            </Button>
+                          </HStack>
+                        </Flex>
+                      </Box>
+                    ))}
+                  </VStack>
+                )}
+              </Box>
+            </Box>
+          </SimpleGrid>
+        </Container>
+      </Box>
+    </Box>
   )
 } 
