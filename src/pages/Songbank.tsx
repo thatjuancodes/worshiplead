@@ -1,38 +1,38 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
-  Box, 
-  VStack, 
-  HStack, 
-  Heading, 
-  Text, 
-  Button, 
-  Spinner, 
-  SimpleGrid, 
+import { supabase } from '../lib/supabase'
+import { getCurrentUser } from '../lib/auth'
+import { getUserPrimaryOrganization } from '../lib/auth'
+import {
+  Box,
+  VStack,
+  HStack,
+  Heading,
+  Text,
+  Button,
+  Grid,
+  SimpleGrid,
   useColorModeValue,
-  Center,
+  useToast,
+  Spinner,
   Input,
-  Textarea,
-  Select,
   FormControl,
   FormLabel,
-  IconButton,
+  Textarea,
+  Select,
   Badge,
+  Flex,
+  Center,
+  IconButton,
   Table,
   Thead,
   Tbody,
   Tr,
   Th,
-  Td,
-  Flex,
-  Grid,
-  GridItem,
-  useToast
+  Td
 } from '@chakra-ui/react'
-import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
 
 interface Song {
   id: string
@@ -355,11 +355,7 @@ export function Songbank() {
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
   const textColor = useColorModeValue('gray.700', 'gray.200')
   const mutedTextColor = useColorModeValue('gray.500', 'gray.400')
-  const metadataBg = useColorModeValue('gray.100', 'gray.700')
-  const metadataColor = useColorModeValue('gray.600', 'gray.300')
-  const tagBg = useColorModeValue('blue.500', 'blue.400')
   const tableHeaderBg = useColorModeValue('gray.50', 'gray.700')
-  const tableBorderColor = useColorModeValue('gray.200', 'gray.600')
   const tableHoverBg = useColorModeValue('gray.50', 'gray.700')
 
   if (loading) {

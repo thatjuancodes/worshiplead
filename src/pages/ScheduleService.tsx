@@ -11,7 +11,6 @@ import {
   Text, 
   Button, 
   Spinner, 
-  SimpleGrid, 
   useColorModeValue,
   Container,
   FormControl,
@@ -24,7 +23,6 @@ import {
   Flex,
   Center,
   Grid,
-  GridItem
 } from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
 

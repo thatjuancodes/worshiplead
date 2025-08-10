@@ -5,7 +5,6 @@ import { getCurrentUser } from '../lib/auth'
 import {
   Box,
   VStack,
-  HStack,
   Heading,
   Text,
   Button,
@@ -14,13 +13,11 @@ import {
   Alert,
   AlertIcon,
   AlertTitle,
-  AlertDescription,
-  useToast
+  AlertDescription
 } from '@chakra-ui/react'
 
 export function InvitationHandler() {
   const navigate = useNavigate()
-  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)

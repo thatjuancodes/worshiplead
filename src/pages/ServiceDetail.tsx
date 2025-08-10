@@ -22,9 +22,7 @@ import {
   Flex,
   Center,
   Grid,
-  GridItem,
   Badge,
-  Divider,
   IconButton,
   Tooltip
 } from '@chakra-ui/react'
@@ -209,8 +207,8 @@ function SortableSongItem({
       <Box flexShrink={0}>
         <Tooltip label="Remove song from service">
           <IconButton
-            aria-label="Remove song"
-            icon={<CloseIcon />}
+            aria-label="Remove song from service"
+            icon={isRemoving ? <Spinner size="sm" /> : <CloseIcon />}
             colorScheme="red"
             size="sm"
             variant="outline"
@@ -220,7 +218,6 @@ function SortableSongItem({
               onRemove(serviceSong.id)
             }}
             isLoading={isRemoving}
-            loadingText="Removing..."
             disabled={isRemoving}
           />
         </Tooltip>

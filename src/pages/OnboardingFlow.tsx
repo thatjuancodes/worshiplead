@@ -5,7 +5,6 @@ import { getCurrentUser } from '../lib/auth'
 import {
   Box,
   VStack,
-  HStack,
   Heading,
   Text,
   Button,
@@ -17,8 +16,7 @@ import {
   Alert,
   AlertIcon,
   AlertTitle,
-  AlertDescription,
-  useToast
+  AlertDescription
 } from '@chakra-ui/react'
 
 interface ProfileData {
@@ -30,7 +28,6 @@ interface ProfileData {
 
 export function OnboardingFlow() {
   const navigate = useNavigate()
-  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState<'checking' | 'profile' | 'processing' | 'complete'>('checking')
   const [error, setError] = useState<string | null>(null)

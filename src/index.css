@@ -1,29 +1,11 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light;
-  color: #213547;
-  background-color: #ffffff;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
+/* Global CSS resets - Chakra UI handles most styling */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
-}
-
-button:focus,
-button:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+/* Remove any default browser focus styles that might conflict with Chakra UI */
+*:focus {
+  outline: none;
 }

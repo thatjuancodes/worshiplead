@@ -12,21 +12,16 @@ import {
   FormControl,
   FormLabel,
   Input,
-  FormErrorMessage,
   Container,
   Card,
   CardBody,
   CardHeader,
   SimpleGrid,
-  useToast,
-  Spinner,
-  Flex,
   Divider
 } from '@chakra-ui/react'
 
 export function OrganizationSetup() {
   const navigate = useNavigate()
-  const toast = useToast()
   const [mode, setMode] = useState<'select' | 'create' | 'join'>('select')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
