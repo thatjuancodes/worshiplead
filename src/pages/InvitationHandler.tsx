@@ -2,10 +2,25 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
-import './InvitationHandler.css'
+import {
+  Box,
+  VStack,
+  HStack,
+  Heading,
+  Text,
+  Button,
+  Container,
+  Spinner,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
+  useToast
+} from '@chakra-ui/react'
 
 export function InvitationHandler() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -189,37 +204,62 @@ export function InvitationHandler() {
 
   if (loading) {
     return (
-      <div className="invitation-handler">
-        <div className="invitation-container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <h2>Processing your invitation...</h2>
-            <p>Please wait while we add you to the organization. This may take a moment to ensure everything is properly set up.</p>
-          </div>
-        </div>
-      </div>
+      <Box minH="100vh" bg="gray.50" display="flex" alignItems="center" justifyContent="center">
+        <Container maxW="container.sm">
+          <VStack spacing={8} textAlign="center">
+            <Spinner size="xl" color="blue.500" thickness="4px" />
+            <VStack spacing={4}>
+              <Heading as="h2" size="lg" color="gray.700">
+                Processing your invitation...
+              </Heading>
+              <Text color="gray.600" fontSize="lg">
+                Please wait while we add you to the organization. This may take a moment to ensure everything is properly set up.
+              </Text>
+            </VStack>
+          </VStack>
+        </Container>
+      </Box>
     )
   }
 
   return (
-    <div className="invitation-handler">
-      <div className="invitation-container">
+    <Box minH="100vh" bg="gray.50" display="flex" alignItems="center" justifyContent="center">
+      <Container maxW="container.sm">
         {error ? (
-          <div className="error-message">
-            <h2>Invitation Error</h2>
-            <p>{error}</p>
-            <button onClick={() => navigate('/dashboard')} className="btn btn-primary">
-              Go to Dashboard
-            </button>
-          </div>
+          <Box bg="white" p={8} borderRadius="lg" shadow="md" textAlign="center">
+            <VStack spacing={6}>
+              <Alert status="error" borderRadius="md">
+                <AlertIcon />
+                <Box>
+                  <AlertTitle>Invitation Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Box>
+              </Alert>
+              <Button
+                colorScheme="blue"
+                size="lg"
+                onClick={() => navigate('/dashboard')}
+              >
+                Go to Dashboard
+              </Button>
+            </VStack>
+          </Box>
         ) : success ? (
-          <div className="success-message">
-            <h2>Welcome!</h2>
-            <p>{success}</p>
-            <p>Redirecting you to the dashboard...</p>
-          </div>
+          <Box bg="white" p={8} borderRadius="lg" shadow="md" textAlign="center">
+            <VStack spacing={4}>
+              <Heading as="h2" size="xl" color="green.600">
+                Welcome!
+              </Heading>
+              <Text color="gray.700" fontSize="lg">
+                {success}
+              </Text>
+              <Text color="gray.600">
+                Redirecting you to the dashboard...
+              </Text>
+            </VStack>
+          </Box>
         ) : null}
-      </div>
-    </div>
+      </Container>
+    </Box>
   )
 } 
