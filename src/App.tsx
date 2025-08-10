@@ -2,8 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import './pages/ServiceDetail.css'
-import './pages/ServiceEdit.css'
+
+
 
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'

@@ -3,6 +3,32 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
+import { 
+  Box, 
+  VStack, 
+  HStack, 
+  Heading, 
+  Text, 
+  Button, 
+  Spinner, 
+  useColorModeValue,
+  Container,
+  FormControl,
+  FormLabel,
+  Input,
+  Select,
+  Alert,
+  AlertIcon,
+  Flex,
+  Center,
+  Grid,
+  GridItem,
+  Badge,
+  Divider,
+  IconButton,
+  Tooltip
+} from '@chakra-ui/react'
+import { CloseIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 import {
   DndContext,
@@ -23,7 +49,6 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import './ServiceDetail.css'
 
 interface WorshipService {
   id: string
@@ -70,8 +95,6 @@ interface OrganizationData {
   }[]
 }
 
-
-
 // Sortable Song Item Component
 function SortableSongItem({ 
   serviceSong, 
@@ -97,54 +120,112 @@ function SortableSongItem({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  const cardBg = useColorModeValue('gray.50', 'gray.700')
+  const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
+  const hoverBg = useColorModeValue('gray.100', 'gray.600')
+  const textColor = useColorModeValue('gray.800', 'white')
+  const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
+  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
+
   return (
-    <div 
+    <Box 
       ref={setNodeRef} 
       style={style} 
-      className="service-song-item"
+      bg={cardBg}
+      border="1px"
+      borderColor={cardBorderColor}
+      borderRadius="md"
+      p={4}
+      display="flex"
+      alignItems="center"
+      gap={4}
+      transition="all 0.2s ease"
+      _hover={{
+        bg: hoverBg,
+        borderColor: useColorModeValue('gray.300', 'gray.500'),
+        transform: 'translateY(-1px)',
+        boxShadow: 'md'
+      }}
+      cursor="grab"
+      userSelect="none"
       {...attributes}
     >
-      <div className="song-position" {...listeners}>
+      {/* Position Badge */}
+      <Box
+        bg="blue.500"
+        color="white"
+        borderRadius="full"
+        w={8}
+        h={8}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        fontWeight="600"
+        fontSize="sm"
+        flexShrink={0}
+        cursor="grab"
+        position="relative"
+        _active={{ cursor: 'grabbing' }}
+        {...listeners}
+      >
         {serviceSong.position}
-      </div>
-      <div className="song-info" {...listeners}>
-        <div className="song-title">
+        <Text
+          position="absolute"
+          bottom="-6px"
+          left="50%"
+          transform="translateX(-50%)"
+          fontSize="xs"
+          color={textMutedColor}
+          opacity={0.6}
+        >
+          ⋮⋮
+        </Text>
+      </Box>
+
+      {/* Song Info */}
+      <Box flex="1" minW="0" cursor="grab" {...listeners}>
+        <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
           {serviceSong.songs.title} - {serviceSong.songs.artist}
-        </div>
+        </Text>
         {serviceSong.notes && (
-          <div className="song-notes">
+          <Text color={textSecondaryColor} fontSize="sm" fontStyle="italic" mb={1}>
             {serviceSong.notes}
-          </div>
+          </Text>
         )}
         {serviceSong.songs.key && (
-          <span className="song-key">Key: {serviceSong.songs.key}</span>
+          <Badge
+            colorScheme="gray"
+            variant="subtle"
+            fontSize="xs"
+            px={2}
+            py={1}
+          >
+            Key: {serviceSong.songs.key}
+          </Badge>
         )}
-      </div>
-      <div className="song-actions">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onRemove(serviceSong.id)
-          }}
-          className="btn btn-danger btn-small"
-          title="Remove song from service"
-          disabled={isRemoving}
-        >
-          {isRemoving ? (
-            <>
-              <span className="spinner-small"></span>
-              Removing...
-            </>
-          ) : (
-            <>
-              ✕ Remove
-            </>
-          )}
-        </button>
-      </div>
-    </div>
+      </Box>
+
+      {/* Actions */}
+      <Box flexShrink={0}>
+        <Tooltip label="Remove song from service">
+          <IconButton
+            aria-label="Remove song"
+            icon={<CloseIcon />}
+            colorScheme="red"
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onRemove(serviceSong.id)
+            }}
+            isLoading={isRemoving}
+            loadingText="Removing..."
+            disabled={isRemoving}
+          />
+        </Tooltip>
+      </Box>
+    </Box>
   )
 }
 
@@ -171,6 +252,14 @@ export function ServiceDetail() {
   const [removingSong, setRemovingSong] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<string>('')
+
+  // Color mode values
+  const bgColor = useColorModeValue('gray.50', 'gray.900')
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
+  const textColor = useColorModeValue('gray.800', 'white')
+  const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
+  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -444,8 +533,6 @@ export function ServiceDetail() {
     }
   }, [service, loadServiceSongs, loadAvailableSongs])
 
-
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       weekday: 'long',
@@ -456,247 +543,397 @@ export function ServiceDetail() {
   }
 
   const getStatusBadge = (status: string) => {
-    const statusClasses = {
-      draft: 'status-draft',
-      published: 'status-published',
-      completed: 'status-completed'
+    const statusColorScheme = {
+      draft: 'yellow',
+      published: 'green',
+      completed: 'blue'
     }
-    return `status-badge ${statusClasses[status as keyof typeof statusClasses] || 'status-draft'}`
+    return statusColorScheme[status as keyof typeof statusColorScheme] || 'yellow'
   }
 
   if (loading) {
     return (
-      <div className="service-detail">
-        <div className="service-loading">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-          </div>
-          <p>Loading service details...</p>
-        </div>
-      </div>
+      <Box minH="100vh" bg={bgColor}>
+        <Center h="100vh">
+          <VStack spacing={4}>
+            <Spinner size="xl" color="blue.500" />
+            <Text color={textColor}>Loading service details...</Text>
+          </VStack>
+        </Center>
+      </Box>
     )
   }
 
   if (error) {
     return (
-      <div className="service-detail">
+      <Box minH="100vh" bg={bgColor}>
         <DashboardHeader user={user} organization={organization} />
 
-        <main className="service-main">
-          <div className="service-container">
-            <div className="error-section">
-              <h2>Error</h2>
-              <p>{error}</p>
-              <button onClick={() => navigate('/schedule')} className="btn btn-primary">
+        <Box as="main" py={8}>
+          <Container maxW="1200px" px={6}>
+            <Box textAlign="center" py={12}>
+              <Heading as="h2" size="lg" color="red.500" mb={4}>
+                Error
+              </Heading>
+              <Text color={textMutedColor} mb={6}>
+                {error}
+              </Text>
+              <Button
+                colorScheme="blue"
+                onClick={() => navigate('/schedule')}
+                size="md"
+              >
                 Back to Services
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
+              </Button>
+            </Box>
+          </Container>
+        </Box>
+      </Box>
     )
   }
 
   if (!service) {
     return (
-      <div className="service-detail">
-        <div className="service-loading">
-          <p>Service not found</p>
-          <button onClick={() => navigate('/schedule')} className="btn btn-primary">
-            Back to Services
-          </button>
-        </div>
-      </div>
+      <Box minH="100vh" bg={bgColor}>
+        <Center h="100vh">
+          <VStack spacing={4}>
+            <Text color={textColor}>Service not found</Text>
+            <Button
+              colorScheme="blue"
+              onClick={() => navigate('/schedule')}
+              size="md"
+            >
+              Back to Services
+            </Button>
+          </VStack>
+        </Center>
+      </Box>
     )
   }
 
   return (
-    <div className="service-detail">
+    <Box minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <main className="service-main">
-        <div className="service-container">
-          <div className="service-header-section">
-            <div className="service-title">
-              <h2>Service Details</h2>
-              <p>View and manage your worship service</p>
-            </div>
-            <div className="service-actions">
-              <button
+      <Box as="main" py={8}>
+        <Container maxW="1200px" px={6}>
+          {/* Header Section */}
+          <Flex 
+            justify="space-between" 
+            align="flex-start" 
+            mb={8}
+            direction={{ base: 'column', md: 'row' }}
+            gap={{ base: 4, md: 0 }}
+          >
+            <Box flex="1">
+              <Heading as="h2" size="xl" color={textColor} mb={2}>
+                Service Details
+              </Heading>
+              <Text color={textSecondaryColor} fontSize="lg">
+                View and manage your worship service
+              </Text>
+            </Box>
+            
+            <HStack spacing={3}>
+              <Button
+                colorScheme="blue"
                 onClick={() => navigate(`/service/${service.id}/edit`)}
-                className="btn btn-primary"
+                size="md"
               >
                 Edit Service
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                colorScheme="gray"
                 onClick={() => navigate('/schedule')}
-                className="btn btn-secondary"
+                size="md"
               >
                 Back to Services
-              </button>
-            </div>
-          </div>
+              </Button>
+            </HStack>
+          </Flex>
 
+          {/* Messages */}
           {error && (
-            <div className="error-message">
+            <Alert status="error" borderRadius="md" mb={6}>
+              <AlertIcon />
               {error}
-            </div>
+            </Alert>
           )}
 
           {success && (
-            <div className="success-message">
+            <Alert status="success" borderRadius="md" mb={6}>
+              <AlertIcon />
               {success}
-            </div>
+            </Alert>
           )}
 
-          <div className="service-content">
-            <div className="service-info-section">
-              <div className="service-header-info">
-                <h3>{service.title}</h3>
-                <span className={getStatusBadge(service.status)}>
+          <VStack spacing={6} align="stretch">
+            {/* Service Info Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Flex 
+                justify="space-between" 
+                align="center" 
+                mb={6}
+                direction={{ base: 'column', sm: 'row' }}
+                gap={{ base: 3, sm: 0 }}
+              >
+                <Heading as="h3" size="lg" color={textColor}>
+                  {service.title}
+                </Heading>
+                <Badge
+                  colorScheme={getStatusBadge(service.status)}
+                  variant="subtle"
+                  textTransform="capitalize"
+                  fontSize="sm"
+                  px={3}
+                  py={1}
+                >
                   {service.status}
-                </span>
-              </div>
+                </Badge>
+              </Flex>
 
-              <div className="service-details-grid">
-                <div className="detail-item">
-                  <label>Service Date</label>
-                  <span>{formatDate(service.service_date)}</span>
-                </div>
+              <Grid 
+                templateColumns={{ base: '1fr', md: 'repeat(auto-fit, minmax(200px, 1fr))' }} 
+                gap={5} 
+                mb={6}
+              >
+                <Box>
+                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                    Service Date
+                  </Text>
+                  <Text fontSize="md" fontWeight="500" color={textColor}>
+                    {formatDate(service.service_date)}
+                  </Text>
+                </Box>
 
                 {service.service_time && (
-                  <div className="detail-item">
-                    <label>Service Time</label>
-                    <span>{service.service_time}</span>
-                  </div>
+                  <Box>
+                    <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                      Service Time
+                    </Text>
+                    <Text fontSize="md" fontWeight="500" color={textColor}>
+                      {service.service_time}
+                    </Text>
+                  </Box>
                 )}
 
-                <div className="detail-item">
-                  <label>Created</label>
-                  <span>{formatDate(service.created_at)}</span>
-                </div>
+                <Box>
+                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                    Created
+                  </Text>
+                  <Text fontSize="md" fontWeight="500" color={textColor}>
+                    {formatDate(service.created_at)}
+                  </Text>
+                </Box>
 
-                <div className="detail-item">
-                  <label>Last Updated</label>
-                  <span>{formatDate(service.updated_at)}</span>
-                </div>
-              </div>
+                <Box>
+                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                    Last Updated
+                  </Text>
+                  <Text fontSize="md" fontWeight="500" color={textColor}>
+                    {formatDate(service.updated_at)}
+                  </Text>
+                </Box>
+              </Grid>
 
               {service.description && (
-                <div className="service-description">
-                  <label>Description</label>
-                  <p>{service.description}</p>
-                </div>
+                <Box borderTop="1px" borderColor={cardBorderColor} pt={5}>
+                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={2}>
+                    Description
+                  </Text>
+                  <Text color={textSecondaryColor} lineHeight="1.6">
+                    {service.description}
+                  </Text>
+                </Box>
               )}
-            </div>
+            </Box>
 
-            <div className="service-songs-section">
-              <div className="section-header">
-                <h3>Service Songs</h3>
-                <button 
+            {/* Service Songs Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Flex 
+                justify="space-between" 
+                align="center" 
+                mb={5}
+                direction={{ base: 'column', sm: 'row' }}
+                gap={{ base: 3, sm: 0 }}
+              >
+                <Heading as="h3" size="md" color={textColor}>
+                  Service Songs
+                </Heading>
+                <Button 
+                  colorScheme="blue"
+                  size="sm"
                   onClick={() => setShowAddSongForm(!showAddSongForm)}
-                  className="btn btn-primary btn-small"
                 >
                   {showAddSongForm ? 'Cancel' : 'Add Songs'}
-                </button>
-              </div>
+                </Button>
+              </Flex>
 
               {showAddSongForm && (
-                <div className="add-song-form">
-                  <h4>Add Song to Service</h4>
+                <Box
+                  bg={useColorModeValue('gray.50', 'gray.700')}
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  borderRadius="lg"
+                  p={5}
+                  mb={5}
+                >
+                  <Heading as="h4" size="sm" color={textColor} mb={4}>
+                    Add Song to Service
+                  </Heading>
                   <form onSubmit={handleAddSong}>
-                    <div className="form-group">
-                      <label htmlFor="songSelect">Select Song</label>
-                      <select
-                        id="songSelect"
-                        value={selectedSongId}
-                        onChange={(e) => setSelectedSongId(e.target.value)}
-                        required
-                      >
-                        <option value="">Choose a song...</option>
-                        {availableSongs.map(song => (
-                          <option key={song.id} value={song.id}>
-                            {song.title} - {song.artist}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="songNotes">Notes (optional)</label>
-                      <input
-                        type="text"
-                        id="songNotes"
-                        value={songNotes}
-                        onChange={(e) => setSongNotes(e.target.value)}
-                        placeholder="e.g., special number, ending song"
-                      />
-                    </div>
-                    <div className="form-actions">
-                      <button 
-                        type="submit" 
-                        className="btn btn-primary"
-                        disabled={addingSong || !selectedSongId}
-                      >
-                        {addingSong ? 'Adding Song...' : 'Add Song'}
-                      </button>
-                      <button 
-                        type="button" 
-                        className="btn btn-secondary"
-                        onClick={() => setShowAddSongForm(false)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                    <VStack spacing={4} align="stretch">
+                      <FormControl isRequired>
+                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                          Select Song
+                        </FormLabel>
+                        <Select
+                          value={selectedSongId}
+                          onChange={(e) => setSelectedSongId(e.target.value)}
+                          size="md"
+                        >
+                          <option value="">Choose a song...</option>
+                          {availableSongs.map(song => (
+                            <option key={song.id} value={song.id}>
+                              {song.title} - {song.artist}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      
+                      <FormControl>
+                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                          Notes (optional)
+                        </FormLabel>
+                        <Input
+                          type="text"
+                          value={songNotes}
+                          onChange={(e) => setSongNotes(e.target.value)}
+                          placeholder="e.g., special number, ending song"
+                          size="md"
+                        />
+                      </FormControl>
+                      
+                      <HStack spacing={3} pt={2}>
+                        <Button 
+                          type="submit" 
+                          colorScheme="blue"
+                          isLoading={addingSong}
+                          loadingText="Adding Song..."
+                          disabled={!selectedSongId}
+                          size="md"
+                        >
+                          Add Song
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          colorScheme="gray"
+                          onClick={() => setShowAddSongForm(false)}
+                          size="md"
+                        >
+                          Cancel
+                        </Button>
+                      </HStack>
+                    </VStack>
                   </form>
-                </div>
+                </Box>
               )}
               
               {serviceSongs.length === 0 ? (
-                <div className="no-songs">
-                  <p>No songs added to this service yet</p>
-                  <p>Add songs from your songbank to create a setlist</p>
-                </div>
+                <Box textAlign="center" py={10}>
+                  <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
+                    No songs added to this service yet
+                  </Text>
+                  <Text color={textMutedColor}>
+                    Add songs from your songbank to create a setlist
+                  </Text>
+                </Box>
               ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={serviceSongs.map(song => song.id)}
-                    strategy={verticalListSortingStrategy}
+                <Box>
+                  <Text fontSize="xs" color={textMutedColor} fontStyle="italic" mb={3}>
+                    Drag to reorder songs
+                  </Text>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
                   >
-                    <div className="service-songs-list">
-                      {serviceSongs.map((serviceSong) => (
-                        <SortableSongItem
-                          key={serviceSong.id}
-                          serviceSong={serviceSong}
-                          onRemove={handleRemoveSong}
-                          isRemoving={removingSong === serviceSong.id}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
+                    <SortableContext
+                      items={serviceSongs.map(song => song.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <VStack spacing={3} align="stretch">
+                        {serviceSongs.map((serviceSong) => (
+                          <SortableSongItem
+                            key={serviceSong.id}
+                            serviceSong={serviceSong}
+                            onRemove={handleRemoveSong}
+                            isRemoving={removingSong === serviceSong.id}
+                          />
+                        ))}
+                      </VStack>
+                    </SortableContext>
+                  </DndContext>
+                </Box>
               )}
-            </div>
+            </Box>
 
-            <div className="service-notes-section">
-              <div className="section-header">
-                <h3>Service Notes</h3>
-                <button className="btn btn-secondary btn-small">
+            {/* Service Notes Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Flex 
+                justify="space-between" 
+                align="center" 
+                mb={5}
+                direction={{ base: 'column', sm: 'row' }}
+                gap={{ base: 3, sm: 0 }}
+              >
+                <Heading as="h3" size="md" color={textColor}>
+                  Service Notes
+                </Heading>
+                <Button 
+                  variant="outline"
+                  colorScheme="gray"
+                  size="sm"
+                >
                   Add Notes
-                </button>
-              </div>
+                </Button>
+              </Flex>
               
-              <div className="no-notes">
-                <p>No notes added yet</p>
-                <p>Add notes for the worship team, announcements, or special instructions</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+              <Box textAlign="center" py={10}>
+                <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
+                  No notes added yet
+                </Text>
+                <Text color={textMutedColor}>
+                  Add notes for the worship team, announcements, or special instructions
+                </Text>
+              </Box>
+            </Box>
+          </VStack>
+        </Container>
+      </Box>
+    </Box>
   )
 } 
