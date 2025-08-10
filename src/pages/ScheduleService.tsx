@@ -3,6 +3,29 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader, DeleteServiceModal } from '../components'
+import { 
+  Box, 
+  VStack, 
+  HStack, 
+  Heading, 
+  Text, 
+  Button, 
+  Spinner, 
+  SimpleGrid, 
+  useColorModeValue,
+  Container,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  Alert,
+  AlertIcon,
+  Badge,
+  Flex,
+  Center,
+  Grid,
+  GridItem
+} from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
 
 interface WorshipService {
@@ -31,8 +54,6 @@ interface OrganizationData {
   }[]
 }
 
-
-
 export function ScheduleService() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -54,6 +75,14 @@ export function ScheduleService() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [serviceToDelete, setServiceToDelete] = useState<WorshipService | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Color mode values
+  const bgColor = useColorModeValue('gray.50', 'gray.900')
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
+  const textColor = useColorModeValue('gray.800', 'white')
+  const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
+  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -190,8 +219,6 @@ export function ScheduleService() {
     }
   }
 
-
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       weekday: 'long',
@@ -209,12 +236,12 @@ export function ScheduleService() {
   }
 
   const getStatusBadge = (status: string) => {
-    const statusClasses = {
-      draft: 'status-draft',
-      published: 'status-published',
-      completed: 'status-completed'
+    const statusColorScheme = {
+      draft: 'yellow',
+      published: 'green',
+      completed: 'blue'
     }
-    return `status-badge ${statusClasses[status as keyof typeof statusClasses] || 'status-draft'}`
+    return statusColorScheme[status as keyof typeof statusColorScheme] || 'yellow'
   }
 
   const handleDeleteService = (service: WorshipService) => {
@@ -277,187 +304,290 @@ export function ScheduleService() {
 
   if (loading) {
     return (
-      <div className="schedule">
-        <div className="schedule-loading">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-          </div>
-          <p>Loading services...</p>
-        </div>
-      </div>
+      <Box minH="100vh" bg={bgColor}>
+        <Center h="100vh">
+          <VStack spacing={4}>
+            <Spinner size="xl" color="blue.500" />
+            <Text color={textColor}>Loading services...</Text>
+          </VStack>
+        </Center>
+      </Box>
     )
   }
 
   return (
-    <div className="schedule">
+    <Box minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <main className="schedule-main">
-        <div className="schedule-container">
-          <div className="schedule-header-section">
-            <div className="schedule-title">
-              <h2>Schedule Service</h2>
-              <p>Create and manage worship services for your organization</p>
-            </div>
-            <div className="schedule-actions">
-              <button
+      <Box as="main" py={8}>
+        <Container maxW="1200px" px={6}>
+          {/* Header Section */}
+          <Flex 
+            justify="space-between" 
+            align="flex-start" 
+            mb={5}
+            direction={{ base: 'column', md: 'row' }}
+            gap={{ base: 5, md: 0 }}
+            flexWrap="wrap"
+          >
+            <Box flex="1" minW="300px">
+              <Heading as="h2" size="lg" color={textColor} mb={2} mt={8}>
+                Schedule Service
+              </Heading>
+              <Text color={textSecondaryColor} fontSize="lg">
+                Create and manage worship services for your organization
+              </Text>
+            </Box>
+            
+            <HStack spacing={3} flexShrink={0} flexWrap="wrap">
+              <Button
+                colorScheme="blue"
                 onClick={() => setShowCreateForm(!showCreateForm)}
-                className="btn btn-primary"
+                size="md"
               >
                 {showCreateForm ? 'Cancel' : 'Create New Service'}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                colorScheme="gray"
                 onClick={() => navigate('/dashboard')}
-                className="btn btn-secondary"
+                size="md"
               >
                 Back to Dashboard
-              </button>
-            </div>
-          </div>
+              </Button>
+            </HStack>
+          </Flex>
 
+          {/* Messages */}
           {error && (
-            <div className="error-message">
+            <Alert status="error" borderRadius="md" mb={5}>
+              <AlertIcon />
               {error}
-            </div>
+            </Alert>
           )}
 
           {success && (
-            <div className="success-message">
+            <Alert status="success" borderRadius="md" mb={5}>
+              <AlertIcon />
               {success}
-            </div>
+            </Alert>
           )}
 
+          {/* Create Form */}
           {showCreateForm && (
-            <div className="schedule-section">
-              <h3>Create New Service</h3>
-              <form onSubmit={handleCreateService} className="service-form">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="title">Service Title *</label>
-                    <input
-                      type="text"
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g., Sunday Morning Service"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="serviceDate">Service Date *</label>
-                    <input
-                      type="date"
-                      id="serviceDate"
-                      value={serviceDate}
-                      onChange={(e) => setServiceDate(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="serviceTime">Service Time</label>
-                    <input
-                      type="time"
-                      id="serviceTime"
-                      value={serviceTime}
-                      onChange={(e) => setServiceTime(e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="description">Description</label>
-                    <textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Optional description or notes..."
-                      rows={3}
-                    />
-                  </div>
-                </div>
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+              mb={6}
+            >
+              <Heading as="h3" size="md" color={textColor} mb={5}>
+                Create New Service
+              </Heading>
+              
+              <form onSubmit={handleCreateService}>
+                <VStack spacing={5} align="stretch">
+                  <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={5}>
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Service Title *
+                      </FormLabel>
+                      <Input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="e.g., Sunday Morning Service"
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Service Date *
+                      </FormLabel>
+                      <Input
+                        type="date"
+                        value={serviceDate}
+                        onChange={(e) => setServiceDate(e.target.value)}
+                        size="md"
+                      />
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={5}>
+                    <FormControl>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Service Time
+                      </FormLabel>
+                      <Input
+                        type="time"
+                        value={serviceTime}
+                        onChange={(e) => setServiceTime(e.target.value)}
+                        size="md"
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Description
+                      </FormLabel>
+                      <Textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Optional description or notes..."
+                        rows={3}
+                        resize="vertical"
+                        minH="80px"
+                      />
+                    </FormControl>
+                  </Grid>
 
-                <div className="form-actions">
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary"
-                    disabled={creating || !title.trim() || !serviceDate}
-                  >
-                    {creating ? 'Creating Service...' : 'Create Service'}
-                  </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary"
-                    onClick={() => setShowCreateForm(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
+                  <HStack spacing={3} pt={2}>
+                    <Button
+                      type="submit"
+                      colorScheme="blue"
+                      isLoading={creating}
+                      loadingText="Creating Service..."
+                      disabled={!title.trim() || !serviceDate}
+                      size="md"
+                    >
+                      Create Service
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      colorScheme="gray"
+                      onClick={() => setShowCreateForm(false)}
+                      size="md"
+                    >
+                      Cancel
+                    </Button>
+                  </HStack>
+                </VStack>
               </form>
-            </div>
+            </Box>
           )}
 
-          <div className="schedule-section">
-            <h3>Worship Services ({services.length})</h3>
+          {/* Services List */}
+          <Box
+            bg={cardBg}
+            borderRadius="lg"
+            boxShadow="sm"
+            border="1px"
+            borderColor={cardBorderColor}
+            p={6}
+          >
+            <Heading as="h3" size="md" color={textColor} mb={5}>
+              Worship Services ({services.length})
+            </Heading>
+            
             {services.length === 0 ? (
-              <div className="no-services">
-                <p>No services found</p>
-                <p>Create your first worship service to get started.</p>
-              </div>
+              <Box textAlign="center" py={10}>
+                <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
+                  No services found
+                </Text>
+                <Text color={textMutedColor}>
+                  Create your first worship service to get started.
+                </Text>
+              </Box>
             ) : (
-              <div className="services-list">
+              <VStack spacing={5} align="stretch">
                 {services.map(service => (
-                  <div key={service.id} className="service-item">
-                    <div className="service-info">
-                      <div className="service-header">
-                        <h4 className="service-title">{formatServiceTitle(service.service_date, service.title)}</h4>
-                        <span className={getStatusBadge(service.status)}>
+                  <Box
+                    key={service.id}
+                    bg={cardBg}
+                    borderRadius="lg"
+                    border="1px"
+                    borderColor={cardBorderColor}
+                    boxShadow="sm"
+                    p={6}
+                    transition="all 0.2s ease"
+                    _hover={{
+                      bg: useColorModeValue('gray.50', 'gray.700'),
+                      borderColor: useColorModeValue('gray.300', 'gray.500'),
+                      boxShadow: 'md'
+                    }}
+                  >
+                    <Box>
+                      {/* Service Header */}
+                      <Flex 
+                        align="center" 
+                        gap={3} 
+                        mb={3}
+                        direction={{ base: 'column', sm: 'row' }}
+                        alignSelf={{ base: 'flex-start', sm: 'center' }}
+                      >
+                        <Heading as="h4" size="md" color={textColor} fontWeight="600">
+                          {formatServiceTitle(service.service_date, service.title)}
+                        </Heading>
+                        <Badge
+                          colorScheme={getStatusBadge(service.status)}
+                          variant="subtle"
+                          textTransform="capitalize"
+                          fontSize="xs"
+                          px={2}
+                          py={1}
+                        >
                           {service.status}
-                        </span>
-                      </div>
-                      <div className="service-details">
-                        <span className="service-date">
+                        </Badge>
+                      </Flex>
+                      
+                      {/* Service Details */}
+                      <VStack spacing={2} align="stretch">
+                        <Text fontWeight="500" color={textColor} fontSize="sm">
                           {formatDate(service.service_date)}
-                        </span>
+                        </Text>
+                        
                         {service.service_time && (
-                          <span className="service-time">
+                          <Text color={textMutedColor} fontSize="sm">
                             {service.service_time}
-                          </span>
+                          </Text>
                         )}
+                        
                         {service.description && (
-                          <p className="service-description">
+                          <Text color={textSecondaryColor} fontSize="sm" lineHeight="1.5">
                             {service.description}
-                          </p>
+                          </Text>
                         )}
-                        <div className="service-actions">
-                          <button
+                        
+                        {/* Service Actions */}
+                        <HStack spacing={3} mt={4} flexWrap="wrap">
+                          <Button
+                            colorScheme="blue"
+                            size="sm"
                             onClick={() => navigate(`/service/${service.id}`)}
-                            className="btn btn-primary btn-small"
                           >
                             View Details
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="outline"
+                            colorScheme="gray"
+                            size="sm"
                             onClick={() => navigate(`/service/${service.id}/edit`)}
-                            className="btn btn-secondary btn-small"
                           >
                             Edit
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="outline"
+                            colorScheme="red"
+                            size="sm"
                             onClick={() => handleDeleteService(service)}
-                            className="btn btn-danger btn-small"
                           >
                             Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                          </Button>
+                        </HStack>
+                      </VStack>
+                    </Box>
+                  </Box>
                 ))}
-              </div>
+              </VStack>
             )}
-          </div>
-        </div>
-      </main>
+          </Box>
+        </Container>
+      </Box>
 
       <DeleteServiceModal
         isOpen={deleteModalOpen}
@@ -466,6 +596,6 @@ export function ScheduleService() {
         serviceTitle={serviceToDelete?.title || ''}
         isLoading={deleting}
       />
-    </div>
+    </Box>
   )
 } 
