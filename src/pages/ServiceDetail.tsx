@@ -24,7 +24,6 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import './ServiceDetail.css'
-import './Dashboard.css'
 
 interface WorshipService {
   id: string

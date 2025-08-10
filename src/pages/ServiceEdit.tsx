@@ -5,7 +5,6 @@ import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
 import './ServiceEdit.css'
-import './Dashboard.css'
 
 interface OrganizationData {
   organization_id: string
