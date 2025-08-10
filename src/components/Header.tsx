@@ -1,11 +1,24 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { 
+  Box, 
+  Flex, 
+  Heading, 
+  Button, 
+  Container,
+  useColorModeValue
+} from '@chakra-ui/react'
 import { getCurrentUser } from '../lib/auth'
 import type { User } from '@supabase/supabase-js'
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const headerBg = useColorModeValue('white', 'gray.800')
+  const borderColor = useColorModeValue('gray.200', 'gray.700')
+  const logoColor = useColorModeValue('gray.800', 'white')
+  const logoHoverColor = useColorModeValue('blue.500', 'blue.300')
 
   useEffect(() => {
     const checkUser = async () => {
@@ -24,36 +37,60 @@ export function Header() {
   }, [])
 
   return (
-    <header className="header">
-      <div className="header-content">
-        <div className="logo">
-          <Link to={user ? "/dashboard" : "/"} className="logo-link">
-            <h1>Worship Lead</h1>
-          </Link>
-        </div>
+    <Box
+      as="header"
+      bg={headerBg}
+      borderBottom="1px"
+      borderColor={borderColor}
+      py={3}
+      position="sticky"
+      top={0}
+      zIndex={100}
+    >
+      <Container maxW="1200px" px={6}>
+        <Flex justify="space-between" align="center" minH="3.5rem">
+          <Box display="flex" alignItems="center" minH="2.25rem">
+            <Link to={user ? "/dashboard" : "/"} style={{ textDecoration: 'none' }}>
+              <Heading
+                as="h1"
+                size="lg"
+                color={logoColor}
+                _hover={{ color: logoHoverColor }}
+                transition="color 0.2s ease"
+                m={0}
+                p={0}
+                lineHeight={1}
+                display="flex"
+                alignItems="center"
+              >
+                Worship Lead
+              </Heading>
+            </Link>
+          </Box>
 
-        <nav className="nav">
-          {!loading && (
-            <>
-              {user ? (
-                <Link to="/dashboard" className="btn btn-primary">
-                  Dashboard
-                </Link>
-              ) : (
-                <>
-                  <Link to="/login" className="btn btn-secondary">
-                    Login
-                  </Link>
+          <Flex gap={3} alignItems="center">
+            {!loading && (
+              <>
+                {user ? (
+                  <Button as={Link} to="/dashboard" colorScheme="blue" size="md">
+                    Dashboard
+                  </Button>
+                ) : (
+                  <>
+                    <Button as={Link} to="/login" variant="outline" size="md">
+                      Login
+                    </Button>
 
-                  <Link to="/signup" className="btn btn-primary">
-                    Try for free
-                  </Link>
-                </>
-              )}
-            </>
-          )}
-        </nav>
-      </div>
-    </header>
+                    <Button as={Link} to="/signup" colorScheme="blue" size="md">
+                      Try for free
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </Flex>
+        </Flex>
+      </Container>
+    </Box>
   )
 } 
