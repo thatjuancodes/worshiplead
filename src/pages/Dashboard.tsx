@@ -127,6 +127,20 @@ export function Dashboard() {
   const [loadingRecentSongs, setLoadingRecentSongs] = useState(false)
   const [recentSongsError, setRecentSongsError] = useState('')
 
+  // Add Song Drawer state
+  const addSongDrawer = useDisclosure()
+  const [isAddingSong, setIsAddingSong] = useState(false)
+  const [songError, setSongError] = useState('')
+  const [songTitle, setSongTitle] = useState('')
+  const [songArtist, setSongArtist] = useState('')
+  const [songYouTubeUrl, setSongYouTubeUrl] = useState('')
+  const [songSpotifyUrl, setSongSpotifyUrl] = useState('')
+  const [songKey, setSongKey] = useState('')
+  const [songBpm, setSongBpm] = useState('')
+  const [songCcli, setSongCcli] = useState('')
+  const [songTags, setSongTags] = useState('')
+  const [songLyrics, setSongLyrics] = useState('')
+
   // Songs data
   const [availableSongs, setAvailableSongs] = useState<Song[]>([])
   const [serviceIdToSongs, setServiceIdToSongs] = useState<Record<string, ServiceSong[]>>({})
@@ -759,6 +773,7 @@ export function Dashboard() {
                       '100%': { left: '100%' }
                     }
                   }}
+                  onClick={addSongDrawer.onOpen}
                 >
                   Add song
                 </Button>
@@ -1106,6 +1121,123 @@ export function Dashboard() {
                   </HStack>
                 </DrawerFooter>
               )}
+            </DrawerContent>
+          </Drawer>
+
+          {/* Add Song Drawer */}
+          <Drawer isOpen={addSongDrawer.isOpen} placement="right" onClose={addSongDrawer.onClose} size="lg">
+            <DrawerOverlay />
+            <DrawerContent>
+              <DrawerCloseButton />
+              <DrawerHeader>Add New Song</DrawerHeader>
+              <DrawerBody>
+                {songError && (
+                  <Alert status="error" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    {songError}
+                  </Alert>
+                )}
+                <VStack spacing={5} align="stretch">
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">Title *</FormLabel>
+                    <Input value={songTitle} onChange={(e) => setSongTitle(e.target.value)} placeholder="Song title" size="md" />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">Artist *</FormLabel>
+                    <Input value={songArtist} onChange={(e) => setSongArtist(e.target.value)} placeholder="Artist name" size="md" />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontSize="sm">YouTube URL</FormLabel>
+                    <Input type="url" value={songYouTubeUrl} onChange={(e) => setSongYouTubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." size="md" />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontSize="sm">Spotify URL</FormLabel>
+                    <Input type="url" value={songSpotifyUrl} onChange={(e) => setSongSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/track/..." size="md" />
+                  </FormControl>
+
+                  <HStack spacing={4} align="stretch">
+                    <FormControl>
+                      <FormLabel fontSize="sm">Key</FormLabel>
+                      <Input value={songKey} onChange={(e) => setSongKey(e.target.value)} placeholder="C, G, D, etc." size="md" />
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel fontSize="sm">BPM</FormLabel>
+                      <Input type="number" value={songBpm} onChange={(e) => setSongBpm(e.target.value)} placeholder="120" size="md" />
+                    </FormControl>
+                  </HStack>
+
+                  <FormControl>
+                    <FormLabel fontSize="sm">CCLI Number</FormLabel>
+                    <Input value={songCcli} onChange={(e) => setSongCcli(e.target.value)} placeholder="CCLI-123456" size="md" />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontSize="sm">Tags</FormLabel>
+                    <Input value={songTags} onChange={(e) => setSongTags(e.target.value)} placeholder="worship, contemporary, gospel (comma separated)" size="md" />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontSize="sm">Lyrics</FormLabel>
+                    <Textarea value={songLyrics} onChange={(e) => setSongLyrics(e.target.value)} placeholder="Enter song lyrics..." size="md" rows={4} />
+                  </FormControl>
+                </VStack>
+              </DrawerBody>
+              <DrawerFooter>
+                <HStack w="100%" justify="flex-end">
+                  <Button variant="outline" colorScheme="gray" onClick={addSongDrawer.onClose}>
+                    Cancel
+                  </Button>
+                  <Button colorScheme="blue" onClick={async () => {
+                    if (!organization) { setSongError('Organization not found.'); return }
+                    if (!songTitle.trim() || !songArtist.trim()) { setSongError('Title and Artist are required.'); return }
+                    try {
+                      setIsAddingSong(true)
+                      setSongError('')
+                      const tagsArray = songTags
+                        .split(',')
+                        .map(tag => tag.trim())
+                        .filter(tag => tag.length > 0)
+                      const { error } = await supabase
+                        .from('songs')
+                        .insert({
+                          organization_id: organization.organization_id,
+                          title: songTitle.trim(),
+                          artist: songArtist.trim(),
+                          youtube_url: songYouTubeUrl || null,
+                          spotify_url: songSpotifyUrl || null,
+                          key: songKey || null,
+                          bpm: songBpm ? parseInt(songBpm) : null,
+                          ccli_number: songCcli || null,
+                          tags: tagsArray,
+                          lyrics: songLyrics || null,
+                          created_by: user?.id || null
+                        })
+                      if (error) { setSongError('Failed to add song. Please try again.'); return }
+                      setSongTitle('')
+                      setSongArtist('')
+                      setSongYouTubeUrl('')
+                      setSongSpotifyUrl('')
+                      setSongKey('')
+                      setSongBpm('')
+                      setSongCcli('')
+                      setSongTags('')
+                      setSongLyrics('')
+                      addSongDrawer.onClose()
+                      await loadRecentSongs()
+                    } catch (err) {
+                      setSongError('Failed to add song. Please try again later.')
+                    } finally {
+                      setIsAddingSong(false)
+                    }
+                  }} isLoading={isAddingSong} loadingText="Adding...">
+                    Add Song
+                  </Button>
+                </HStack>
+              </DrawerFooter>
             </DrawerContent>
           </Drawer>
         </VStack>
