@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Box, 
@@ -20,12 +20,18 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerCloseButton,
+  Badge,
   FormControl,
   FormLabel,
   Input,
   Textarea,
   Alert,
   AlertIcon,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
   useColorModeValue,
   useDisclosure,
   Center
@@ -61,6 +67,27 @@ interface WorshipService {
   updated_at: string
 }
 
+interface Song {
+  id: string
+  title: string
+  artist: string
+  key?: string
+  bpm?: number
+  ccli_number?: string
+  tags?: string[]
+}
+
+interface ServiceSong {
+  id: string
+  service_id: string
+  song_id: string
+  position: number
+  notes?: string
+  created_at: string
+  updated_at: string
+  songs: Song
+}
+
 export function Dashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -78,6 +105,22 @@ export function Dashboard() {
   const [formTime, setFormTime] = useState('')
   const [formDescription, setFormDescription] = useState('')
   const [formError, setFormError] = useState('')
+
+  // Per-day services
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [dayServices, setDayServices] = useState<WorshipService[]>([])
+  const [loadingDayServices, setLoadingDayServices] = useState(false)
+  const [accordionIndex, setAccordionIndex] = useState<number[]>([])
+  const [singleExpanded, setSingleExpanded] = useState(false)
+  const firstServiceRef = useRef<HTMLDivElement | null>(null)
+
+  // Songs data
+  const [availableSongs, setAvailableSongs] = useState<Song[]>([])
+  const [serviceIdToSongs, setServiceIdToSongs] = useState<Record<string, ServiceSong[]>>({})
+  const [selectedSongByService, setSelectedSongByService] = useState<Record<string, string>>({})
+  const [songNotesByService, setSongNotesByService] = useState<Record<string, string>>({})
+  const [addingSongByService, setAddingSongByService] = useState<Record<string, boolean>>({})
+  const [serviceErrorByService, setServiceErrorByService] = useState<Record<string, string>>({})
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -107,6 +150,22 @@ export function Dashboard() {
     if (Number.isNaN(next)) return
     setDisplayMonth(next)
   }
+
+  const loadAvailableSongs = useCallback(async () => {
+    if (!organization) return
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .select('*')
+        .eq('organization_id', organization.organization_id)
+        .order('title', { ascending: true })
+
+      if (error) return
+      setAvailableSongs(data || [])
+    } catch {
+      // ignore
+    }
+  }, [organization])
 
   async function handleCreateServiceSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -154,6 +213,134 @@ export function Dashboard() {
       setFormError('Failed to create service. Please try again later.')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const loadServicesForDate = useCallback(async (isoDate: string) => {
+    if (!organization) return
+    try {
+      setLoadingDayServices(true)
+      const { data, error } = await supabase
+        .from('worship_services')
+        .select('id, title, service_date, service_time, description, status, created_at, updated_at')
+        .eq('organization_id', organization.organization_id)
+        .eq('service_date', isoDate)
+
+      if (error) {
+        console.error('Error loading day services:', error)
+        setDayServices([])
+        return
+      }
+
+      const sorted = (data || []).sort((a: any, b: any) => {
+        const ta = a.service_time ? a.service_time : '99:99'
+        const tb = b.service_time ? b.service_time : '99:99'
+        return ta.localeCompare(tb)
+      }) as WorshipService[]
+
+      setDayServices(sorted)
+      if (sorted.length) await loadSongsForServices(sorted.map(s => s.id))
+    } catch (err) {
+      console.error('Unexpected error loading day services:', err)
+      setDayServices([])
+    } finally {
+      setLoadingDayServices(false)
+    }
+  }, [organization])
+
+  useEffect(() => {
+    // Reset when not a single-service case or still loading
+    if (loadingDayServices || dayServices.length !== 1) {
+      setAccordionIndex([])
+      setSingleExpanded(false)
+    }
+  }, [loadingDayServices, dayServices])
+
+  useEffect(() => {
+    // Ensure the expanded panel is visible when auto-expanded
+    if (createDrawer.isOpen && singleExpanded && accordionIndex.includes(0)) {
+      setTimeout(() => firstServiceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+    }
+  }, [createDrawer.isOpen, singleExpanded, accordionIndex])
+
+  useEffect(() => {
+    // 500ms delayed auto-expand after data loads to avoid race conditions
+    if (createDrawer.isOpen && !loadingDayServices && dayServices.length === 1) {
+      const t = setTimeout(() => {
+        setSingleExpanded(true)
+        setAccordionIndex([0])
+      }, 500)
+      return () => clearTimeout(t)
+    }
+  }, [createDrawer.isOpen, loadingDayServices, dayServices.length])
+
+  const loadSongsForServices = useCallback(async (serviceIds: string[]) => {
+    if (!organization || serviceIds.length === 0) return
+    try {
+      const { data, error } = await supabase
+        .from('service_songs')
+        .select(`*, songs(*)`)
+        .in('service_id', serviceIds)
+        .order('position', { ascending: true })
+
+      if (error) return
+
+      const mapping: Record<string, ServiceSong[]> = {}
+      ;(data || []).forEach((row: any) => {
+        const svcId = row.service_id as string
+        if (!mapping[svcId]) mapping[svcId] = []
+        mapping[svcId].push(row as ServiceSong)
+      })
+      setServiceIdToSongs(mapping)
+    } catch {
+      // ignore
+    }
+  }, [organization])
+
+  useEffect(() => {
+    if (createDrawer.isOpen) loadAvailableSongs()
+  }, [createDrawer.isOpen, loadAvailableSongs])
+
+  async function handleAddSongToService(serviceId: string) {
+    if (!serviceId) return
+    const selectedSongId = selectedSongByService[serviceId]
+    const notes = (songNotesByService[serviceId] || '').trim()
+    if (!selectedSongId) {
+      setServiceErrorByService(prev => ({ ...prev, [serviceId]: 'Please select a song.' }))
+      return
+    }
+
+    try {
+      setAddingSongByService(prev => ({ ...prev, [serviceId]: true }))
+      setServiceErrorByService(prev => ({ ...prev, [serviceId]: '' }))
+
+      const currentSongs = serviceIdToSongs[serviceId] || []
+      const nextPosition = currentSongs.length + 1
+
+      const { error } = await supabase
+        .from('service_songs')
+        .insert({
+          service_id: serviceId,
+          song_id: selectedSongId,
+          position: nextPosition,
+          notes: notes || null
+        })
+        .select(`*, songs(*)`)
+        .single()
+
+      if (error) {
+        setServiceErrorByService(prev => ({ ...prev, [serviceId]: 'Failed to add song. Please try again.' }))
+        return
+      }
+
+      // Refresh songs for this service
+      await loadSongsForServices([serviceId])
+      setSelectedSongByService(prev => ({ ...prev, [serviceId]: '' }))
+      setSongNotesByService(prev => ({ ...prev, [serviceId]: '' }))
+    } catch {
+      setServiceErrorByService(prev => ({ ...prev, [serviceId]: 'Failed to add song. Please try again.' }))
+    } finally {
+      setAddingSongByService(prev => ({ ...prev, [serviceId]: false }))
     }
   }
 
@@ -467,11 +654,24 @@ export function Dashboard() {
                   scheduledDates={[...new Set(services.map(s => s.service_date))]}
                   onDateClick={(iso) => {
                     setFormDate(iso)
+                    setSelectedDate(iso)
+                    loadServicesForDate(iso)
                     createDrawer.onOpen()
                   }}
                 />
 
-                <Button colorScheme="blue" size="md" mt={4} w="100%" onClick={createDrawer.onOpen}>
+                <Button
+                  colorScheme="blue"
+                  size="md"
+                  mt={4}
+                  w="100%"
+                  onClick={() => {
+                    setSelectedDate('')
+                    setDayServices([])
+                    setFormDate('')
+                    createDrawer.onOpen()
+                  }}
+                >
                   Add New Service
                 </Button>
               </Box>
@@ -535,81 +735,338 @@ export function Dashboard() {
           </Grid>
 
           {/* Create Service Drawer */}
-          <Drawer isOpen={createDrawer.isOpen} placement="right" onClose={createDrawer.onClose} size="md">
+          <Drawer isOpen={createDrawer.isOpen} placement="right" onClose={createDrawer.onClose} size="lg">
             <DrawerOverlay />
             <DrawerContent>
               <DrawerCloseButton />
-              <DrawerHeader>Schedule New Service</DrawerHeader>
+              <DrawerHeader>
+                {selectedDate && dayServices.length > 0
+                  ? `${new Date(selectedDate).toLocaleDateString('en-US', {
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    })} - Services`
+                  : 'Schedule New Service'}
+              </DrawerHeader>
               <DrawerBody>
+                {selectedDate && (
+                  <Box mb={4}>
+                    {loadingDayServices ? (
+                      <HStack>
+                        <Spinner size="sm" />
+                        <Text>Loading services for this date...</Text>
+                      </HStack>
+                    ) : dayServices.length > 0 ? (
+                      dayServices.length === 1 ? (
+                        <Accordion
+                          allowToggle
+                          index={singleExpanded ? [0] : []}
+                          borderTop="1px"
+                          borderColor={cardBorderColor}
+                        >
+                          {dayServices.map((svc, idx) => (
+                            <AccordionItem
+                              key={svc.id}
+                              borderColor={cardBorderColor}
+                              mb={3}
+                              ref={idx === 0 ? firstServiceRef : undefined}
+                            >
+                              <h2>
+                                <AccordionButton>
+                                  <Box as="span" flex='1' textAlign='left'>
+                                    <Text m={0} fontWeight="600" fontSize="lg">
+                                      {(svc.service_time ? svc.service_time : 'All day') + ' - ' + svc.title}
+                                    </Text>
+                                  </Box>
+                                  <AccordionIcon />
+                                </AccordionButton>
+                              </h2>
+                              <AccordionPanel pb={5}>
+                                <VStack align="stretch" spacing={4}>
+                                  <Box>
+                                    <VStack align="stretch" spacing={1}>
+                                      {svc.description && (
+                                        <Text color={mutedTextColor} whiteSpace="pre-wrap" fontSize="md">{svc.description}</Text>
+                                      )}
+                                      <HStack>
+                                        <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
+                                          {svc.status}
+                                        </Badge>
+                                        <Button size="sm" variant="outline" onClick={() => navigate(`/service/${svc.id}`)}>
+                                          Open Full Page
+                                        </Button>
+                                      </HStack>
+                                    </VStack>
+                                  </Box>
+
+                                  <Box>
+                                    <Text fontWeight="700" mb={2} fontSize="md">Songs</Text>
+                                    {(serviceIdToSongs[svc.id] || []).length === 0 ? (
+                                      <Text color={mutedTextColor}>No songs added yet</Text>
+                                    ) : (
+                                      <VStack spacing={2} align="stretch">
+                                        {(serviceIdToSongs[svc.id] || []).map(songRow => (
+                                          <Box
+                                            key={songRow.id}
+                                            border="1px"
+                                            borderColor={cardBorderColor}
+                                            borderRadius="lg"
+                                            p={4}
+                                          >
+                                            <Text fontWeight="600" fontSize="md">{songRow.songs.title} - {songRow.songs.artist}</Text>
+                                            {songRow.notes && (
+                                              <Text color={mutedTextColor} fontSize="sm">{songRow.notes}</Text>
+                                            )}
+                                          </Box>
+                                        ))}
+                                      </VStack>
+                                    )}
+                                  </Box>
+
+                                  <Box>
+                                    <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
+                                    {serviceErrorByService[svc.id] && (
+                                      <Alert status="error" borderRadius="md" mb={3}>
+                                        <AlertIcon />
+                                        {serviceErrorByService[svc.id]}
+                                      </Alert>
+                                    )}
+                                    <VStack spacing={3} align="stretch">
+                                      <Select
+                                        placeholder="Choose a song..."
+                                        value={selectedSongByService[svc.id] || ''}
+                                        onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                        size="md"
+                                      >
+                                        {availableSongs.map(song => (
+                                          <option key={song.id} value={song.id}>
+                                            {song.title} - {song.artist}
+                                          </option>
+                                        ))}
+                                      </Select>
+                                      <Input
+                                        type="text"
+                                        placeholder="Notes (optional)"
+                                        size="md"
+                                        value={songNotesByService[svc.id] || ''}
+                                        onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                      />
+                                      <Button
+                                        size="md"
+                                        colorScheme="blue"
+                                        onClick={() => handleAddSongToService(svc.id)}
+                                        isLoading={!!addingSongByService[svc.id]}
+                                        loadingText="Adding..."
+                                        isDisabled={!availableSongs.length}
+                                      >
+                                        Add Song
+                                      </Button>
+                                    </VStack>
+                                  </Box>
+                                </VStack>
+                              </AccordionPanel>
+                            </AccordionItem>
+                          ))}
+                        </Accordion>
+                      ) : (
+                        <Accordion
+                          allowMultiple
+                          index={accordionIndex}
+                          onChange={(idx) => {
+                            if (Array.isArray(idx)) setAccordionIndex(idx as number[])
+                          }}
+                          borderTop="1px"
+                          borderColor={cardBorderColor}
+                        >
+                          {dayServices.map((svc, idx) => (
+                            <AccordionItem
+                              key={svc.id}
+                              borderColor={cardBorderColor}
+                              mb={3}
+                              ref={idx === 0 ? firstServiceRef : undefined}
+                            >
+                              <h2>
+                                <AccordionButton>
+                                  <Box as="span" flex='1' textAlign='left'>
+                                    <Text m={0} fontWeight="600" fontSize="lg">
+                                      {(svc.service_time ? svc.service_time : 'All day') + ' - ' + svc.title}
+                                    </Text>
+                                  </Box>
+                                  <AccordionIcon />
+                                </AccordionButton>
+                              </h2>
+                              <AccordionPanel pb={5}>
+                                <VStack align="stretch" spacing={4}>
+                                  <Box>
+                                    <VStack align="stretch" spacing={1}>
+                                      {svc.description && (
+                                        <Text color={mutedTextColor} whiteSpace="pre-wrap" fontSize="md">{svc.description}</Text>
+                                      )}
+                                      <HStack>
+                                        <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
+                                          {svc.status}
+                                        </Badge>
+                                        <Button size="sm" variant="outline" onClick={() => navigate(`/service/${svc.id}`)}>
+                                          Open Full Page
+                                        </Button>
+                                      </HStack>
+                                    </VStack>
+                                  </Box>
+
+                                  <Box>
+                                    <Text fontWeight="700" mb={2} fontSize="md">Songs</Text>
+                                    {(serviceIdToSongs[svc.id] || []).length === 0 ? (
+                                      <Text color={mutedTextColor}>No songs added yet</Text>
+                                    ) : (
+                                      <VStack spacing={2} align="stretch">
+                                        {(serviceIdToSongs[svc.id] || []).map(songRow => (
+                                          <Box
+                                            key={songRow.id}
+                                            border="1px"
+                                            borderColor={cardBorderColor}
+                                            borderRadius="lg"
+                                            p={4}
+                                          >
+                                            <Text fontWeight="600" fontSize="md">{songRow.songs.title} - {songRow.songs.artist}</Text>
+                                            {songRow.notes && (
+                                              <Text color={mutedTextColor} fontSize="sm">{songRow.notes}</Text>
+                                            )}
+                                          </Box>
+                                        ))}
+                                      </VStack>
+                                    )}
+                                  </Box>
+
+                                  <Box>
+                                    <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
+                                    {serviceErrorByService[svc.id] && (
+                                      <Alert status="error" borderRadius="md" mb={3}>
+                                        <AlertIcon />
+                                        {serviceErrorByService[svc.id]}
+                                      </Alert>
+                                    )}
+                                    <VStack spacing={3} align="stretch">
+                                      <Select
+                                        placeholder="Choose a song..."
+                                        value={selectedSongByService[svc.id] || ''}
+                                        onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                        size="md"
+                                      >
+                                        {availableSongs.map(song => (
+                                          <option key={song.id} value={song.id}>
+                                            {song.title} - {song.artist}
+                                          </option>
+                                        ))}
+                                      </Select>
+                                      <Input
+                                        type="text"
+                                        placeholder="Notes (optional)"
+                                        size="md"
+                                        value={songNotesByService[svc.id] || ''}
+                                        onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                      />
+                                      <Button
+                                        size="md"
+                                        colorScheme="blue"
+                                        onClick={() => handleAddSongToService(svc.id)}
+                                        isLoading={!!addingSongByService[svc.id]}
+                                        loadingText="Adding..."
+                                        isDisabled={!availableSongs.length}
+                                      >
+                                        Add Song
+                                      </Button>
+                                    </VStack>
+                                  </Box>
+                                </VStack>
+                              </AccordionPanel>
+                            </AccordionItem>
+                          ))}
+                        </Accordion>
+                      )
+                    ) : (
+                      <Text color={mutedTextColor}>No services scheduled for this date.</Text>
+                    )}
+                  </Box>
+                )}
+
                 {formError && (
                   <Alert status="error" borderRadius="md" mb={4}>
                     <AlertIcon />
                     {formError}
                   </Alert>
                 )}
+                {(!selectedDate || dayServices.length === 0) && (
+                  <form onSubmit={handleCreateServiceSubmit}>
+                    <VStack spacing={5} align="stretch">
+                      <FormControl isRequired>
+                        <FormLabel fontSize="sm">Service Title *</FormLabel>
+                        <Input
+                          type="text"
+                          value={formTitle}
+                          onChange={(e) => setFormTitle(e.target.value)}
+                          placeholder="e.g., Sunday Morning Service"
+                          size="md"
+                        />
+                      </FormControl>
 
-                <form onSubmit={handleCreateServiceSubmit}>
-                  <VStack spacing={5} align="stretch">
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm">Service Title *</FormLabel>
-                      <Input
-                        type="text"
-                        value={formTitle}
-                        onChange={(e) => setFormTitle(e.target.value)}
-                        placeholder="e.g., Sunday Morning Service"
-                        size="md"
-                      />
-                    </FormControl>
+                      <FormControl isRequired>
+                        <FormLabel fontSize="sm">Service Date *</FormLabel>
+                        <Input
+                          type="date"
+                          value={formDate}
+                          onChange={(e) => setFormDate(e.target.value)}
+                          size="md"
+                        />
+                      </FormControl>
 
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm">Service Date *</FormLabel>
-                      <Input
-                        type="date"
-                        value={formDate}
-                        onChange={(e) => setFormDate(e.target.value)}
-                        size="md"
-                      />
-                    </FormControl>
+                      <FormControl>
+                        <FormLabel fontSize="sm">Service Time</FormLabel>
+                        <Input
+                          type="time"
+                          value={formTime}
+                          onChange={(e) => setFormTime(e.target.value)}
+                          size="md"
+                        />
+                      </FormControl>
 
-                    <FormControl>
-                      <FormLabel fontSize="sm">Service Time</FormLabel>
-                      <Input
-                        type="time"
-                        value={formTime}
-                        onChange={(e) => setFormTime(e.target.value)}
-                        size="md"
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel fontSize="sm">Description</FormLabel>
-                      <Textarea
-                        value={formDescription}
-                        onChange={(e) => setFormDescription(e.target.value)}
-                        placeholder="Optional description or notes..."
-                        rows={4}
-                        resize="vertical"
-                        minH="80px"
-                      />
-                    </FormControl>
-                  </VStack>
-                </form>
+                      <FormControl>
+                        <FormLabel fontSize="sm">Description</FormLabel>
+                        <Textarea
+                          value={formDescription}
+                          onChange={(e) => setFormDescription(e.target.value)}
+                          placeholder="Optional description or notes..."
+                          rows={4}
+                          resize="vertical"
+                          minH="80px"
+                        />
+                      </FormControl>
+                    </VStack>
+                  </form>
+                )}
               </DrawerBody>
-              <DrawerFooter>
-                <HStack w="100%" justify="flex-end">
-                  <Button variant="outline" colorScheme="gray" onClick={createDrawer.onClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    colorScheme="blue"
-                    onClick={handleCreateServiceSubmit}
-                    isLoading={creating}
-                    loadingText="Scheduling..."
-                  >
-                    Schedule Service
-                  </Button>
-                </HStack>
-              </DrawerFooter>
+              {(!selectedDate || dayServices.length === 0) ? (
+                <DrawerFooter>
+                  <HStack w="100%" justify="flex-end">
+                    <Button variant="outline" colorScheme="gray" onClick={createDrawer.onClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      colorScheme="blue"
+                      onClick={handleCreateServiceSubmit}
+                      isLoading={creating}
+                      loadingText="Scheduling..."
+                    >
+                      Schedule Service
+                    </Button>
+                  </HStack>
+                </DrawerFooter>
+              ) : (
+                <DrawerFooter>
+                  <HStack w="100%" justify="flex-end">
+                    <Button colorScheme="blue" onClick={createDrawer.onClose}>
+                      Close
+                    </Button>
+                  </HStack>
+                </DrawerFooter>
+              )}
             </DrawerContent>
           </Drawer>
         </VStack>
