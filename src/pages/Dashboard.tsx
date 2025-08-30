@@ -13,7 +13,21 @@ import {
   GridItem, 
   IconButton,
   Select,
+  Drawer,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerHeader,
+  DrawerBody,
+  DrawerFooter,
+  DrawerCloseButton,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  Alert,
+  AlertIcon,
   useColorModeValue,
+  useDisclosure,
   Center
 } from '@chakra-ui/react'
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
@@ -55,6 +69,15 @@ export function Dashboard() {
   const [services, setServices] = useState<WorshipService[]>([])
   const [displayYear, setDisplayYear] = useState(new Date().getFullYear())
   const [displayMonth, setDisplayMonth] = useState(new Date().getMonth()) // 0-11
+  const createDrawer = useDisclosure()
+
+  // Create service form state
+  const [creating, setCreating] = useState(false)
+  const [formTitle, setFormTitle] = useState('')
+  const [formDate, setFormDate] = useState('')
+  const [formTime, setFormTime] = useState('')
+  const [formDescription, setFormDescription] = useState('')
+  const [formError, setFormError] = useState('')
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -83,6 +106,55 @@ export function Dashboard() {
     const next = Number(e.target.value)
     if (Number.isNaN(next)) return
     setDisplayMonth(next)
+  }
+
+  async function handleCreateServiceSubmit(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!organization || !user) {
+      setFormError('You must be logged in to create a service.')
+      return
+    }
+
+    if (!formTitle.trim() || !formDate) {
+      setFormError('Please fill in all required fields.')
+      return
+    }
+
+    try {
+      setCreating(true)
+      setFormError('')
+
+      const { error } = await supabase
+        .from('worship_services')
+        .insert({
+          organization_id: organization.organization_id,
+          title: formTitle.trim(),
+          service_date: formDate,
+          service_time: formTime || null,
+          description: formDescription.trim() || null,
+          status: 'draft',
+          created_by: user.id
+        })
+        .select()
+        .single()
+
+      if (error) {
+        setFormError('Failed to create service. Please try again.')
+        return
+      }
+
+      setFormTitle('')
+      setFormDate('')
+      setFormTime('')
+      setFormDescription('')
+      createDrawer.onClose()
+      await loadServices()
+    } catch (err) {
+      setFormError('Failed to create service. Please try again later.')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const checkUserAndOrganization = useCallback(async () => {
@@ -395,7 +467,7 @@ export function Dashboard() {
                   scheduledDates={[...new Set(services.map(s => s.service_date))]}
                 />
 
-                <Button colorScheme="blue" size="md" mt={4} w="100%">
+                <Button colorScheme="blue" size="md" mt={4} w="100%" onClick={createDrawer.onOpen}>
                   Add New Service
                 </Button>
               </Box>
@@ -457,6 +529,85 @@ export function Dashboard() {
               </Box>
             </GridItem>
           </Grid>
+
+          {/* Create Service Drawer */}
+          <Drawer isOpen={createDrawer.isOpen} placement="right" onClose={createDrawer.onClose} size="md">
+            <DrawerOverlay />
+            <DrawerContent>
+              <DrawerCloseButton />
+              <DrawerHeader>Schedule New Service</DrawerHeader>
+              <DrawerBody>
+                {formError && (
+                  <Alert status="error" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    {formError}
+                  </Alert>
+                )}
+
+                <form onSubmit={handleCreateServiceSubmit}>
+                  <VStack spacing={5} align="stretch">
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm">Service Title *</FormLabel>
+                      <Input
+                        type="text"
+                        value={formTitle}
+                        onChange={(e) => setFormTitle(e.target.value)}
+                        placeholder="e.g., Sunday Morning Service"
+                        size="md"
+                      />
+                    </FormControl>
+
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm">Service Date *</FormLabel>
+                      <Input
+                        type="date"
+                        value={formDate}
+                        onChange={(e) => setFormDate(e.target.value)}
+                        size="md"
+                      />
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel fontSize="sm">Service Time</FormLabel>
+                      <Input
+                        type="time"
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                        size="md"
+                      />
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel fontSize="sm">Description</FormLabel>
+                      <Textarea
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        placeholder="Optional description or notes..."
+                        rows={4}
+                        resize="vertical"
+                        minH="80px"
+                      />
+                    </FormControl>
+                  </VStack>
+                </form>
+              </DrawerBody>
+              <DrawerFooter>
+                <HStack w="100%" justify="flex-end">
+                  <Button variant="outline" colorScheme="gray" onClick={createDrawer.onClose}>
+                    Cancel
+                  </Button>
+                  <Button
+                    colorScheme="blue"
+                    onClick={handleCreateServiceSubmit}
+                    isLoading={creating}
+                    loadingText="Scheduling..."
+                  >
+                    Schedule Service
+                  </Button>
+                </HStack>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
         </VStack>
       </Box>
     </Box>
