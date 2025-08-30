@@ -115,6 +115,18 @@ export function Dashboard() {
   const [isAddingServiceMode, setIsAddingServiceMode] = useState(false)
   const firstServiceRef = useRef<HTMLDivElement | null>(null)
 
+  // Recent songs usage
+  interface RecentSongUsage {
+    songId: string
+    title: string
+    artist: string
+    usageCount: number
+    lastUsedDate: string
+  }
+  const [recentSongs, setRecentSongs] = useState<RecentSongUsage[]>([])
+  const [loadingRecentSongs, setLoadingRecentSongs] = useState(false)
+  const [recentSongsError, setRecentSongsError] = useState('')
+
   // Songs data
   const [availableSongs, setAvailableSongs] = useState<Song[]>([])
   const [serviceIdToSongs, setServiceIdToSongs] = useState<Record<string, ServiceSong[]>>({})
@@ -309,6 +321,93 @@ export function Dashboard() {
     if (createDrawer.isOpen) loadAvailableSongs()
   }, [createDrawer.isOpen, loadAvailableSongs])
 
+  const loadRecentSongs = useCallback(async () => {
+    if (!organization) return
+    try {
+      setLoadingRecentSongs(true)
+      setRecentSongsError('')
+
+      // 1) Fetch all services for org (id -> service_date)
+      const { data: servicesData, error: servicesErr } = await supabase
+        .from('worship_services')
+        .select('id, service_date')
+        .eq('organization_id', organization.organization_id)
+
+      if (servicesErr) {
+        setRecentSongsError('Failed to load services for songs usage')
+        setRecentSongs([])
+        return
+      }
+
+      const serviceIdToDate = new Map<string, string>()
+      const serviceIds: string[] = []
+      ;(servicesData || []).forEach((s: any) => {
+        serviceIdToDate.set(s.id as string, s.service_date as string)
+        serviceIds.push(s.id as string)
+      })
+
+      if (serviceIds.length === 0) {
+        setRecentSongs([])
+        return
+      }
+
+      // 2) Fetch all service_songs for these services with song info
+      const { data: ssData, error: ssErr } = await supabase
+        .from('service_songs')
+        .select(`id, service_id, songs ( id, title, artist )`)
+        .in('service_id', serviceIds)
+
+      if (ssErr) {
+        setRecentSongsError('Failed to load songs usage')
+        setRecentSongs([])
+        return
+      }
+
+      // 3) Aggregate usage by song
+      const usageMap = new Map<string, { title: string, artist: string, count: number, last: string }>()
+      ;(ssData || []).forEach((row: any) => {
+        const song = row.songs
+        if (!song) return
+        const songId = song.id as string
+        const title = song.title as string
+        const artist = song.artist as string
+
+        const svcDate = serviceIdToDate.get(row.service_id as string) || '1970-01-01'
+
+        const prev = usageMap.get(songId)
+        if (!prev) usageMap.set(songId, { title, artist, count: 1, last: svcDate })
+        else {
+          const last = prev.last > svcDate ? prev.last : svcDate
+          usageMap.set(songId, { title, artist, count: prev.count + 1, last })
+        }
+      })
+
+      const aggregated: RecentSongUsage[] = Array.from(usageMap.entries()).map(([songId, v]) => ({
+        songId,
+        title: v.title,
+        artist: v.artist,
+        usageCount: v.count,
+        lastUsedDate: v.last
+      }))
+
+      // Sort by total usage desc, then by last used desc
+      aggregated.sort((a, b) => {
+        if (b.usageCount !== a.usageCount) return b.usageCount - a.usageCount
+        return a.lastUsedDate < b.lastUsedDate ? 1 : -1
+      })
+      setRecentSongs(aggregated.slice(0, 5))
+    } catch (err) {
+      setRecentSongsError('Failed to load recent songs')
+      setRecentSongs([])
+    } finally {
+      setLoadingRecentSongs(false)
+    }
+  }, [organization])
+
+  useEffect(() => {
+    loadRecentSongs()
+  }, [loadRecentSongs])
+
   async function handleAddSongToService(serviceId: string) {
     if (!serviceId) return
     const selectedSongId = selectedSongByService[serviceId]
@@ -415,9 +514,11 @@ export function Dashboard() {
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
   const textColor = useColorModeValue('gray.700', 'gray.200')
   const mutedTextColor = useColorModeValue('gray.500', 'gray.400')
-  const activityBg = useColorModeValue('gray.50', 'gray.700')
-  const activityIconBg = useColorModeValue('white', 'gray.600')
-  const activityIconBorder = useColorModeValue('gray.200', 'gray.500')
+  const rankColors = ['blue.500', 'blue.400', 'blue.300', 'blue.200', 'blue.100']
+  function getRankColor(index: number) {
+    return rankColors[index] || 'blue.100'
+  }
+  // Removed unused activity styles after replacing Recent Activity with Songs
 
   if (loading) {
     return (
@@ -687,7 +788,7 @@ export function Dashboard() {
               </Box>
             </GridItem>
 
-            {/* Recent Activity Section (4/12) */}
+            {/* Songs Section (4/12) */}
             <GridItem colSpan={{ base: 12, md: 4 }}>
               <Box
                 bg={cardBg}
@@ -703,43 +804,77 @@ export function Dashboard() {
                   mb={5}
                   fontWeight="600"
                 >
-                  Recent Activity
+                  Songs
                 </Heading>
 
-                <VStack spacing={4} align="stretch">
-                  <HStack
-                    spacing={4}
-                    p={4}
-                    border="1px"
-                    borderColor={cardBorderColor}
-                    borderRadius="lg"
-                    bg={activityBg}
-                    align="center"
-                  >
-                    <Box
-                      fontSize="xl"
-                      w="40px"
-                      h="40px"
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      bg={activityIconBg}
-                      borderRadius="lg"
-                      border="1px"
-                      borderColor={activityIconBorder}
-                    >
-                      📅
-                    </Box>
-                    <Box flex="1">
-                      <Text color={textColor} fontWeight="500" mb={1}>
-                        No recent activity
-                      </Text>
-                      <Text color={mutedTextColor} fontSize="xs">
-                        Your activity will appear here
-                      </Text>
-                    </Box>
-                  </HStack>
-                </VStack>
+                {recentSongsError && (
+                  <Alert status="error" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    {recentSongsError}
+                  </Alert>
+                )}
+
+                {loadingRecentSongs ? (
+                  <Center py={6}>
+                    <Spinner />
+                  </Center>
+                ) : recentSongs.length === 0 ? (
+                  <Box textAlign="center" py={6}>
+                    <Text color={mutedTextColor}>No song usage yet</Text>
+                  </Box>
+                ) : (
+                  <VStack spacing={3} align="stretch">
+                    {recentSongs.map((song, idx) => (
+                      <HStack
+                        key={song.songId}
+                        p={3}
+                        border="1px"
+                        borderColor={cardBorderColor}
+                        borderRadius="lg"
+                        align="center"
+                        justify="space-between"
+                      >
+                        <HStack>
+                          <Box
+                            w="28px"
+                            h="28px"
+                            borderRadius="full"
+                            bg={getRankColor(idx)}
+                            color="white"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                            fontWeight="700"
+                            fontSize="sm"
+                          >
+                            {idx + 1}
+                          </Box>
+
+                          <Box>
+                            <Text color={textColor} fontWeight="600" m={0}>
+                              {song.title}
+                            </Text>
+                            <Text color={mutedTextColor} fontSize="sm" m={0}>
+                              {song.artist}
+                            </Text>
+                          </Box>
+                        </HStack>
+                        <Box textAlign="right">
+                          <Text color={textColor} fontSize="sm" m={0}>
+                            {song.usageCount} uses
+                          </Text>
+                          <Text color={mutedTextColor} fontSize="xs" m={0}>
+                            Last: {new Date(song.lastUsedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                        </Box>
+                      </HStack>
+                    ))}
+                  </VStack>
+                )}
+
+                <Button mt={5} w="100%" variant="outline" colorScheme="gray">
+                  Add song
+                </Button>
               </Box>
             </GridItem>
           </Grid>
