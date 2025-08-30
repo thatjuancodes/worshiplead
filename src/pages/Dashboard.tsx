@@ -11,9 +11,12 @@ import {
   SimpleGrid,
   Grid,
   GridItem, 
+  IconButton,
+  Select,
   useColorModeValue,
   Center
 } from '@chakra-ui/react'
+import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
 import { keyframes } from '@emotion/react'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
@@ -50,6 +53,37 @@ export function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [services, setServices] = useState<WorshipService[]>([])
+  const [displayYear, setDisplayYear] = useState(new Date().getFullYear())
+  const [displayMonth, setDisplayMonth] = useState(new Date().getMonth()) // 0-11
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+
+  function handlePrevMonth() {
+    if (displayMonth === 0) {
+      setDisplayMonth(11)
+      setDisplayYear(displayYear - 1)
+      return
+    }
+    setDisplayMonth(displayMonth - 1)
+  }
+
+  function handleNextMonth() {
+    if (displayMonth === 11) {
+      setDisplayMonth(0)
+      setDisplayYear(displayYear + 1)
+      return
+    }
+    setDisplayMonth(displayMonth + 1)
+  }
+
+  function handleSelectMonth(e: React.ChangeEvent<HTMLSelectElement>) {
+    const next = Number(e.target.value)
+    if (Number.isNaN(next)) return
+    setDisplayMonth(next)
+  }
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -315,13 +349,51 @@ export function Dashboard() {
                   as="h3"
                   size="lg"
                   color={titleColor}
-                  mb={5}
+                  mb={3}
                   fontWeight="600"
                 >
                   Service Calendar
                 </Heading>
 
-                <CalendarGrid scheduledDates={[...new Set(services.map(s => s.service_date))]} />
+                <HStack justify="center" mb={4}>
+                  <IconButton
+                    aria-label="Previous month"
+                    icon={<ChevronLeftIcon />}
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePrevMonth}
+                  />
+
+                  <Select
+                    value={displayMonth}
+                    onChange={handleSelectMonth}
+                    maxW={{ base: '200px', md: '220px' }}
+                    size="sm"
+                  >
+                    {monthNames.map((label, idx) => (
+                      <option key={label} value={idx}>{label}</option>
+                    ))}
+                  </Select>
+
+                  <Text m={0} fontWeight="600" color={textColor}
+                    minW="64px" textAlign="center">
+                    {displayYear}
+                  </Text>
+
+                  <IconButton
+                    aria-label="Next month"
+                    icon={<ChevronRightIcon />}
+                    size="sm"
+                    variant="outline"
+                    onClick={handleNextMonth}
+                  />
+                </HStack>
+
+                <CalendarGrid
+                  year={displayYear}
+                  month={displayMonth}
+                  scheduledDates={[...new Set(services.map(s => s.service_date))]}
+                />
 
                 <Button colorScheme="blue" size="md" mt={4} w="100%">
                   Add New Service
@@ -392,13 +464,12 @@ export function Dashboard() {
 } 
 
 interface CalendarProps {
+  year: number
+  month: number // 0-11
   scheduledDates: string[]
 }
 
-function CalendarGrid({ scheduledDates }: CalendarProps) {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = today.getMonth()
+function CalendarGrid({ year, month, scheduledDates }: CalendarProps) {
 
   const firstOfMonth = new Date(year, month, 1)
   const startWeekday = firstOfMonth.getDay()
