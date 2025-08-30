@@ -465,6 +465,10 @@ export function Dashboard() {
                   year={displayYear}
                   month={displayMonth}
                   scheduledDates={[...new Set(services.map(s => s.service_date))]}
+                  onDateClick={(iso) => {
+                    setFormDate(iso)
+                    createDrawer.onOpen()
+                  }}
                 />
 
                 <Button colorScheme="blue" size="md" mt={4} w="100%" onClick={createDrawer.onOpen}>
@@ -618,9 +622,10 @@ interface CalendarProps {
   year: number
   month: number // 0-11
   scheduledDates: string[]
+  onDateClick?: (isoDate: string) => void
 }
 
-function CalendarGrid({ year, month, scheduledDates }: CalendarProps) {
+function CalendarGrid({ year, month, scheduledDates, onDateClick }: CalendarProps) {
 
   const firstOfMonth = new Date(year, month, 1)
   const startWeekday = firstOfMonth.getDay()
@@ -684,6 +689,9 @@ function CalendarGrid({ year, month, scheduledDates }: CalendarProps) {
               p={2}
               bg={hasEvent ? eventBg : 'transparent'}
               position="relative"
+              onClick={() => onDateClick && onDateClick(iso)}
+              cursor="pointer"
+              _hover={{ borderColor: 'blue.300' }}
             >
               <Text fontSize="sm" color={cellTextColor} fontWeight="500" m={0}>
                 {day}
