@@ -8,7 +8,7 @@ import {
   Text, 
   Button, 
   Spinner, 
-  SimpleGrid,
+  SimpleGrid, 
   Grid,
   GridItem, 
   IconButton,
@@ -790,22 +790,22 @@ export function Dashboard() {
 
             {/* Songs Section (4/12) */}
             <GridItem colSpan={{ base: 12, md: 4 }}>
-              <Box
-                bg={cardBg}
-                borderRadius="xl"
-                p={{ base: 5, md: 6 }}
-                boxShadow="sm"
-                w="100%"
-              >
-                <Heading
-                  as="h3"
-                  size="lg"
-                  color={titleColor}
-                  mb={5}
-                  fontWeight="600"
-                >
+          <Box
+            bg={cardBg}
+            borderRadius="xl"
+            p={{ base: 5, md: 6 }}
+            boxShadow="sm"
+            w="100%"
+          >
+            <Heading
+              as="h3"
+              size="lg"
+              color={titleColor}
+              mb={5}
+              fontWeight="600"
+            >
                   Songs
-                </Heading>
+            </Heading>
 
                 {recentSongsError && (
                   <Alert status="error" borderRadius="md" mb={4}>
@@ -825,13 +825,13 @@ export function Dashboard() {
                 ) : (
                   <VStack spacing={3} align="stretch">
                     {recentSongs.map((song, idx) => (
-                      <HStack
+              <HStack
                         key={song.songId}
                         p={3}
-                        border="1px"
-                        borderColor={cardBorderColor}
-                        borderRadius="lg"
-                        align="center"
+                border="1px"
+                borderColor={cardBorderColor}
+                borderRadius="lg"
+                align="center"
                         justify="space-between"
                       >
                         <HStack>
@@ -841,9 +841,9 @@ export function Dashboard() {
                             borderRadius="full"
                             bg={getRankColor(idx)}
                             color="white"
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
                             fontWeight="700"
                             fontSize="sm"
                           >
@@ -872,10 +872,37 @@ export function Dashboard() {
                   </VStack>
                 )}
 
-                <Button mt={5} w="100%" variant="outline" colorScheme="gray">
+                <Button
+                  mt={5}
+                  w="100%"
+                  colorScheme="blue"
+                  position="relative"
+                  overflow="hidden"
+                  _before={{
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: '-100%',
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
+                    animation: 'shimmer 4s infinite'
+                  }}
+                  sx={{
+                    '@keyframes shimmer': {
+                      '0%': { left: '-100%' },
+                      '50%': { left: '100%' },
+                      '100%': { left: '100%' }
+                    }
+                  }}
+                >
                   Add song
                 </Button>
-              </Box>
+
+                <Button mt={3} w="100%" variant="outline" colorScheme="blue" onClick={() => navigate('/songbank')}>
+                  Manage songs
+                </Button>
+                </Box>
             </GridItem>
           </Grid>
 
@@ -919,7 +946,7 @@ export function Dashboard() {
                                   <Box as="span" flex='1' textAlign='left'>
                                     <Text m={0} fontWeight="600" fontSize="lg">
                                       {(svc.service_time ? svc.service_time : 'All day') + ' - ' + svc.title}
-                                    </Text>
+                  </Text>
                                   </Box>
                                   <AccordionIcon />
                                 </AccordionButton>
@@ -1033,8 +1060,8 @@ export function Dashboard() {
                                   <Box as="span" flex='1' textAlign='left'>
                                     <Text m={0} fontWeight="600" fontSize="lg">
                                       {(svc.service_time ? svc.service_time : 'All day') + ' - ' + svc.title}
-                                    </Text>
-                                  </Box>
+                  </Text>
+                </Box>
                                   <AccordionIcon />
                                 </AccordionButton>
                               </h2>
@@ -1052,9 +1079,9 @@ export function Dashboard() {
                                         <Button size="sm" variant="outline" onClick={() => navigate(`/service/${svc.id}`)}>
                                           Open Full Page
                                         </Button>
-                                      </HStack>
-                                    </VStack>
-                                  </Box>
+              </HStack>
+            </VStack>
+          </Box>
 
                                   <Box>
                                     <Text fontWeight="700" mb={2} fontSize="md">Songs</Text>
@@ -1319,4 +1346,4 @@ function CalendarGrid({ year, month, scheduledDates, onDateClick }: CalendarProp
       </SimpleGrid>
     </VStack>
   )
-}
+} 
