@@ -112,6 +112,7 @@ export function Dashboard() {
   const [loadingDayServices, setLoadingDayServices] = useState(false)
   const [accordionIndex, setAccordionIndex] = useState<number[]>([])
   const [singleExpanded, setSingleExpanded] = useState(false)
+  const [isAddingServiceMode, setIsAddingServiceMode] = useState(false)
   const firstServiceRef = useRef<HTMLDivElement | null>(null)
 
   // Songs data
@@ -204,11 +205,18 @@ export function Dashboard() {
       }
 
       setFormTitle('')
-      setFormDate('')
       setFormTime('')
       setFormDescription('')
-      createDrawer.onClose()
-      await loadServices()
+
+      if (selectedDate) {
+        setIsAddingServiceMode(false)
+        await loadServices()
+        await loadServicesForDate(selectedDate)
+      } else {
+        setFormDate('')
+        await loadServices()
+        createDrawer.onClose()
+      }
     } catch (err) {
       setFormError('Failed to create service. Please try again later.')
     } finally {
@@ -656,6 +664,7 @@ export function Dashboard() {
                     setFormDate(iso)
                     setSelectedDate(iso)
                     loadServicesForDate(iso)
+                    setIsAddingServiceMode(false)
                     createDrawer.onOpen()
                   }}
                 />
@@ -669,6 +678,7 @@ export function Dashboard() {
                     setSelectedDate('')
                     setDayServices([])
                     setFormDate('')
+                    setIsAddingServiceMode(true)
                     createDrawer.onOpen()
                   }}
                 >
@@ -747,7 +757,7 @@ export function Dashboard() {
                   : 'Schedule New Service'}
               </DrawerHeader>
               <DrawerBody>
-                {selectedDate && (
+                {selectedDate && !isAddingServiceMode && (
                   <Box mb={4}>
                     {loadingDayServices ? (
                       <HStack>
@@ -993,7 +1003,7 @@ export function Dashboard() {
                     {formError}
                   </Alert>
                 )}
-                {(!selectedDate || dayServices.length === 0) && (
+                {(isAddingServiceMode || !selectedDate || dayServices.length === 0) && (
                   <form onSubmit={handleCreateServiceSubmit}>
                     <VStack spacing={5} align="stretch">
                       <FormControl isRequired>
@@ -1042,7 +1052,7 @@ export function Dashboard() {
                   </form>
                 )}
               </DrawerBody>
-              {(!selectedDate || dayServices.length === 0) ? (
+              {(isAddingServiceMode || !selectedDate || dayServices.length === 0) ? (
                 <DrawerFooter>
                   <HStack w="100%" justify="flex-end">
                     <Button variant="outline" colorScheme="gray" onClick={createDrawer.onClose}>
@@ -1060,7 +1070,10 @@ export function Dashboard() {
                 </DrawerFooter>
               ) : (
                 <DrawerFooter>
-                  <HStack w="100%" justify="flex-end">
+                  <HStack w="100%" justify="space-between">
+                    <Button variant="outline" onClick={() => setIsAddingServiceMode(true)}>
+                      Add Service
+                    </Button>
                     <Button colorScheme="blue" onClick={createDrawer.onClose}>
                       Close
                     </Button>
