@@ -505,11 +505,7 @@ export function Dashboard() {
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
   const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
-  const cardHoverBorderColor = useColorModeValue('blue.500', 'blue.400')
-  const cardHoverShadow = useColorModeValue(
-    '0 4px 12px rgba(59, 130, 246, 0.1)',
-    '0 4px 12px rgba(59, 130, 246, 0.2)'
-  )
+  // Removed quick actions; hover styles unused
   const titleColor = useColorModeValue('gray.800', 'white')
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
   const textColor = useColorModeValue('gray.700', 'gray.200')
@@ -570,139 +566,7 @@ export function Dashboard() {
 
         {/* Dashboard Content */}
         <VStack spacing={8}>
-          {/* Quick Actions Section */}
-          <Box
-            bg={cardBg}
-            borderRadius="xl"
-            p={{ base: 5, md: 6 }}
-            boxShadow="sm"
-            w="100%"
-          >
-            <Heading
-              as="h3"
-              size="lg"
-              color={titleColor}
-              mb={5}
-              fontWeight="600"
-            >
-              Quick Actions
-            </Heading>
-
-            <SimpleGrid
-              columns={{ base: 1, md: 3 }}
-              spacing={5}
-              minChildWidth="200px"
-            >
-              {/* Schedule Service Card */}
-              <Box
-                border="1px"
-                borderColor={cardBorderColor}
-                borderRadius="lg"
-                p={5}
-                textAlign="center"
-                transition="all 0.3s ease"
-                _hover={{
-                  borderColor: cardHoverBorderColor,
-                  boxShadow: cardHoverShadow
-                }}
-              >
-                <Heading
-                  as="h4"
-                  size="md"
-                  color={titleColor}
-                  mb={2}
-                  fontWeight="600"
-                >
-                  Schedule Service
-                </Heading>
-                <Text color={textColor} fontSize="sm" mb={4}>
-                  Plan your next worship service
-                </Text>
-                <Button
-                  colorScheme="blue"
-                  size="md"
-                  onClick={() => navigate('/schedule')}
-                  w="100%"
-                >
-                  Manage Schedule
-                </Button>
-              </Box>
-
-              {/* Manage Team Card */}
-              <Box
-                border="1px"
-                borderColor={cardBorderColor}
-                borderRadius="lg"
-                p={5}
-                textAlign="center"
-                transition="all 0.3s ease"
-                _hover={{
-                  borderColor: cardHoverBorderColor,
-                  boxShadow: cardHoverShadow
-                }}
-              >
-                <Heading
-                  as="h4"
-                  size="md"
-                  color={titleColor}
-                  mb={2}
-                  fontWeight="600"
-                >
-                  Manage Team
-                </Heading>
-                <Text color={textColor} fontSize="sm" mb={4}>
-                  Add or manage team members
-                </Text>
-                <Button
-                  variant="outline"
-                  colorScheme="gray"
-                  size="md"
-                  onClick={() => navigate('/team')}
-                  w="100%"
-                >
-                  View Team
-                </Button>
-              </Box>
-
-              {/* Song Library Card */}
-              <Box
-                border="1px"
-                borderColor={cardBorderColor}
-                borderRadius="lg"
-                p={5}
-                textAlign="center"
-                transition="all 0.3s ease"
-                _hover={{
-                  borderColor: cardHoverBorderColor,
-                  boxShadow: cardHoverShadow
-                }}
-              >
-                <Heading
-                  as="h4"
-                  size="md"
-                  color={titleColor}
-                  mb={2}
-                  fontWeight="600"
-                >
-                  Song Library
-                </Heading>
-                <Text color={textColor} fontSize="sm" mb={4}>
-                  Manage your song collection
-                </Text>
-                <Button
-                  variant="outline"
-                  colorScheme="gray"
-                  size="md"
-                  onClick={() => navigate('/songbank')}
-                  w="100%"
-                >
-                  Manage Songs
-                </Button>
-              </Box>
-            </SimpleGrid>
-          </Box>
-
-          {/* Calendar and Recent Activity Row */}
+          {/* Calendar and Songs Row */}
           <Grid templateColumns={{ base: '1fr', md: 'repeat(12, 1fr)' }} gap={6} w="100%">
             {/* Service Calendar Section (8/12) */}
             <GridItem colSpan={{ base: 12, md: 8 }}>
