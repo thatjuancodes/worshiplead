@@ -780,22 +780,6 @@ export function Dashboard() {
       <DashboardHeader user={user} organization={organization} />
 
       <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
-        {/* Welcome Section */}
-        <VStack spacing={2} mb={8} mt={8} textAlign="center">
-          <Heading
-            as="h2"
-            size={'xl'}
-            color={titleColor}
-            m={0}
-            fontWeight="600"
-          >
-            Welcome to Worship Lead
-          </Heading>
-          <Text color={subtitleColor} fontSize="md" m={0}>
-            You're logged into your organization
-          </Text>
-        </VStack>
-
         {/* Dashboard Content */}
         <VStack spacing={8}>
           {/* Calendar and Songs Row */}
