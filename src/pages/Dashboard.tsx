@@ -894,23 +894,37 @@ export function Dashboard() {
                     Share this link with potential volunteers to let them sign up for services
                   </Text>
 
-                  <Button
-                    size="md"
-                    colorScheme="green"
-                    variant="outline"
-                    onClick={copyVolunteerLink}
-                    isLoading={loadingVolunteerLink || copyingLink}
-                    loadingText={loadingVolunteerLink ? "Loading..." : "Copying..."}
-                    isDisabled={loadingVolunteerLink}
-                    w="100%"
-                  >
-                    {loadingVolunteerLink 
-                      ? "Loading..." 
-                      : volunteerLink 
-                        ? "Copy volunteer link" 
-                        : "Create volunteer link"
-                    }
-                  </Button>
+                  <VStack spacing={3} align="stretch">
+                    <Button
+                      size="md"
+                      colorScheme="green"
+                      variant="outline"
+                      onClick={copyVolunteerLink}
+                      isLoading={loadingVolunteerLink || copyingLink}
+                      loadingText={loadingVolunteerLink ? "Loading..." : "Copying..."}
+                      isDisabled={loadingVolunteerLink}
+                      w="100%"
+                    >
+                      {loadingVolunteerLink 
+                        ? "Loading..." 
+                        : volunteerLink 
+                          ? "Copy volunteer link" 
+                          : "Create volunteer link"
+                      }
+                    </Button>
+
+                    {volunteerLink && (
+                      <Button
+                        size="md"
+                        colorScheme="blue"
+                        variant="outline"
+                        onClick={() => navigate(`/volunteer/${volunteerLink}`)}
+                        w="100%"
+                      >
+                        Visit Volunteer Page
+                      </Button>
+                    )}
+                  </VStack>
                 </Box>
 
                 {/* Songs Section */}

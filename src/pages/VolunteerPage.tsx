@@ -377,6 +377,15 @@ export function VolunteerPage() {
             <Text color={subtitleColor} fontSize="lg">
               Choose a service to volunteer for
             </Text>
+            
+            <Button
+              size="md"
+              colorScheme="blue"
+              variant="outline"
+              onClick={() => navigate('/dashboard')}
+            >
+              Back to Dashboard
+            </Button>
           </VStack>
         )}
 
