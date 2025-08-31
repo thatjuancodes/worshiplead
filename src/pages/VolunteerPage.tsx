@@ -16,7 +16,7 @@ import {
   AlertIcon
 } from '@chakra-ui/react'
 import { supabase } from '../lib/supabase'
-import { getCurrentUser, signInWithGoogleFromVolunteer } from '../lib/auth'
+import { signInWithGoogleFromVolunteer } from '../lib/auth'
 
 interface OrganizationData {
   id: string
