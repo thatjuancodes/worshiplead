@@ -99,58 +99,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   useEffect(() => {
-    // Add a timeout fallback to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      setIsLoading(false)
-    }, 10000) // 10 second timeout
-    
-    // Get initial session
+    // Get initial session quickly from storage
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) throw error
-        
+
         setSession(session)
         setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-        }
+
+        // Do not block UI on profile fetch
+        if (session?.user) fetchProfile(session.user.id).catch(() => {})
       } catch (err) {
         console.error('Error getting initial session:', err)
         setError(err instanceof Error ? err.message : 'Failed to get initial session')
       } finally {
-        clearTimeout(timeoutId)
         setIsLoading(false)
       }
     }
 
     getInitialSession()
 
-    // Listen for auth changes
+    // Listen for auth changes (non-blocking)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_, session) => {
         try {
           setSession(session)
           setUser(session?.user ?? null)
-          
-          if (session?.user) {
-            await fetchProfile(session.user.id)
-          } else {
-            setProfile(null)
-          }
+
+          if (session?.user) fetchProfile(session.user.id).catch(() => {})
+          else setProfile(null)
         } catch (err) {
           console.error('Error handling auth state change:', err)
           setError(err instanceof Error ? err.message : 'Failed to handle authentication change')
-        } finally {
-          clearTimeout(timeoutId)
-          setIsLoading(false)
         }
       }
     )
 
     return () => {
-      clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
   }, [])

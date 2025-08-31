@@ -40,9 +40,10 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
 import { keyframes } from '@emotion/react'
 import { supabase } from '../lib/supabase'
-import { getCurrentUser, getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../lib/auth'
+import { getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
+import { useAuth } from '../contexts'
 import type { User } from '@supabase/supabase-js'
 
 interface OrganizationData {
@@ -105,8 +106,7 @@ interface Volunteer {
 export function Dashboard() {
   const navigate = useNavigate()
   const { canManagePrimary } = useOrganizationAccess()
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<User | null>(null)
+  const { user, isLoading: authLoading, error: authError } = useAuth()
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [services, setServices] = useState<WorshipService[]>([])
   const [displayYear, setDisplayYear] = useState<number | null>(null)
@@ -709,17 +709,7 @@ export function Dashboard() {
     }
   }
 
-  useEffect(() => {
-    loadRecentSongs()
-  }, [loadRecentSongs])
-
-  useEffect(() => {
-    loadVolunteerLink()
-  }, [loadVolunteerLink])
-
-  useEffect(() => {
-    loadUserVolunteerDates()
-  }, [loadUserVolunteerDates])
+  
 
   async function handleAddSongToService(serviceId: string) {
     if (!serviceId) return
@@ -770,19 +760,15 @@ export function Dashboard() {
     }
   }
 
-  const checkUserAndOrganization = useCallback(async () => {
+  const loadOrganization = useCallback(async () => {
+    if (!user) return
+    
     try {
-      const currentUser = await getCurrentUser()
-      if (!currentUser) {
-        console.log('Dashboard: No current user, redirecting to login')
-        navigate('/login')
-        return
-      }
-      setUser(currentUser)
-
+      console.log('Dashboard: Loading organization for user:', user.id)
+      
       // Ensure user has profile and basic setup
       try {
-        await ensureUserProfileAndMembership(currentUser)
+        await ensureUserProfileAndMembership(user)
         console.log('Dashboard: User profile and membership ensured')
       } catch (error) {
         console.error('Dashboard: Error ensuring user profile and membership:', error)
@@ -795,38 +781,45 @@ export function Dashboard() {
         })
       }
 
-      const userOrg = await getUserPrimaryOrganization(currentUser.id)
-      console.log('Dashboard: User organization data:', userOrg) // Debug log
+      const userOrg = await getUserPrimaryOrganization(user.id)
+      console.log('Dashboard: User organization data:', userOrg)
       if (!userOrg) {
         console.log('Dashboard: No organization found, redirecting to organization-setup')
-        navigate('/organization-setup') // Redirect if no organization
+        navigate('/organization-setup')
         return
       }
       setOrganization(userOrg)
-      setLoading(false)
+      const now = new Date()
+      setDisplayYear(now.getFullYear())
+      setDisplayMonth(now.getMonth())
     } catch (error) {
-      console.error('Dashboard: Error checking user and organization:', error)
+      console.error('Dashboard: Error loading organization:', error)
       navigate('/login')
     }
-  }, [navigate, toast])
+  }, [user, navigate, toast])
 
+  // Wait for auth to complete, then load organization
   useEffect(() => {
-    if (loading) {
-      checkUserAndOrganization()
+    if (authLoading) {
+      console.log('Dashboard: Waiting for auth to complete...')
+      return
     }
-  }, [loading, checkUserAndOrganization])
-
-  // Add a timeout to prevent infinite loading
-  useEffect(() => {
-    if (loading) {
-      const timeoutId = setTimeout(() => {
-        console.warn('Dashboard: Loading timeout reached, setting loading to false')
-        setLoading(false)
-      }, 10000) // 10 second timeout
-
-      return () => clearTimeout(timeoutId)
+    
+    if (authError) {
+      console.error('Dashboard: Auth error:', authError)
+      navigate('/login')
+      return
     }
-  }, [loading])
+    
+    if (!user) {
+      console.log('Dashboard: No user from auth, redirecting to login')
+      navigate('/login')
+      return
+    }
+    
+    console.log('Dashboard: Auth complete, loading organization...')
+    loadOrganization()
+  }, [authLoading, authError, user, loadOrganization, navigate])
 
   const loadServices = useCallback(async () => {
     if (!organization) return
@@ -848,9 +841,14 @@ export function Dashboard() {
     }
   }, [organization])
 
+  // When organization is ready, trigger all data loads in parallel
   useEffect(() => {
-    if (organization) loadServices()
-  }, [organization, loadServices])
+    if (!organization) return
+    loadServices()
+    loadRecentSongs()
+    loadVolunteerLink()
+    loadUserVolunteerDates()
+  }, [organization, loadServices, loadRecentSongs, loadVolunteerLink, loadUserVolunteerDates])
 
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
@@ -866,7 +864,7 @@ export function Dashboard() {
   }
   // Removed unused activity styles after replacing Recent Activity with Songs
 
-  if (loading) {
+  if (authLoading) {
     return (
       <Box
         minH="100vh"
@@ -885,7 +883,7 @@ export function Dashboard() {
               size="xl"
             />
             <Text color={subtitleColor} fontSize="md" m={0}>
-              Loading your dashboard...
+              {authLoading ? 'Authenticating...' : 'Loading your dashboard...'}
             </Text>
           </VStack>
         </Center>
