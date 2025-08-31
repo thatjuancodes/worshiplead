@@ -228,20 +228,7 @@ export function OrganizationSetup() {
                 </Card>
               </SimpleGrid>
 
-              <Divider />
-              
-              <Box textAlign="center">
-                <Text color="gray.600" mb={3}>
-                  Not ready to set up an organization?
-                </Text>
-                <Button
-                  variant="ghost"
-                  color="blue.600"
-                  onClick={() => navigate('/dashboard')}
-                >
-                  Skip for now
-                </Button>
-              </Box>
+
             </VStack>
           )}
 
