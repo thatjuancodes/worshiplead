@@ -44,6 +44,12 @@ export function OrganizationSetup() {
     organizationSlug: string
   } | null>(null)
 
+  // State for newly submitted request organization details
+  const [submittedRequestOrg, setSubmittedRequestOrg] = useState<{
+    organizationName: string
+    organizationSlug: string
+  } | null>(null)
+
   // Check if user already has an organization when component mounts
   useEffect(() => {
     const checkExistingOrganization = async () => {
@@ -75,6 +81,9 @@ export function OrganizationSetup() {
     }
     if (joinRequestSubmitted) {
       setJoinRequestSubmitted(false)
+    }
+    if (submittedRequestOrg) {
+      setSubmittedRequestOrg(null)
     }
   }
 
@@ -173,7 +182,10 @@ export function OrganizationSetup() {
 
       // Success! Show waiting message
       setJoinRequestSubmitted(true)
-      // Don't set existingRequest here since this is a new request
+      setSubmittedRequestOrg({
+        organizationName: orgData.name,
+        organizationSlug: joinForm.organizationSlug
+      })
     } catch (err) {
       console.error('Join organization error:', err)
       setError(err instanceof Error ? err.message : 'Failed to submit join request')
@@ -528,7 +540,7 @@ export function OrganizationSetup() {
                     Join Request Submitted!
                   </Heading>
                   <Text fontSize="lg" color="gray.600">
-                    Waiting for Organization Admin to accept your request to join <strong>{existingRequest?.organizationName || 'the organization'}...</strong>
+                    Waiting for Organization Admin to accept your request to join <strong>{submittedRequestOrg?.organizationName || 'the organization'}...</strong>
                   </Text>
                   <Text fontSize="md" color="gray.500">
                     You will receive an email notification when your request is approved.
@@ -537,6 +549,7 @@ export function OrganizationSetup() {
                     colorScheme="blue"
                     onClick={() => {
                       setJoinRequestSubmitted(false)
+                      setSubmittedRequestOrg(null)
                       setMode('select')
                     }}
                   >
