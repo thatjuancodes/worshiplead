@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import { 
   Spinner, 
   VStack, 
@@ -26,6 +26,7 @@ import { OrganizationAccessDemo } from './pages/OrganizationAccessDemo'
 // Component to handle onboarding for authenticated users
 function AuthenticatedHome() {
   const { user, isLoading, error } = useAuth()
+  const navigate = useNavigate()
   
   const spinnerColor = useColorModeValue('blue.500', 'blue.300')
   const textColor = useColorModeValue('gray.600', 'gray.300')
@@ -59,9 +60,10 @@ function AuthenticatedHome() {
   }
 
   if (user) {
-    // Check if user has invitation data
+    // Check if user has invitation data and redirect using React Router
     if (user.user_metadata?.invite_id) {
-      window.location.href = '/onboarding'
+      // Use React Router navigation instead of window.location.href
+      navigate('/onboarding', { replace: true })
       return null // Don't render anything while redirecting
     }
   }

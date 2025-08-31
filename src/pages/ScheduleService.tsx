@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader, DeleteServiceModal } from '../components'
+import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { 
   Box, 
   VStack, 
@@ -54,6 +55,7 @@ interface OrganizationData {
 
 export function ScheduleService() {
   const navigate = useNavigate()
+  const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
@@ -169,6 +171,11 @@ export function ScheduleService() {
       return
     }
 
+    if (!canManagePrimary) {
+      setError('You do not have permission to create services. Only admins and owners can create services.')
+      return
+    }
+
     if (!title.trim() || !serviceDate) {
       setError('Please fill in all required fields.')
       return
@@ -243,6 +250,10 @@ export function ScheduleService() {
   }
 
   const handleDeleteService = (service: WorshipService) => {
+    if (!canManagePrimary) {
+      setError('You do not have permission to delete services. Only admins and owners can delete services.')
+      return
+    }
     setServiceToDelete(service)
     setDeleteModalOpen(true)
   }
@@ -338,13 +349,15 @@ export function ScheduleService() {
             </Box>
             
             <HStack spacing={3} flexShrink={0} flexWrap="wrap">
-              <Button
-                colorScheme="blue"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                size="md"
-              >
-                {showCreateForm ? 'Cancel' : 'Create New Service'}
-              </Button>
+              {canManagePrimary && (
+                <Button
+                  colorScheme="blue"
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                  size="md"
+                >
+                  {showCreateForm ? 'Cancel' : 'Create New Service'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 colorScheme="gray"
@@ -371,8 +384,8 @@ export function ScheduleService() {
             </Alert>
           )}
 
-          {/* Create Form */}
-          {showCreateForm && (
+          {/* Create Form - Only show if user has permission */}
+          {showCreateForm && canManagePrimary && (
             <Box
               bg={cardBg}
               borderRadius="lg"
@@ -488,7 +501,10 @@ export function ScheduleService() {
                   No services found
                 </Text>
                 <Text color={textMutedColor}>
-                  Create your first worship service to get started.
+                  {canManagePrimary 
+                    ? 'Create your first worship service to get started.'
+                    : 'No services have been created yet.'
+                  }
                 </Text>
               </Box>
             ) : (
@@ -560,22 +576,26 @@ export function ScheduleService() {
                           >
                             View Details
                           </Button>
-                          <Button
-                            variant="outline"
-                            colorScheme="gray"
-                            size="sm"
-                            onClick={() => navigate(`/service/${service.id}/edit`)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            colorScheme="red"
-                            size="sm"
-                            onClick={() => handleDeleteService(service)}
-                          >
-                            Delete
-                          </Button>
+                          {canManagePrimary && (
+                            <>
+                              <Button
+                                variant="outline"
+                                colorScheme="gray"
+                                size="sm"
+                                onClick={() => navigate(`/service/${service.id}/edit`)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                colorScheme="red"
+                                size="sm"
+                                onClick={() => handleDeleteService(service)}
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
                         </HStack>
                       </VStack>
                     </Box>

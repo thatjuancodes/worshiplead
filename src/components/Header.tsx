@@ -6,6 +6,7 @@ import {
   Heading, 
   Button, 
   Container,
+  Spinner,
   useColorModeValue
 } from '@chakra-ui/react'
 import { getCurrentUser } from '../lib/auth'
@@ -23,17 +24,31 @@ export function Header() {
   useEffect(() => {
     const checkUser = async () => {
       try {
+        setLoading(true)
+        console.log('Header: Checking user authentication...')
         const currentUser = await getCurrentUser()
+        console.log('Header: User check result:', currentUser ? 'User found' : 'No user')
         setUser(currentUser)
       } catch (error) {
-        console.error('Error checking user:', error)
+        console.error('Header: Error checking user:', error)
         setUser(null)
       } finally {
         setLoading(false)
+        console.log('Header: User check completed')
       }
     }
 
+    // Add a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.warn('Header: Loading timeout reached, setting loading to false')
+        setLoading(false)
+      }
+    }, 5000) // 5 second timeout
+
     checkUser()
+
+    return () => clearTimeout(timeoutId)
   }, [])
 
   return (
@@ -69,7 +84,9 @@ export function Header() {
           </Box>
 
           <Flex gap={3} alignItems="center">
-            {!loading && (
+            {loading ? (
+              <Spinner size="sm" color="blue.500" />
+            ) : (
               <>
                 {user ? (
                   <Button as={Link} to="/dashboard" colorScheme="blue" size="md">

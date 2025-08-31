@@ -29,6 +29,7 @@ import {
 import { ChevronDownIcon, HamburgerIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 
 interface OrganizationData {
   organization_id: string
@@ -69,6 +70,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
   const navigate = useNavigate()
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const { canManagePrimary } = useOrganizationAccess()
 
   // Color mode values
   const headerBg = useColorModeValue('white', 'gray.800')
@@ -244,18 +246,22 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                     >
                       Songbank
                     </MenuItem>
-                    <MenuItem
-                      onClick={() => navigate('/team')}
-                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                    >
-                      Team Management
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => navigate('/schedule')}
-                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                    >
-                      Schedule Service
-                    </MenuItem>
+                    {canManagePrimary && (
+                      <MenuItem
+                        onClick={() => navigate('/team')}
+                        _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                      >
+                        Team Management
+                      </MenuItem>
+                    )}
+                    {canManagePrimary && (
+                      <MenuItem
+                        onClick={() => navigate('/schedule')}
+                        _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                      >
+                        Schedule Service
+                      </MenuItem>
+                    )}
                     <MenuDivider />
                     <MenuItem
                       onClick={handleSignOut}
@@ -344,35 +350,39 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                 </Text>
               </Button>
               
-              <Button
-                variant="ghost"
-                size="lg"
-                justifyContent="flex-start"
-                py={6}
-                px={6}
-                onClick={() => handleNavigation('/team')}
-                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
-                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-              >
-                <Text fontSize="lg" fontWeight="500">
-                  Team Management
-                </Text>
-              </Button>
+              {canManagePrimary && (
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  justifyContent="flex-start"
+                  py={6}
+                  px={6}
+                  onClick={() => handleNavigation('/team')}
+                  _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                  _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                >
+                  <Text fontSize="lg" fontWeight="500">
+                    Team Management
+                  </Text>
+                </Button>
+              )}
               
-              <Button
-                variant="ghost"
-                size="lg"
-                justifyContent="flex-start"
-                py={6}
-                px={6}
-                onClick={() => handleNavigation('/schedule')}
-                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
-                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-              >
-                <Text fontSize="lg" fontWeight="500">
-                  Schedule Service
-                </Text>
-              </Button>
+              {canManagePrimary && (
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  justifyContent="flex-start"
+                  py={6}
+                  px={6}
+                  onClick={() => handleNavigation('/schedule')}
+                  _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                  _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                >
+                  <Text fontSize="lg" fontWeight="500">
+                    Schedule Service
+                  </Text>
+                </Button>
+              )}
               
               <Divider my={4} />
               

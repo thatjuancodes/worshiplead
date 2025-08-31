@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import { supabase } from '../lib/supabase'
+import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { 
   Box, 
   VStack, 
@@ -85,6 +86,7 @@ interface Instrument {
 
 export function TeamManagement() {
   const navigate = useNavigate()
+  const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
@@ -391,6 +393,12 @@ export function TeamManagement() {
   async function handleSaveInstrument(e: React.FormEvent) {
     e.preventDefault()
     if (!organization) return
+    
+    if (!canManagePrimary) {
+      setInstrumentError('You do not have permission to manage instruments. Only admins and owners can manage instruments.')
+      return
+    }
+    
     if (!instrumentForm.name.trim()) {
       setInstrumentError('Name is required')
       return
@@ -466,6 +474,11 @@ export function TeamManagement() {
     if (!organization) return
     if (!confirm('Delete this instrument?')) return
 
+    if (!canManagePrimary) {
+      setInstrumentError('You do not have permission to delete instruments. Only admins and owners can delete instruments.')
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('instruments')
@@ -492,6 +505,11 @@ export function TeamManagement() {
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!organization || !inviteEmail.trim()) return
+
+    if (!canManagePrimary) {
+      setError('You do not have permission to invite users. Only admins and owners can invite users.')
+      return
+    }
 
     setInviting(true)
     setError('')
@@ -575,6 +593,11 @@ export function TeamManagement() {
   const handleCancelInvite = async (inviteId: string) => {
     if (!confirm('Are you sure you want to cancel this invitation?')) return
 
+    if (!canManagePrimary) {
+      setError('You do not have permission to cancel invitations. Only admins and owners can cancel invitations.')
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('organization_invites')
@@ -655,6 +678,22 @@ export function TeamManagement() {
             </Button>
           </Flex>
 
+          {/* Permission Info Alert */}
+          {!canManagePrimary && (
+            <Box
+              bg={useColorModeValue('blue.50', 'blue.900')}
+              p={4}
+              borderRadius="lg"
+              border="1px"
+              borderColor={useColorModeValue('blue.200', 'blue.700')}
+              mb={6}
+            >
+              <Text color={useColorModeValue('blue.800', 'blue.200')} fontSize="sm" fontWeight="500">
+              📖 Read-Only Access: You can view team members and instruments, but only admins and owners can invite members, manage roles, or manage instruments.
+              </Text>
+            </Box>
+          )}
+
           {/* Content Grid */}
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
 
@@ -725,42 +764,55 @@ export function TeamManagement() {
             </Box>
 
             <VStack align="start" spacing={4}>
-              <Heading as="h3" size="md" color={titleColor}>
-                Invite New Member
-              </Heading>
-              <Text color={subtitleColor} fontSize="sm">
-                Send an invitation to join your organization
-              </Text>
-              
-              <form onSubmit={handleInviteUser}>
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
-                  <FormControl>
-                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                      Email Address
-                    </FormLabel>
-                    <Input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="Enter email address"
-                      required
-                      size="md"
-                    />
-                  </FormControl>
+              {canManagePrimary ? (
+                <>
+                  <Heading as="h3" size="md" color={titleColor}>
+                    Invite New Member
+                  </Heading>
+                  <Text color={subtitleColor} fontSize="sm">
+                    Send an invitation to join your organization
+                  </Text>
                   
-                  <Button
-                    type="submit"
-                    colorScheme="blue"
-                    isLoading={inviting}
-                    loadingText="Sending..."
-                    disabled={!inviteEmail.trim()}
-                    size="md"
-                    h="40px"
-                  >
-                    Send Invitation
-                  </Button>
-                </SimpleGrid>
-              </form>
+                  <form onSubmit={handleInviteUser}>
+                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
+                      <FormControl>
+                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                          Email Address
+                        </FormLabel>
+                        <Input
+                          type="email"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          placeholder="Enter email address"
+                          required
+                          size="md"
+                        />
+                      </FormControl>
+                      
+                      <Button
+                        type="submit"
+                        colorScheme="blue"
+                        isLoading={inviting}
+                        loadingText="Sending..."
+                        disabled={!inviteEmail.trim()}
+                        size="md"
+                        h="40px"
+                      >
+                        Send Invitation
+                      </Button>
+                    </SimpleGrid>
+                  </form>
+                </>
+              ) : (
+                <Box>
+                  <Heading as="h3" size="md" color={titleColor}>
+                    Invite New Member
+                  </Heading>
+                  <Text color={subtitleColor} fontSize="sm">
+                    Only admins and owners can invite new members to the organization.
+                  </Text>
+                </Box>
+              )}
 
               {error && (
                 <Alert status="error" borderRadius="md" mt={4}>
@@ -849,14 +901,16 @@ export function TeamManagement() {
                             >
                               Copy Link
                             </Button>
-                            <Button
-                              variant="outline"
-                              colorScheme="red"
-                              size="sm"
-                              onClick={() => handleCancelInvite(invite.id)}
-                            >
-                              Cancel
-                            </Button>
+                            {canManagePrimary && (
+                              <Button
+                                variant="outline"
+                                colorScheme="red"
+                                size="sm"
+                                onClick={() => handleCancelInvite(invite.id)}
+                              >
+                                Cancel
+                              </Button>
+                            )}
                           </HStack>
                         </Flex>
                       </Box>
@@ -879,60 +933,66 @@ export function TeamManagement() {
                 Instruments ({instruments.length})
               </Heading>
 
-              <form onSubmit={handleSaveInstrument}>
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
-                  <FormControl>
-                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                      Name
-                    </FormLabel>
-                    <Input
-                      type="text"
-                      value={instrumentForm.name}
-                      onChange={e => setInstrumentForm(v => ({ ...v, name: e.target.value }))}
-                      placeholder="e.g. Acoustic Guitar"
-                      required
-                      size="md"
-                    />
-                  </FormControl>
+              {canManagePrimary ? (
+                <form onSubmit={handleSaveInstrument}>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
+                    <FormControl>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Name
+                      </FormLabel>
+                      <Input
+                        type="text"
+                        value={instrumentForm.name}
+                        onChange={e => setInstrumentForm(v => ({ ...v, name: e.target.value }))}
+                        placeholder="e.g. Acoustic Guitar"
+                        required
+                        size="md"
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                      Description (optional)
-                    </FormLabel>
-                    <Textarea
-                      value={instrumentForm.description}
-                      onChange={e => setInstrumentForm(v => ({ ...v, description: e.target.value }))}
-                      placeholder="Details or notes"
-                      size="md"
-                      rows={1}
-                    />
-                  </FormControl>
-                </SimpleGrid>
+                    <FormControl>
+                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                        Description (optional)
+                      </FormLabel>
+                      <Textarea
+                        value={instrumentForm.description}
+                        onChange={e => setInstrumentForm(v => ({ ...v, description: e.target.value }))}
+                        placeholder="Details or notes"
+                        size="md"
+                        rows={1}
+                      />
+                    </FormControl>
+                  </SimpleGrid>
 
-                <HStack spacing={3} mb={4}>
-                  <Button
-                    type="submit"
-                    colorScheme="blue"
-                    isLoading={isSavingInstrument}
-                    loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
-                    disabled={!instrumentForm.name.trim()}
-                    size="md"
-                  >
-                    {editingInstrumentId ? 'Save Changes' : 'Add Instrument'}
-                  </Button>
-
-                  {editingInstrumentId && (
+                  <HStack spacing={3} mb={4}>
                     <Button
-                      variant="outline"
-                      colorScheme="gray"
-                      onClick={handleCancelEditInstrument}
+                      type="submit"
+                      colorScheme="blue"
+                      isLoading={isSavingInstrument}
+                      loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
+                      disabled={!instrumentForm.name.trim()}
                       size="md"
                     >
-                      Cancel
+                      {editingInstrumentId ? 'Save Changes' : 'Add Instrument'}
                     </Button>
-                  )}
-                </HStack>
-              </form>
+
+                    {editingInstrumentId && (
+                      <Button
+                        variant="outline"
+                        colorScheme="gray"
+                        onClick={handleCancelEditInstrument}
+                        size="md"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </HStack>
+                </form>
+              ) : (
+                <Text color={subtitleColor} fontSize="sm" mb={4}>
+                  Only admins and owners can manage instruments.
+                </Text>
+              )}
 
               {instrumentError && (
                 <Alert status="error" borderRadius="md" mt={2}>
@@ -983,23 +1043,27 @@ export function TeamManagement() {
                           </Box>
 
                           <HStack spacing={2}>
-                            <Button
-                              variant="outline"
-                              colorScheme="gray"
-                              size="sm"
-                              onClick={() => handleEditInstrument(instrument)}
-                            >
-                              Edit
-                            </Button>
+                            {canManagePrimary && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  colorScheme="gray"
+                                  size="sm"
+                                  onClick={() => handleEditInstrument(instrument)}
+                                >
+                                  Edit
+                                </Button>
 
-                            <Button
-                              variant="outline"
-                              colorScheme="red"
-                              size="sm"
-                              onClick={() => handleDeleteInstrument(instrument.id)}
-                            >
-                              Delete
-                            </Button>
+                                <Button
+                                  variant="outline"
+                                  colorScheme="red"
+                                  size="sm"
+                                  onClick={() => handleDeleteInstrument(instrument.id)}
+                                >
+                                  Delete
+                                </Button>
+                              </>
+                            )}
                           </HStack>
                         </Flex>
                       </Box>

@@ -42,6 +42,7 @@ import { keyframes } from '@emotion/react'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../lib/auth'
 import { DashboardHeader } from '../components'
+import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import type { User } from '@supabase/supabase-js'
 
 interface OrganizationData {
@@ -103,6 +104,7 @@ interface Volunteer {
 
 export function Dashboard() {
   const navigate = useNavigate()
+  const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
@@ -223,6 +225,11 @@ export function Dashboard() {
 
     if (!organization || !user) {
       setFormError('You must be logged in to create a service.')
+      return
+    }
+
+    if (!canManagePrimary) {
+      setFormError('You do not have permission to create services. Only admins and owners can create services.')
       return
     }
 
@@ -685,6 +692,12 @@ export function Dashboard() {
 
   async function handleAddSongToService(serviceId: string) {
     if (!serviceId) return
+    
+    if (!canManagePrimary) {
+      setServiceErrorByService(prev => ({ ...prev, [serviceId]: 'You do not have permission to add songs. Only admins and owners can add songs to services.' }))
+      return
+    }
+    
     const selectedSongId = selectedSongByService[serviceId]
     const notes = (songNotesByService[serviceId] || '').trim()
     if (!selectedSongId) {
@@ -730,6 +743,7 @@ export function Dashboard() {
     try {
       const currentUser = await getCurrentUser()
       if (!currentUser) {
+        console.log('Dashboard: No current user, redirecting to login')
         navigate('/login')
         return
       }
@@ -751,22 +765,37 @@ export function Dashboard() {
       }
 
       const userOrg = await getUserPrimaryOrganization(currentUser.id)
-      console.log('User organization data:', userOrg) // Debug log
+      console.log('Dashboard: User organization data:', userOrg) // Debug log
       if (!userOrg) {
+        console.log('Dashboard: No organization found, redirecting to organization-setup')
         navigate('/organization-setup') // Redirect if no organization
         return
       }
       setOrganization(userOrg)
       setLoading(false)
     } catch (error) {
-      console.error('Error checking user and organization:', error)
+      console.error('Dashboard: Error checking user and organization:', error)
       navigate('/login')
     }
   }, [navigate, toast])
 
   useEffect(() => {
-    checkUserAndOrganization()
-  }, [checkUserAndOrganization])
+    if (loading) {
+      checkUserAndOrganization()
+    }
+  }, [loading, checkUserAndOrganization])
+
+  // Add a timeout to prevent infinite loading
+  useEffect(() => {
+    if (loading) {
+      const timeoutId = setTimeout(() => {
+        console.warn('Dashboard: Loading timeout reached, setting loading to false')
+        setLoading(false)
+      }, 10000) // 10 second timeout
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [loading])
 
   const loadServices = useCallback(async () => {
     if (!organization) return
@@ -1005,21 +1034,23 @@ export function Dashboard() {
                   }}
                 />
 
-                <Button
-                  colorScheme="blue"
-                  size="md"
-                  mt={4}
-                  w="100%"
-                  onClick={() => {
-                    setSelectedDate('')
-                    setDayServices([])
-                    setFormDate('')
-                    setIsAddingServiceMode(true)
-                    createDrawer.onOpen()
-                  }}
-                >
-                  Add New Service
-                </Button>
+                {canManagePrimary && (
+                  <Button
+                    colorScheme="blue"
+                    size="md"
+                    mt={4}
+                    w="100%"
+                    onClick={() => {
+                      setSelectedDate('')
+                      setDayServices([])
+                      setFormDate('')
+                      setIsAddingServiceMode(true)
+                      createDrawer.onOpen()
+                    }}
+                  >
+                    Add New Service
+                  </Button>
+                )}
               </Box>
             </VStack>
           </GridItem>
@@ -1165,33 +1196,35 @@ export function Dashboard() {
                   </VStack>
                 )}
 
-                <Button
-                  mt={5}
-                  w="100%"
-                  colorScheme="blue"
-                  position="relative"
-                  overflow="hidden"
-                  _before={{
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: '-100%',
-                    width: '100%',
-                    height: '100%',
-                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
-                    animation: 'shimmer 4s infinite'
-                  }}
-                  sx={{
-                    '@keyframes shimmer': {
-                      '0%': { left: '-100%' },
-                      '50%': { left: '100%' },
-                      '100%': { left: '100%' }
-                    }
-                  }}
-                  onClick={addSongDrawer.onOpen}
-                >
-                  Add song
-                </Button>
+                {canManagePrimary && (
+                  <Button
+                    mt={5}
+                    w="100%"
+                    colorScheme="blue"
+                    position="relative"
+                    overflow="hidden"
+                    _before={{
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: '-100%',
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
+                      animation: 'shimmer 4s infinite'
+                    }}
+                    sx={{
+                      '@keyframes shimmer': {
+                        '0%': { left: '-100%' },
+                        '50%': { left: '100%' },
+                        '100%': { left: '100%' }
+                      }
+                    }}
+                    onClick={addSongDrawer.onOpen}
+                  >
+                    Add song
+                  </Button>
+                )}
 
                 <Button mt={3} w="100%" variant="outline" colorScheme="blue" onClick={() => navigate('/songbank')}>
                   Manage songs
@@ -1314,46 +1347,48 @@ export function Dashboard() {
                                     )}
                                   </Box>
 
-                                  <Box>
-                                    <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
-                                    {serviceErrorByService[svc.id] && (
-                                      <Alert status="error" borderRadius="md" mb={3}>
-                                        <AlertIcon />
-                                        {serviceErrorByService[svc.id]}
-                                      </Alert>
-                                    )}
-                                    <VStack spacing={3} align="stretch">
-                                      <Select
-                                        placeholder="Choose a song..."
-                                        value={selectedSongByService[svc.id] || ''}
-                                        onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                        size="md"
-                                      >
-                                        {availableSongs.map(song => (
-                                          <option key={song.id} value={song.id}>
-                                            {song.title} - {song.artist}
-                                          </option>
-                                        ))}
-                                      </Select>
-                                      <Input
-                                        type="text"
-                                        placeholder="Notes (optional)"
-                                        size="md"
-                                        value={songNotesByService[svc.id] || ''}
-                                        onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                      />
-                                      <Button
-                                        size="md"
-                                        colorScheme="blue"
-                                        onClick={() => handleAddSongToService(svc.id)}
-                                        isLoading={!!addingSongByService[svc.id]}
-                                        loadingText="Adding..."
-                                        isDisabled={!availableSongs.length}
-                                      >
-                                        Add Song
-                                      </Button>
-                                    </VStack>
-                                  </Box>
+                                  {canManagePrimary && (
+                                    <Box>
+                                      <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
+                                      {serviceErrorByService[svc.id] && (
+                                        <Alert status="error" borderRadius="md" mb={3}>
+                                          <AlertIcon />
+                                          {serviceErrorByService[svc.id]}
+                                        </Alert>
+                                      )}
+                                      <VStack spacing={3} align="stretch">
+                                        <Select
+                                          placeholder="Choose a song..."
+                                          value={selectedSongByService[svc.id] || ''}
+                                          onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                          size="md"
+                                        >
+                                          {availableSongs.map(song => (
+                                            <option key={song.id} value={song.id}>
+                                              {song.title} - {song.artist}
+                                            </option>
+                                          ))}
+                                        </Select>
+                                        <Input
+                                          type="text"
+                                          placeholder="Notes (optional)"
+                                          size="md"
+                                          value={songNotesByService[svc.id] || ''}
+                                          onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                        />
+                                        <Button
+                                          size="md"
+                                          colorScheme="blue"
+                                          onClick={() => handleAddSongToService(svc.id)}
+                                          isLoading={!!addingSongByService[svc.id]}
+                                          loadingText="Adding..."
+                                          isDisabled={!availableSongs.length}
+                                        >
+                                          Add Song
+                                        </Button>
+                                      </VStack>
+                                    </Box>
+                                  )}
                                 </VStack>
                               </AccordionPanel>
                             </AccordionItem>
@@ -1454,46 +1489,48 @@ export function Dashboard() {
                                     )}
                                   </Box>
 
-                                  <Box>
-                                    <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
-                                    {serviceErrorByService[svc.id] && (
-                                      <Alert status="error" borderRadius="md" mb={3}>
-                                        <AlertIcon />
-                                        {serviceErrorByService[svc.id]}
-                                      </Alert>
-                                    )}
-                                    <VStack spacing={3} align="stretch">
-                                      <Select
-                                        placeholder="Choose a song..."
-                                        value={selectedSongByService[svc.id] || ''}
-                                        onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                        size="md"
-                                      >
-                                        {availableSongs.map(song => (
-                                          <option key={song.id} value={song.id}>
-                                            {song.title} - {song.artist}
-                                          </option>
-                                        ))}
-                                      </Select>
-                                      <Input
-                                        type="text"
-                                        placeholder="Notes (optional)"
-                                        size="md"
-                                        value={songNotesByService[svc.id] || ''}
-                                        onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                      />
-                                      <Button
-                                        size="md"
-                                        colorScheme="blue"
-                                        onClick={() => handleAddSongToService(svc.id)}
-                                        isLoading={!!addingSongByService[svc.id]}
-                                        loadingText="Adding..."
-                                        isDisabled={!availableSongs.length}
-                                      >
-                                        Add Song
-                                      </Button>
-                                    </VStack>
-                                  </Box>
+                                  {canManagePrimary && (
+                                    <Box>
+                                      <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
+                                      {serviceErrorByService[svc.id] && (
+                                        <Alert status="error" borderRadius="md" mb={3}>
+                                          <AlertIcon />
+                                          {serviceErrorByService[svc.id]}
+                                        </Alert>
+                                      )}
+                                      <VStack spacing={3} align="stretch">
+                                        <Select
+                                          placeholder="Choose a song..."
+                                          value={selectedSongByService[svc.id] || ''}
+                                          onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                          size="md"
+                                        >
+                                          {availableSongs.map(song => (
+                                            <option key={song.id} value={song.id}>
+                                              {song.title} - {song.artist}
+                                            </option>
+                                          ))}
+                                        </Select>
+                                        <Input
+                                          type="text"
+                                          placeholder="Notes (optional)"
+                                          size="md"
+                                          value={songNotesByService[svc.id] || ''}
+                                          onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                        />
+                                        <Button
+                                          size="md"
+                                          colorScheme="blue"
+                                          onClick={() => handleAddSongToService(svc.id)}
+                                          isLoading={!!addingSongByService[svc.id]}
+                                          loadingText="Adding..."
+                                          isDisabled={!availableSongs.length}
+                                        >
+                                          Add Song
+                                        </Button>
+                                      </VStack>
+                                    </Box>
+                                  )}
                                 </VStack>
                               </AccordionPanel>
                             </AccordionItem>
@@ -1580,9 +1617,11 @@ export function Dashboard() {
               ) : (
                 <DrawerFooter>
                   <HStack w="100%" justify="space-between">
-                    <Button variant="outline" onClick={() => setIsAddingServiceMode(true)}>
-                      Add Service
-                    </Button>
+                    {canManagePrimary && (
+                      <Button variant="outline" onClick={() => setIsAddingServiceMode(true)}>
+                        Add Service
+                      </Button>
+                    )}
                     <Button colorScheme="blue" onClick={createDrawer.onClose}>
                       Close
                     </Button>
@@ -1661,6 +1700,7 @@ export function Dashboard() {
                   </Button>
                   <Button colorScheme="blue" onClick={async () => {
                     if (!organization) { setSongError('Organization not found.'); return }
+                    if (!canManagePrimary) { setSongError('You do not have permission to create songs. Only admins and owners can create songs.'); return }
                     if (!songTitle.trim() || !songArtist.trim()) { setSongError('Title and Artist are required.'); return }
                     try {
                       setIsAddingSong(true)

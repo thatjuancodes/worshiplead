@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
+import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { 
   Box, 
   VStack, 
@@ -109,11 +110,13 @@ interface OrganizationData {
 function SortableSongItem({ 
   serviceSong, 
   onRemove,
-  isRemoving
+  isRemoving,
+  canManage
 }: { 
   serviceSong: ServiceSong
   onRemove: (id: string) => void 
   isRemoving: boolean
+  canManage: boolean
 }) {
   const {
     attributes,
@@ -156,7 +159,7 @@ function SortableSongItem({
         transform: 'translateY(-1px)',
         boxShadow: 'md'
       }}
-      cursor="grab"
+      cursor={canManage ? "grab" : "default"}
       userSelect="none"
       {...attributes}
     >
@@ -173,27 +176,29 @@ function SortableSongItem({
         fontWeight="600"
         fontSize="sm"
         flexShrink={0}
-        cursor="grab"
+        cursor={canManage ? "grab" : "default"}
         position="relative"
-        _active={{ cursor: 'grabbing' }}
-        {...listeners}
+        _active={{ cursor: canManage ? "grabbing" : "default" }}
+        {...(canManage ? listeners : {})}
       >
         {serviceSong.position}
-        <Text
-          position="absolute"
-          bottom="-6px"
-          left="50%"
-          transform="translateX(-50%)"
-          fontSize="xs"
-          color={textMutedColor}
-          opacity={0.6}
-        >
-          ⋮⋮
-        </Text>
+        {canManage && (
+          <Text
+            position="absolute"
+            bottom="-6px"
+            left="50%"
+            transform="translateX(-50%)"
+            fontSize="xs"
+            color={textMutedColor}
+            opacity={0.6}
+          >
+            ⋮⋮
+          </Text>
+        )}
       </Box>
 
       {/* Song Info */}
-      <Box flex="1" minW="0" cursor="grab" {...listeners}>
+      <Box flex="1" minW="0" cursor={canManage ? "grab" : "default"} {...(canManage ? listeners : {})}>
         <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
           {serviceSong.songs.title} - {serviceSong.songs.artist}
         </Text>
@@ -217,22 +222,24 @@ function SortableSongItem({
 
       {/* Actions */}
       <Box flexShrink={0}>
-        <Tooltip label="Remove song from service">
-          <IconButton
-            aria-label="Remove song from service"
-            icon={isRemoving ? <Spinner size="sm" /> : <CloseIcon />}
-            colorScheme="red"
-            size="sm"
-            variant="outline"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              onRemove(serviceSong.id)
-            }}
-            isLoading={isRemoving}
-            disabled={isRemoving}
-          />
-        </Tooltip>
+        {canManage && (
+          <Tooltip label="Remove song from service">
+            <IconButton
+              aria-label="Remove song from service"
+              icon={isRemoving ? <Spinner size="sm" /> : <CloseIcon />}
+              colorScheme="red"
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onRemove(serviceSong.id)
+              }}
+              isLoading={isRemoving}
+              disabled={isRemoving}
+            />
+          </Tooltip>
+        )}
       </Box>
     </Box>
   )
@@ -241,6 +248,7 @@ function SortableSongItem({
 export function ServiceDetail() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   
   const sensors = useSensors(
@@ -448,6 +456,11 @@ export function ServiceDetail() {
       return
     }
 
+    if (!canManagePrimary) {
+      setError('You do not have permission to add songs to services. Only admins and owners can manage service songs.')
+      return
+    }
+
     try {
       setAddingSong(true)
       setError('')
@@ -490,6 +503,11 @@ export function ServiceDetail() {
   }
 
   const handleRemoveSong = async (serviceSongId: string) => {
+    if (!canManagePrimary) {
+      setError('You do not have permission to remove songs from services. Only admins and owners can manage service songs.')
+      return
+    }
+
     if (!confirm('Are you sure you want to remove this song from the service?')) return
 
     try {
@@ -522,6 +540,11 @@ export function ServiceDetail() {
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!canManagePrimary) {
+      setError('You do not have permission to reorder songs. Only admins and owners can manage service songs.')
+      return
+    }
+
     const { active, over } = event
 
     if (active.id !== over?.id) {
@@ -701,13 +724,15 @@ export function ServiceDetail() {
             </Box>
             
             <HStack spacing={3}>
-              <Button
-                colorScheme="blue"
-                onClick={() => navigate(`/service/${service.id}/edit`)}
-                size="md"
-              >
-                Edit Service
-              </Button>
+              {canManagePrimary && (
+                <Button
+                  colorScheme="blue"
+                  onClick={() => navigate(`/service/${service.id}/edit`)}
+                  size="md"
+                >
+                  Edit Service
+                </Button>
+              )}
               <Button
                 variant="outline"
                 colorScheme="gray"
@@ -841,16 +866,18 @@ export function ServiceDetail() {
                 <Heading as="h3" size="md" color={textColor}>
                   Service Songs
                 </Heading>
-                <Button 
-                  colorScheme="blue"
-                  size="sm"
-                  onClick={() => setShowAddSongForm(!showAddSongForm)}
-                >
-                  {showAddSongForm ? 'Cancel' : 'Add Songs'}
-                </Button>
+                {canManagePrimary && (
+                  <Button 
+                    colorScheme="blue"
+                    size="sm"
+                    onClick={() => setShowAddSongForm(!showAddSongForm)}
+                  >
+                    {showAddSongForm ? 'Cancel' : 'Add Songs'}
+                  </Button>
+                )}
               </Flex>
 
-              {showAddSongForm && (
+              {showAddSongForm && canManagePrimary && (
                 <Box
                   bg={useColorModeValue('gray.50', 'gray.700')}
                   border="1px"
@@ -927,14 +954,19 @@ export function ServiceDetail() {
                     No songs added to this service yet
                   </Text>
                   <Text color={textMutedColor}>
-                    Add songs from your songbank to create a setlist
+                    {canManagePrimary 
+                      ? 'Add songs from your songbank to create a setlist'
+                      : 'No songs have been added to this service yet.'
+                    }
                   </Text>
                 </Box>
               ) : (
                 <Box>
-                  <Text fontSize="xs" color={textMutedColor} fontStyle="italic" mb={3}>
-                    Drag to reorder songs
-                  </Text>
+                  {canManagePrimary && (
+                    <Text fontSize="xs" color={textMutedColor} fontStyle="italic" mb={3}>
+                      Drag to reorder songs
+                    </Text>
+                  )}
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -951,6 +983,7 @@ export function ServiceDetail() {
                             serviceSong={serviceSong}
                             onRemove={handleRemoveSong}
                             isRemoving={removingSong === serviceSong.id}
+                            canManage={canManagePrimary}
                           />
                         ))}
                       </VStack>
@@ -1041,13 +1074,15 @@ export function ServiceDetail() {
                 <Heading as="h3" size="md" color={textColor}>
                   Service Notes
                 </Heading>
-                <Button 
-                  variant="outline"
-                  colorScheme="gray"
-                  size="sm"
-                >
-                  Add Notes
-                </Button>
+                {canManagePrimary && (
+                  <Button 
+                    variant="outline"
+                    colorScheme="gray"
+                    size="sm"
+                  >
+                    Add Notes
+                  </Button>
+                )}
               </Flex>
               
               <Box textAlign="center" py={10}>
@@ -1055,7 +1090,10 @@ export function ServiceDetail() {
                   No notes added yet
                 </Text>
                 <Text color={textMutedColor}>
-                  Add notes for the worship team, announcements, or special instructions
+                  {canManagePrimary 
+                    ? 'Add notes for the worship team, announcements, or special instructions'
+                    : 'No notes have been added to this service yet.'
+                  }
                 </Text>
               </Box>
             </Box>

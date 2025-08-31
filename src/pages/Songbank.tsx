@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
 import { getUserPrimaryOrganization } from '../lib/auth'
+import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import {
   Box,
   Button,
@@ -76,6 +77,7 @@ interface OrganizationData {
 export function Songbank() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
@@ -152,6 +154,17 @@ export function Songbank() {
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!organization) return
+
+    if (!canManagePrimary) {
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to create songs. Only admins and owners can create songs.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+      return
+    }
 
     try {
       const tagsArray = formData.tags
@@ -280,6 +293,17 @@ export function Songbank() {
       return
     }
 
+    if (!canManagePrimary) {
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to delete songs. Only admins and owners can delete songs.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('songs')
@@ -324,6 +348,17 @@ export function Songbank() {
   const handleEditSong = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!organization || !editingSong) return
+
+    if (!canManagePrimary) {
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to edit songs. Only admins and owners can edit songs.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+      return
+    }
 
     try {
       const tagsArray = formData.tags
@@ -678,32 +713,34 @@ export function Songbank() {
             </Box>
 
             {/* Add Song Button - Green */}
-            <Button
-              colorScheme="green"
-              onClick={onAddDrawerOpen}
-              size="md"
-              position="relative"
-              overflow="hidden"
-              _before={{
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
-                animation: 'shimmer 4.5s infinite',
-              }}
-                              sx={{
+            {canManagePrimary && (
+              <Button
+                colorScheme="green"
+                onClick={onAddDrawerOpen}
+                size="md"
+                position="relative"
+                overflow="hidden"
+                _before={{
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: '-100%',
+                  width: '100%',
+                  height: '100%',
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                  animation: 'shimmer 4.5s infinite',
+                }}
+                sx={{
                   '@keyframes shimmer': {
                     '0%': { left: '-100%' },
                     '33.33%': { left: '100%' },
                     '100%': { left: '100%' },
                   },
                 }}
-            >
-              + Add Song
-            </Button>
+              >
+                + Add Song
+              </Button>
+            )}
           </Flex>
         </Box>
 
@@ -1263,21 +1300,25 @@ export function Songbank() {
                   </Box>
 
                   <HStack spacing={1} justify="flex-end">
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      colorScheme="gray"
-                      onClick={() => openEditForm(song)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="xs"
-                      colorScheme="red"
-                                              onClick={() => openDeleteModal(song)}
-                    >
-                      Delete
-                    </Button>
+                    {canManagePrimary && (
+                      <>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          colorScheme="gray"
+                          onClick={() => openEditForm(song)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          colorScheme="red"
+                          onClick={() => openDeleteModal(song)}
+                        >
+                          Delete
+                        </Button>
+                      </>
+                    )}
                   </HStack>
                 </VStack>
               </Box>
@@ -1445,21 +1486,25 @@ export function Songbank() {
                       </Td>
                       <Td minW="120px">
                         <HStack spacing={2}>
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            colorScheme="gray"
-                            onClick={() => openEditForm(song)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="xs"
-                            colorScheme="red"
-                            onClick={() => openDeleteModal(song)}
-                          >
-                            Delete
-                          </Button>
+                          {canManagePrimary && (
+                            <>
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                colorScheme="gray"
+                                onClick={() => openEditForm(song)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="xs"
+                                colorScheme="red"
+                                onClick={() => openDeleteModal(song)}
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
                         </HStack>
                       </Td>
                     </Tr>

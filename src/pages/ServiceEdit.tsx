@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
+import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { 
   Box, 
   VStack, 
@@ -53,6 +54,7 @@ interface WorshipService {
 export function ServiceEdit() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -157,6 +159,11 @@ export function ServiceEdit() {
     e.preventDefault()
     if (!service) return
 
+    if (!canManagePrimary) {
+      setError('You do not have permission to edit services. Only admins and owners can edit services.')
+      return
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -205,6 +212,35 @@ export function ServiceEdit() {
             <Text color={textColor}>Loading service details...</Text>
           </VStack>
         </Center>
+      </Box>
+    )
+  }
+
+  // Check permissions after loading
+  if (!canManagePrimary) {
+    return (
+      <Box minH="100vh" bg={bgColor}>
+        <DashboardHeader user={user} organization={organization} />
+
+        <Box as="main" py={8}>
+          <Container maxW="800px" px={6}>
+            <Box textAlign="center" py={12}>
+              <Heading as="h2" size="lg" color="red.500" mb={4}>
+                Access Denied
+              </Heading>
+              <Text color={textMutedColor} mb={6}>
+                You do not have permission to edit services. Only admins and owners can edit services.
+              </Text>
+              <Button
+                colorScheme="blue"
+                onClick={() => navigate(`/service/${id}`)}
+                size="md"
+              >
+                Back to Service
+              </Button>
+            </Box>
+          </Container>
+        </Box>
       </Box>
     )
   }
