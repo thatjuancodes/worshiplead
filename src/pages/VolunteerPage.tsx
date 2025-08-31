@@ -351,22 +351,27 @@ export function VolunteerPage() {
   }
 
   return (
-    <Box minH="100vh" bg={bgColor}>
+    <Box minH="100vh" bg={bgColor} display="flex" alignItems="center" justifyContent="center">
       <Box as="main" maxW="800px" mx="auto" p={{ base: 6, md: 8 }}>
         {/* Header */}
-        <VStack spacing={4} mb={8} mt={8} textAlign="center">
-          <Heading as="h1" size="xl" color={titleColor} fontWeight="600">
-            Volunteer for {organization.name}
-          </Heading>
-          <Text color={subtitleColor} fontSize="lg">
-            Choose a service to volunteer for
-          </Text>
-        </VStack>
+        {user && (
+          <VStack spacing={4} mb={8} mt={8} textAlign="center">
+            <Heading as="h1" size="xl" color={titleColor} fontWeight="600">
+              Volunteer for {organization.name}
+            </Heading>
+            <Text color={subtitleColor} fontSize="lg">
+              Choose a service to volunteer for
+            </Text>
+          </VStack>
+        )}
 
         {/* Login Section */}
         {!user && (
           <Box bg={cardBg} mb={6} p={6} borderRadius="lg">
             <VStack spacing={4}>
+              <Heading as="h1" size="lg" color={titleColor} fontWeight="600" textAlign="center">
+                Volunteer for {organization.name}
+              </Heading>
               <Text color={textColor} textAlign="center">
                 Please log in to volunteer for services
               </Text>
@@ -383,74 +388,74 @@ export function VolunteerPage() {
         )}
 
         {/* Services Section */}
-        <VStack spacing={6} align="stretch">
-          <Heading as="h2" size="lg" color={titleColor} fontWeight="600">
-            Available Services
-          </Heading>
+        {user && (
+          <VStack spacing={6} align="stretch">
+            <Heading as="h2" size="lg" color={titleColor} fontWeight="600">
+              Available Services
+            </Heading>
 
-          {loadingServices ? (
-            <Center py={8}>
-              <VStack spacing={3}>
-                <Spinner size="lg" />
-                <Text color={subtitleColor}>Loading available services...</Text>
-              </VStack>
-            </Center>
-          ) : availableServices.length === 0 ? (
-            <Box bg={cardBg} p={6} borderRadius="lg">
-              <Text color={subtitleColor} textAlign="center">
-                No services available for volunteering at the moment
-              </Text>
-            </Box>
-          ) : (
-            availableServices.map(service => {
-              const isAssigned = userVolunteerAssignments.some(
-                assignment => assignment.worship_service_id === service.id
-              )
-              
-              return (
-                <Box
-                  key={service.id}
-                  bg={cardBg}
-                  border="1px"
-                  borderColor={useColorModeValue('gray.200', 'gray.600')}
-                  borderRadius="lg"
-                  p={4}
-                >
-                  <HStack justify="space-between" align="center" w="100%">
-                    <HStack spacing={6} flex={1}>
-                      <HStack spacing={2} minW="140px">
-                        <Text color={textColor} fontWeight="500">
-                          {new Date(service.service_date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </Text>
-                        
-                        {service.service_time && (
+            {loadingServices ? (
+              <Center py={8}>
+                <VStack spacing={3}>
+                  <Spinner size="lg" />
+                  <Text color={subtitleColor}>Loading available services...</Text>
+                </VStack>
+              </Center>
+            ) : availableServices.length === 0 ? (
+              <Box bg={cardBg} p={6} borderRadius="lg">
+                <Text color={subtitleColor} textAlign="center">
+                  No services available for volunteering at the moment
+                </Text>
+              </Box>
+            ) : (
+              availableServices.map(service => {
+                const isAssigned = userVolunteerAssignments.some(
+                  assignment => assignment.worship_service_id === service.id
+                )
+                
+                return (
+                  <Box
+                    key={service.id}
+                    bg={cardBg}
+                    border="1px"
+                    borderColor={useColorModeValue('gray.200', 'gray.600')}
+                    borderRadius="lg"
+                    p={4}
+                  >
+                    <HStack justify="space-between" align="center" w="100%">
+                      <HStack spacing={6} flex={1}>
+                        <HStack spacing={2} minW="140px">
                           <Text color={textColor} fontWeight="500">
-                            {new Date(`2000-01-01T${service.service_time}`).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
+                            {new Date(service.service_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
                             })}
                           </Text>
-                        )}
+                          
+                          {service.service_time && (
+                            <Text color={textColor} fontWeight="500">
+                              {new Date(`2000-01-01T${service.service_time}`).toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true
+                              })}
+                            </Text>
+                          )}
+                        </HStack>
+                        
+                        <Text color={titleColor} fontWeight="600" flex={1}>
+                          {service.title}
+                        </Text>
                       </HStack>
                       
-                      <Text color={titleColor} fontWeight="600" flex={1}>
-                        {service.title}
-                      </Text>
-                    </HStack>
-                    
-                    <HStack spacing={3}>
-                      {isAssigned && (
-                        <Badge colorScheme="blue" size="sm">
-                          Assigned
-                        </Badge>
-                      )}
-                      
-                      {user ? (
+                      <HStack spacing={3}>
+                        {isAssigned && (
+                          <Badge colorScheme="blue" size="sm">
+                            Assigned
+                          </Badge>
+                        )}
+                        
                         <Box
                           as="input"
                           type="checkbox"
@@ -467,22 +472,14 @@ export function VolunteerPage() {
                             opacity: 0.5
                           }}
                         />
-                      ) : (
-                        <Button
-                          size="sm"
-                          colorScheme="blue"
-                          onClick={() => navigate('/login')}
-                        >
-                          Log In
-                        </Button>
-                      )}
+                      </HStack>
                     </HStack>
-                  </HStack>
-                </Box>
-              )
-            })
-          )}
-        </VStack>
+                  </Box>
+                )
+              })
+            )}
+          </VStack>
+        )}
       </Box>
     </Box>
   )
