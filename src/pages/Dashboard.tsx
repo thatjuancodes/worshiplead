@@ -109,8 +109,8 @@ export function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [services, setServices] = useState<WorshipService[]>([])
-  const [displayYear, setDisplayYear] = useState(new Date().getFullYear())
-  const [displayMonth, setDisplayMonth] = useState(new Date().getMonth()) // 0-11
+  const [displayYear, setDisplayYear] = useState<number | null>(null)
+  const [displayMonth, setDisplayMonth] = useState<number | null>(null) // 0-11
   const createDrawer = useDisclosure()
 
   // Create service form state
@@ -180,6 +180,7 @@ export function Dashboard() {
   ]
 
   function handlePrevMonth() {
+    if (!displayMonth || !displayYear) return
     if (displayMonth === 0) {
       setDisplayMonth(11)
       setDisplayYear(displayYear - 1)
@@ -189,6 +190,7 @@ export function Dashboard() {
   }
 
   function handleNextMonth() {
+    if (!displayMonth || !displayYear) return
     if (displayMonth === 11) {
       setDisplayMonth(0)
       setDisplayYear(displayYear + 1)
@@ -621,11 +623,45 @@ export function Dashboard() {
         .filter(date => date) as string[]
 
       setUserVolunteerDates(dates)
+
+      // Find the next upcoming volunteer service and set calendar to that month
+      if (dates.length > 0) {
+        const today = new Date()
+        const upcomingDates = dates
+          .filter(date => new Date(date) >= today)
+          .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+
+        if (upcomingDates.length > 0) {
+          const nextVolunteerDate = new Date(upcomingDates[0])
+          const nextYear = nextVolunteerDate.getFullYear()
+          const nextMonth = nextVolunteerDate.getMonth() // 0-11
+          
+          // Only update if it's different from current display
+          if (nextYear !== displayYear || nextMonth !== displayMonth) {
+            setDisplayYear(nextYear)
+            setDisplayMonth(nextMonth)
+          }
+        } else {
+          // No upcoming dates, set to current month if not already set
+          if (displayYear === null || displayMonth === null) {
+            const now = new Date()
+            setDisplayYear(now.getFullYear())
+            setDisplayMonth(now.getMonth())
+          }
+        }
+      } else {
+        // No volunteer dates at all, set to current month if not already set
+        if (displayYear === null || displayMonth === null) {
+          const now = new Date()
+          setDisplayYear(now.getFullYear())
+          setDisplayMonth(now.getMonth())
+        }
+      }
     } catch (error) {
       console.error('Error loading user volunteer dates:', error)
       setUserVolunteerDates([])
     }
-  }, [organization, user])
+  }, [organization, user, displayYear, displayMonth])
 
   const copyVolunteerLink = async () => {
     try {
@@ -988,13 +1024,15 @@ export function Dashboard() {
                     size="sm"
                     variant="outline"
                     onClick={handlePrevMonth}
+                    isDisabled={displayYear === null || displayMonth === null}
                   />
 
                   <Select
-                    value={displayMonth}
+                    value={displayMonth ?? new Date().getMonth()}
                     onChange={handleSelectMonth}
                     maxW={{ base: '200px', md: '220px' }}
                     size="sm"
+                    isDisabled={displayYear === null || displayMonth === null}
                   >
                     {monthNames.map((label, idx) => (
                       <option key={label} value={idx}>{label}</option>
@@ -1003,7 +1041,7 @@ export function Dashboard() {
 
                   <Text m={0} fontWeight="600" color={textColor}
                     minW="64px" textAlign="center">
-                    {displayYear}
+                    {displayYear ?? new Date().getFullYear()}
                   </Text>
 
                   <IconButton
@@ -1012,22 +1050,29 @@ export function Dashboard() {
                     size="sm"
                     variant="outline"
                     onClick={handleNextMonth}
+                    isDisabled={displayYear === null || displayMonth === null}
                   />
                 </HStack>
 
-                <CalendarGrid
-                  year={displayYear}
-                  month={displayMonth}
-                  scheduledDates={[...new Set(services.map(s => s.service_date))]}
-                  userVolunteerDates={userVolunteerDates}
-                  onDateClick={(iso) => {
-                    setFormDate(iso)
-                    setSelectedDate(iso)
-                    loadServicesForDate(iso)
-                    setIsAddingServiceMode(false)
-                    createDrawer.onOpen()
-                  }}
-                />
+                {displayYear === null || displayMonth === null ? (
+                  <Center py={8}>
+                    <Spinner />
+                  </Center>
+                ) : (
+                  <CalendarGrid
+                    year={displayYear}
+                    month={displayMonth}
+                    scheduledDates={[...new Set(services.map(s => s.service_date))]}
+                    userVolunteerDates={userVolunteerDates}
+                    onDateClick={(iso) => {
+                      setFormDate(iso)
+                      setSelectedDate(iso)
+                      loadServicesForDate(iso)
+                      setIsAddingServiceMode(false)
+                      createDrawer.onOpen()
+                    }}
+                  />
+                )}
 
                 {canManagePrimary && (
                   <Button
