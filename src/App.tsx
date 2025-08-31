@@ -1,11 +1,7 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { 
-  Box, 
-  useColorModeValue
-} from '@chakra-ui/react'
-
-import { AuthProvider, OrganizationMembershipsProvider } from './contexts'
+import { Box, useColorModeValue } from '@chakra-ui/react'
+import { AuthProvider } from './contexts'
 import { AuthenticatedApp } from './AuthenticatedApp'
+import './index.css'
 
 function App() {
   return (

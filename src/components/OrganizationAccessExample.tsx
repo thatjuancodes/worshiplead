@@ -17,7 +17,6 @@ export function OrganizationAccessExample() {
     primaryOrganizationId,
     primaryRole,
     isPrimaryOwner,
-    isPrimaryAdmin,
     isPrimaryMember,
     canManagePrimary,
     canManageAny,

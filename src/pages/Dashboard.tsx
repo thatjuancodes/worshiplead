@@ -132,7 +132,6 @@ export function Dashboard() {
 
   // User volunteer dates
   const [userVolunteerDates, setUserVolunteerDates] = useState<string[]>([])
-  const [loadingVolunteerDates, setLoadingVolunteerDates] = useState(false)
 
   // Recent songs usage
   interface RecentSongUsage {
@@ -585,8 +584,6 @@ export function Dashboard() {
   const loadUserVolunteerDates = useCallback(async () => {
     if (!organization || !user) return
     try {
-      setLoadingVolunteerDates(true)
-      
       // Get all services where the current user has volunteered
       const { data: volunteerRecords, error: volunteerError } = await supabase
         .from('worship_service_volunteers')
@@ -627,8 +624,6 @@ export function Dashboard() {
     } catch (error) {
       console.error('Error loading user volunteer dates:', error)
       setUserVolunteerDates([])
-    } finally {
-      setLoadingVolunteerDates(false)
     }
   }, [organization, user])
 
