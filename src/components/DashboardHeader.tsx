@@ -114,8 +114,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
     ? `${userProfile.first_name} ${userProfile.last_name}`
     : user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'User'
 
-  const firstName = userProfile?.first_name || user?.user_metadata?.first_name || 'U'
-  const lastName = userProfile?.last_name || user?.user_metadata?.last_name || 's'
+
 
   const handleSignOut = async () => {
     try {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createOrganizationAndMembership, checkSlugAvailability, getUserPrimaryOrganization } from '../lib/auth'
 import type { OrganizationData } from '../lib/auth'
+import { supabase } from '../lib/supabase'
 import {
   Box,
   VStack,
@@ -16,8 +17,7 @@ import {
   Card,
   CardBody,
   CardHeader,
-  SimpleGrid,
-  Divider
+  SimpleGrid
 } from '@chakra-ui/react'
 
 export function OrganizationSetup() {
@@ -54,7 +54,7 @@ export function OrganizationSetup() {
   useEffect(() => {
     const checkExistingOrganization = async () => {
       try {
-        const { data: { user } } = await import('../lib/supabase').then(m => m.supabase.auth.getUser())
+        const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
         const userOrg = await getUserPrimaryOrganization(user.id)
@@ -107,7 +107,7 @@ export function OrganizationSetup() {
       }
 
       // Get current user ID
-      const { data: { user } } = await import('../lib/supabase').then(m => m.supabase.auth.getUser())
+      const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
         setError('User not authenticated')
@@ -136,7 +136,7 @@ export function OrganizationSetup() {
 
     try {
       // Get current user ID
-      const { data: { user } } = await import('../lib/supabase').then(m => m.supabase.auth.getUser())
+      const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
         setError('User not authenticated')
@@ -151,9 +151,6 @@ export function OrganizationSetup() {
         return
       }
 
-      // Get supabase client
-      const { supabase } = await import('../lib/supabase')
-      
       // First, get the organization ID from the slug
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
@@ -214,8 +211,6 @@ export function OrganizationSetup() {
   // Check for existing join request
   const checkExistingJoinRequest = async (organizationSlug: string) => {
     try {
-      const { supabase } = await import('../lib/supabase')
-      
       // Get current user ID
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return null
