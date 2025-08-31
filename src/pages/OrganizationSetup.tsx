@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createOrganizationAndMembership, joinOrganizationViaInvite, checkSlugAvailability } from '../lib/auth'
+import { createOrganizationAndMembership, checkSlugAvailability } from '../lib/auth'
 import type { OrganizationData } from '../lib/auth'
 import {
   Box,
@@ -25,6 +25,7 @@ export function OrganizationSetup() {
   const [mode, setMode] = useState<'select' | 'create' | 'join'>('select')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [joinRequestSubmitted, setJoinRequestSubmitted] = useState(false)
 
   // Organization creation form state
   const [orgForm, setOrgForm] = useState({
@@ -93,14 +94,40 @@ export function OrganizationSetup() {
         return
       }
 
-      await joinOrganizationViaInvite(user.id, joinForm.organizationSlug)
+      // Get supabase client
+      const { supabase } = await import('../lib/supabase')
       
-      // Success! Redirect to dashboard
-      navigate('/dashboard', { 
-        state: { message: 'Successfully joined organization!' }
-      })
+      // First, get the organization ID from the slug
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('slug', joinForm.organizationSlug)
+        .single()
+
+      if (orgError || !orgData) {
+        setError('Organization not found. Please check the slug and try again.')
+        return
+      }
+
+      // Create organization join request
+      const { error: joinRequestError } = await supabase
+        .from('organization_join_requests')
+        .insert({
+          organization_id: orgData.id,
+          user_id: user.id
+        })
+
+      if (joinRequestError) {
+        console.error('Join request error:', joinRequestError)
+        setError('Failed to submit join request. Please try again.')
+        return
+      }
+
+      // Success! Show waiting message
+      setJoinRequestSubmitted(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join organization')
+      console.error('Join organization error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to submit join request')
     } finally {
       setLoading(false)
     }
@@ -287,13 +314,13 @@ export function OrganizationSetup() {
           )}
 
           {/* Join Organization */}
-          {mode === 'join' && (
+          {mode === 'join' && !joinRequestSubmitted && (
             <Card>
               <CardHeader>
                 <VStack spacing={2} align="stretch">
                   <Heading size="lg">Join Organization</Heading>
                   <Text color="gray.600">
-                    Enter the organization slug from your invite
+                    Enter the organization slug to request to join
                   </Text>
                 </VStack>
               </CardHeader>
@@ -315,7 +342,7 @@ export function OrganizationSetup() {
                         />
                       </HStack>
                       <Text fontSize="sm" color="gray.500" mt={1}>
-                        Enter the organization slug from your invitation email
+                        Enter the organization slug you'd like to join
                       </Text>
                     </FormControl>
 
@@ -332,9 +359,9 @@ export function OrganizationSetup() {
                         colorScheme="blue"
                         size="lg"
                         isLoading={loading}
-                        loadingText="Joining..."
+                        loadingText="Submitting..."
                       >
-                        Join Organization
+                        Submit Join Request
                       </Button>
                     </HStack>
                   </VStack>
@@ -342,6 +369,49 @@ export function OrganizationSetup() {
               </CardBody>
             </Card>
           )}
+
+          {/* Join Request Submitted */}
+          {mode === 'join' && joinRequestSubmitted && (
+            <Card>
+              <CardBody>
+                <VStack spacing={6} align="center" textAlign="center" py={8}>
+                  <Box
+                    as="div"
+                    boxSize="40px"
+                    borderRadius="full"
+                    bg="blue.500"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    color="white"
+                    fontSize="xl"
+                  >
+                    ✓
+                  </Box>
+                  <Heading size="lg" color="blue.600">
+                    Join Request Submitted!
+                  </Heading>
+                  <Text fontSize="lg" color="gray.600">
+                    Waiting for Organization Admin to accept your request to join...
+                  </Text>
+                  <Text fontSize="md" color="gray.500">
+                    You will receive an email notification when your request is approved.
+                  </Text>
+                  <Button
+                    colorScheme="blue"
+                    onClick={() => {
+                      setJoinRequestSubmitted(false)
+                      setMode('select')
+                    }}
+                  >
+                    Back to Selection
+                  </Button>
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+
+
         </VStack>
       </Container>
     </Box>
