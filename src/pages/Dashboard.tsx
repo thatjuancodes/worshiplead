@@ -37,6 +37,7 @@ import {
   Center,
   useToast
 } from '@chakra-ui/react'
+import { CloseButton } from '@chakra-ui/react'
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
 import { keyframes } from '@emotion/react'
 import { supabase } from '../lib/supabase'
@@ -100,6 +101,15 @@ interface Volunteer {
     last_name: string
     email: string
   }
+}
+
+interface Instrument {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export function Dashboard() {
@@ -166,6 +176,13 @@ export function Dashboard() {
   const [addingSongByService, setAddingSongByService] = useState<Record<string, boolean>>({})
   const [serviceErrorByService, setServiceErrorByService] = useState<Record<string, string>>({})
   const [serviceIdToVolunteers, setServiceIdToVolunteers] = useState<Record<string, Volunteer[]>>({})
+
+  // Instruments and assignments
+  const [instruments, setInstruments] = useState<Instrument[]>([])
+  const [loadingInstruments, setLoadingInstruments] = useState(false)
+  const [volunteerToInstrumentIds, setVolunteerToInstrumentIds] = useState<Record<string, string[]>>({})
+  const [selectedInstrumentByVolunteer, setSelectedInstrumentByVolunteer] = useState<Record<string, string>>({})
+  const [savingAssignmentByVolunteer, setSavingAssignmentByVolunteer] = useState<Record<string, boolean>>({})
 
   // Volunteer link state
   const [volunteerLink, setVolunteerLink] = useState<string>('')
@@ -415,10 +432,105 @@ export function Dashboard() {
       
       console.log('Volunteers mapping:', mapping)
       setServiceIdToVolunteers(mapping)
+
+      // Load instrument assignments for these volunteers
+      const volunteerIds = (volunteerRecords || []).map(v => v.id as string)
+      if (volunteerIds.length) await loadVolunteerInstruments(volunteerIds)
     } catch {
       // ignore
     }
   }, [organization])
+
+  const loadOrganizationInstruments = useCallback(async () => {
+    if (!organization) return
+    try {
+      setLoadingInstruments(true)
+      const { data, error } = await supabase
+        .from('instruments')
+        .select('*')
+        .eq('organization_id', organization.organization_id)
+        .order('name', { ascending: true })
+
+      if (error) return
+      setInstruments(data || [])
+    } catch {
+      // ignore
+    } finally {
+      setLoadingInstruments(false)
+    }
+  }, [organization])
+
+  const loadVolunteerInstruments = useCallback(async (volunteerIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('volunteer_instruments')
+        .select('volunteer_id, instrument_id')
+        .in('volunteer_id', volunteerIds)
+
+      if (error) return
+
+      const mapping: Record<string, string[]> = {}
+      ;(data || []).forEach((row: any) => {
+        const vId = row.volunteer_id as string
+        const iId = row.instrument_id as string
+        if (!mapping[vId]) mapping[vId] = []
+        mapping[vId].push(iId)
+      })
+      setVolunteerToInstrumentIds(mapping)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const handleAssignInstrument = useCallback(async (volunteerId: string, instrumentId: string) => {
+    if (!instrumentId) return
+    try {
+      // Prevent assigning instruments already assigned to any volunteer in the expanded services list
+      const assignedInstrumentIds = new Set<string>(
+        Object.values(volunteerToInstrumentIds).flat()
+      )
+      if (assignedInstrumentIds.has(instrumentId)) return
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: true }))
+      const { error } = await supabase
+        .from('volunteer_instruments')
+        .insert({ volunteer_id: volunteerId, instrument_id: instrumentId })
+
+      if (error) return
+
+      setVolunteerToInstrumentIds(prev => {
+        const existing = prev[volunteerId] || []
+        if (existing.includes(instrumentId)) return prev
+        return { ...prev, [volunteerId]: [...existing, instrumentId] }
+      })
+      setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteerId]: '' }))
+    } catch {
+      // ignore
+    } finally {
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
+    }
+  }, [])
+
+  const handleRemoveInstrument = useCallback(async (volunteerId: string, instrumentId: string) => {
+    try {
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: true }))
+      const { error } = await supabase
+        .from('volunteer_instruments')
+        .delete()
+        .eq('volunteer_id', volunteerId)
+        .eq('instrument_id', instrumentId)
+
+      if (error) return
+
+      setVolunteerToInstrumentIds(prev => {
+        const existing = prev[volunteerId] || []
+        return { ...prev, [volunteerId]: existing.filter(id => id !== instrumentId) }
+      })
+    } catch {
+      // ignore
+    } finally {
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
+    }
+  }, [])
 
   useEffect(() => {
     if (createDrawer.isOpen) loadAvailableSongs()
@@ -847,7 +959,8 @@ export function Dashboard() {
     loadRecentSongs()
     loadVolunteerLink()
     loadUserVolunteerDates()
-  }, [organization, loadServices, loadRecentSongs, loadVolunteerLink, loadUserVolunteerDates])
+    loadOrganizationInstruments()
+  }, [organization, loadServices, loadRecentSongs, loadVolunteerLink, loadUserVolunteerDates, loadOrganizationInstruments])
 
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
@@ -1372,12 +1485,80 @@ export function Dashboard() {
                                             borderRadius="lg"
                                             p={3}
                                           >
-                                            <Text fontWeight="600" fontSize="sm">
-                                              {volunteer.profiles.first_name} {volunteer.profiles.last_name}
-                                            </Text>
-                                            <Text color={mutedTextColor} fontSize="xs">
-                                              {volunteer.profiles.email}
-                                            </Text>
+                                            <VStack align="stretch" spacing={1}>
+                                              <HStack spacing={2} align="center">
+                                                <Text fontWeight="600" fontSize="sm" m={0}>
+                                                  {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                                                </Text>
+                                                {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
+                                                  const inst = instruments.find(i => i.id === instId)
+                                                  if (!inst) return null
+                                                  return (
+                                                    <Box key={instId} as="span">
+                                                      <Badge
+                                                        colorScheme="blue"
+                                                        variant="solid"
+                                                        borderRadius="md"
+                                                        fontSize="0.7rem"
+                                                        display="inline-flex"
+                                                        alignItems="center"
+                                                        pl={2}
+                                                        pr={2}
+                                                        py={0.5}
+                                                        gap={0}
+                                                        role="group"
+                                                      >
+                                                        {inst.name}
+                                                        <Box
+                                                          h="14px"
+                                                          ml={0}
+                                                          display="none"
+                                                          alignItems="center"
+                                                          justifyContent="center"
+                                                          _groupHover={{ display: 'inline-flex', ml: 1 }}
+                                                        >
+                                                          <CloseButton
+                                                            size="xs"
+                                                            aria-label={`Unassign ${inst.name}`}
+                                                            onClick={() => handleRemoveInstrument(volunteer.id, instId)}
+                                                            variant="ghost"
+                                                            color="whiteAlpha.800"
+                                                            _hover={{ color: 'white' }}
+                                                          />
+                                                        </Box>
+                                                      </Badge>
+                                                    </Box>
+                                                  )
+                                                }).filter(Boolean)}
+                                              </HStack>
+                                              <Text color={mutedTextColor} fontSize="xs" m={0}>
+                                                {volunteer.profiles.email}
+                                              </Text>
+                                              <HStack spacing={2} align="center" mt={2}>
+                                                <Select
+                                                  placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign instrument'}
+                                                  size="sm"
+                                                  value={selectedInstrumentByVolunteer[volunteer.id] || ''}
+                                                  onChange={async (e) => {
+                                                    const val = e.target.value
+                                                    setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: val }))
+                                                    await handleAssignInstrument(volunteer.id, val)
+                                                    setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: '' }))
+                                                  }}
+                                                  isDisabled={loadingInstruments || !!savingAssignmentByVolunteer[volunteer.id]}
+                                                  maxW={{ base: '100%', md: '320px' }}
+                                                >
+                                                  {(() => {
+                                                    const assigned = new Set<string>(Object.values(volunteerToInstrumentIds).flat())
+                                                    return instruments
+                                                      .filter(inst => !assigned.has(inst.id))
+                                                      .map(inst => (
+                                                        <option key={inst.id} value={inst.id}>{inst.name}</option>
+                                                      ))
+                                                  })()}
+                                                </Select>
+                                              </HStack>
+                                            </VStack>
                                           </Box>
                                         ))}
                                       </VStack>
@@ -1514,12 +1695,77 @@ export function Dashboard() {
                                             borderRadius="lg"
                                             p={3}
                                           >
-                                            <Text fontWeight="600" fontSize="sm">
-                                              {volunteer.profiles.first_name} {volunteer.profiles.last_name}
-                                            </Text>
-                                            <Text color={mutedTextColor} fontSize="xs">
-                                              {volunteer.profiles.email}
-                                            </Text>
+                                            <VStack align="stretch" spacing={1}>
+                                              <HStack spacing={2} align="center">
+                                                <Text fontWeight="600" fontSize="sm" m={0}>
+                                                  {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                                                </Text>
+                                                {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
+                                                  const inst = instruments.find(i => i.id === instId)
+                                                  if (!inst) return null
+                                                  return (
+                                                    <Box key={instId} as="span">
+                                                      <Badge
+                                                        colorScheme="blue"
+                                                        variant="solid"
+                                                        borderRadius="md"
+                                                        fontSize="0.7rem"
+                                                        display="inline-flex"
+                                                        alignItems="center"
+                                                        pl={2}
+                                                        pr={2}
+                                                        py={0.5}
+                                                        gap={0}
+                                                        role="group"
+                                                      >
+                                                        {inst.name}
+                                                        <Box
+                                                          h="14px"
+                                                          ml={0}
+                                                          display="none"
+                                                          alignItems="center"
+                                                          justifyContent="center"
+                                                          _groupHover={{ display: 'inline-flex', ml: 1 }}
+                                                        >
+                                                          <CloseButton
+                                                            size="xs"
+                                                            aria-label={`Unassign ${inst.name}`}
+                                                            onClick={() => handleRemoveInstrument(volunteer.id, instId)}
+                                                            variant="ghost"
+                                                            color="whiteAlpha.800"
+                                                            _hover={{ color: 'white' }}
+                                                          />
+                                                        </Box>
+                                                      </Badge>
+                                                    </Box>
+                                                  )
+                                                }).filter(Boolean)}
+                                              </HStack>
+                                              <Text color={mutedTextColor} fontSize="xs" m={0}>
+                                                {volunteer.profiles.email}
+                                              </Text>
+                                              <HStack spacing={2} align="center" mt={2}>
+                                                <Select
+                                                  placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign instrument'}
+                                                  size="sm"
+                                                  value={selectedInstrumentByVolunteer[volunteer.id] || ''}
+                                                  onChange={async (e) => {
+                                                    const val = e.target.value
+                                                    setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: val }))
+                                                    await handleAssignInstrument(volunteer.id, val)
+                                                    setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: '' }))
+                                                  }}
+                                                  isDisabled={loadingInstruments || !!savingAssignmentByVolunteer[volunteer.id]}
+                                                  maxW={{ base: '100%', md: '320px' }}
+                                                >
+                                                  {instruments
+                                                    .filter(inst => !(volunteerToInstrumentIds[volunteer.id] || []).includes(inst.id))
+                                                    .map(inst => (
+                                                      <option key={inst.id} value={inst.id}>{inst.name}</option>
+                                                    ))}
+                                                </Select>
+                                              </HStack>
+                                            </VStack>
                                           </Box>
                                         ))}
                                       </VStack>

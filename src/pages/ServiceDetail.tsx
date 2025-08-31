@@ -27,6 +27,7 @@ import {
   IconButton,
   Tooltip
 } from '@chakra-ui/react'
+import { CloseButton } from '@chakra-ui/react'
 import { CloseIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 import {
@@ -104,6 +105,15 @@ interface OrganizationData {
     name: string
     slug: string
   }[]
+}
+
+interface Instrument {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 // Sortable Song Item Component
@@ -271,6 +281,13 @@ export function ServiceDetail() {
   const [loadingVolunteers, setLoadingVolunteers] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<string>('')
+
+  // Instruments
+  const [instruments, setInstruments] = useState<Instrument[]>([])
+  const [loadingInstruments, setLoadingInstruments] = useState(false)
+  const [volunteerToInstrumentIds, setVolunteerToInstrumentIds] = useState<Record<string, string[]>>({})
+  const [selectedInstrumentByVolunteer, setSelectedInstrumentByVolunteer] = useState<Record<string, string>>({})
+  const [savingAssignmentByVolunteer, setSavingAssignmentByVolunteer] = useState<Record<string, boolean>>({})
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -441,12 +458,134 @@ export function ServiceDetail() {
 
       console.log('Volunteers data:', volunteersWithProfiles)
       setVolunteers(volunteersWithProfiles)
+      // Load instrument assignments for these volunteers
+      const volunteerIds = volunteerRecords.map(v => v.id as string)
+      if (volunteerIds.length) await loadVolunteerInstruments(volunteerIds)
     } catch (error) {
       console.error('Error loading volunteers:', error)
     } finally {
       setLoadingVolunteers(false)
     }
   }, [service])
+
+  const loadOrganizationInstruments = useCallback(async () => {
+    if (!organization) return
+    try {
+      setLoadingInstruments(true)
+      const { data, error } = await supabase
+        .from('instruments')
+        .select('*')
+        .eq('organization_id', organization.organization_id)
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('Error loading instruments:', error)
+        return
+      }
+      setInstruments(data || [])
+    } catch (err) {
+      console.error('Unexpected error loading instruments:', err)
+    } finally {
+      setLoadingInstruments(false)
+    }
+  }, [organization])
+
+  const loadVolunteerInstruments = useCallback(async (volunteerIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('volunteer_instruments')
+        .select('volunteer_id, instrument_id')
+        .in('volunteer_id', volunteerIds)
+
+      if (error) {
+        console.error('Error loading volunteer instruments:', error)
+        return
+      }
+
+      const mapping: Record<string, string[]> = {}
+      ;(data || []).forEach((row: any) => {
+        const vId = row.volunteer_id as string
+        const iId = row.instrument_id as string
+        if (!mapping[vId]) mapping[vId] = []
+        mapping[vId].push(iId)
+      })
+      setVolunteerToInstrumentIds(mapping)
+    } catch (err) {
+      console.error('Unexpected error loading volunteer instruments:', err)
+    }
+  }, [])
+
+  const handleAssignInstrument = useCallback(async (volunteerId: string, instrumentId: string) => {
+    if (!canManagePrimary) {
+      setError('You do not have permission to assign instruments.')
+      return
+    }
+    if (!instrumentId) return
+    try {
+      // Prevent assigning instruments already assigned to any volunteer in this service
+      const assignedInstrumentIds = new Set<string>(
+        Object.values(volunteerToInstrumentIds).flat()
+      )
+      if (assignedInstrumentIds.has(instrumentId)) {
+        setError('That instrument is already assigned to another volunteer.')
+        return
+      }
+
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: true }))
+      const { error } = await supabase
+        .from('volunteer_instruments')
+        .insert({ volunteer_id: volunteerId, instrument_id: instrumentId })
+
+      if (error) {
+        console.error('Error assigning instrument:', error)
+        setError('Failed to assign instrument')
+        return
+      }
+
+      setVolunteerToInstrumentIds(prev => {
+        const existing = prev[volunteerId] || []
+        if (existing.includes(instrumentId)) return prev
+        return { ...prev, [volunteerId]: [...existing, instrumentId] }
+      })
+      setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteerId]: '' }))
+    } catch (err) {
+      console.error('Unexpected error assigning instrument:', err)
+      setError('Failed to assign instrument')
+    } finally {
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
+    }
+  }, [canManagePrimary])
+
+  const handleRemoveInstrument = useCallback(async (volunteerId: string, instrumentId: string) => {
+    if (!canManagePrimary) {
+      setError('You do not have permission to remove instruments.')
+      return
+    }
+    try {
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: true }))
+      const { error } = await supabase
+        .from('volunteer_instruments')
+        .delete()
+        .eq('volunteer_id', volunteerId)
+        .eq('instrument_id', instrumentId)
+
+      if (error) {
+        console.error('Error removing instrument:', error)
+        setError('Failed to remove instrument')
+        return
+      }
+
+      setVolunteerToInstrumentIds(prev => {
+        const existing = prev[volunteerId] || []
+        return { ...prev, [volunteerId]: existing.filter(id => id !== instrumentId) }
+      })
+    } catch (err) {
+      console.error('Unexpected error removing instrument:', err)
+      setError('Failed to remove instrument')
+    } finally {
+      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
+    }
+  }, [canManagePrimary])
 
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -619,8 +758,9 @@ export function ServiceDetail() {
       loadServiceSongs()
       loadAvailableSongs()
       loadVolunteers()
+      loadOrganizationInstruments()
     }
-  }, [service, loadServiceSongs, loadAvailableSongs, loadVolunteers])
+  }, [service, loadServiceSongs, loadAvailableSongs, loadVolunteers, loadOrganizationInstruments])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -1035,9 +1175,55 @@ export function ServiceDetail() {
                     >
                       <HStack justify="space-between" align="center">
                         <VStack align="start" spacing={1}>
-                          <Text fontWeight="600" color={textColor}>
-                            {volunteer.profiles.first_name} {volunteer.profiles.last_name}
-                          </Text>
+                          <HStack spacing={2} align="center">
+                            <Text fontWeight="600" color={textColor}>
+                              {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                            </Text>
+                            {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
+                              const inst = instruments.find(i => i.id === instId)
+                              if (!inst) return null
+                              return (
+                                <Box key={instId} as="span">
+                                  <Badge
+                                    colorScheme="blue"
+                                    variant="solid"
+                                    borderRadius="md"
+                                    fontSize="0.7rem"
+                                    display="inline-flex"
+                                    alignItems="center"
+                                    pl={2}
+                                    pr={2}
+                                    py={0.5}
+                                    gap={0}
+                                    role="group"
+                                  >
+                                    {inst.name}
+                                    {canManagePrimary && (
+                                      <Box
+                                        h="14px"
+                                        ml={0}
+                                        display="none"
+                                        alignItems="center"
+                                        justifyContent="center"
+                                        _groupHover={{ display: 'inline-flex', ml: 1 }}
+                                      >
+                                        <CloseButton
+                                          size="xs"
+                                          aria-label={`Unassign ${inst.name}`}
+                                          onClick={() => handleRemoveInstrument(volunteer.id, instId)}
+                                          isDisabled={!!savingAssignmentByVolunteer[volunteer.id]}
+                                          variant="ghost"
+                                          color="whiteAlpha.800"
+                                          _hover={{ color: 'white' }}
+                                        />
+                                      </Box>
+                                    )}
+                                  </Badge>
+                                </Box>
+                              )
+                            }).filter(Boolean)}
+                          </HStack>
+
                           <Text fontSize="sm" color={textSecondaryColor}>
                             {volunteer.profiles.email}
                           </Text>
@@ -1049,6 +1235,33 @@ export function ServiceDetail() {
                           })}
                         </Text>
                       </HStack>
+
+                      {canManagePrimary && (
+                        <HStack spacing={2} align="center" mt={3}>
+                          <Select
+                            placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign instrument'}
+                            size="sm"
+                            value={selectedInstrumentByVolunteer[volunteer.id] || ''}
+                            onChange={async (e) => {
+                              const val = e.target.value
+                              setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: val }))
+                              await handleAssignInstrument(volunteer.id, val)
+                              setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: '' }))
+                            }}
+                            isDisabled={loadingInstruments || !!savingAssignmentByVolunteer[volunteer.id]}
+                            maxW={{ base: '100%', sm: '320px' }}
+                          >
+                            {(() => {
+                              const assigned = new Set<string>(Object.values(volunteerToInstrumentIds).flat())
+                              return instruments
+                                .filter(inst => !assigned.has(inst.id))
+                                .map(inst => (
+                                  <option key={inst.id} value={inst.id}>{inst.name}</option>
+                                ))
+                            })()}
+                          </Select>
+                        </HStack>
+                      )}
                     </Box>
                   ))}
                 </VStack>
