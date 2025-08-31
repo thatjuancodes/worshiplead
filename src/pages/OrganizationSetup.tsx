@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createOrganizationAndMembership, checkSlugAvailability } from '../lib/auth'
+import { createOrganizationAndMembership, checkSlugAvailability, getUserPrimaryOrganization } from '../lib/auth'
 import type { OrganizationData } from '../lib/auth'
 import {
   Box,
@@ -37,6 +37,46 @@ export function OrganizationSetup() {
   const [joinForm, setJoinForm] = useState({
     organizationSlug: ''
   })
+
+  // State for existing join request
+  const [existingRequest, setExistingRequest] = useState<{
+    organizationName: string
+    organizationSlug: string
+  } | null>(null)
+
+  // Check if user already has an organization when component mounts
+  useEffect(() => {
+    const checkExistingOrganization = async () => {
+      try {
+        const { data: { user } } = await import('../lib/supabase').then(m => m.supabase.auth.getUser())
+        if (!user) return
+
+        const userOrg = await getUserPrimaryOrganization(user.id)
+        if (userOrg) {
+          // User already has an organization, redirect to dashboard
+          navigate('/dashboard', { 
+            state: { message: 'Welcome back! Redirected to your dashboard.' }
+          })
+        }
+      } catch (error) {
+        console.error('Error checking existing organization:', error)
+      }
+    }
+
+    checkExistingOrganization()
+  }, [navigate])
+
+  // Handle organization slug change
+  const handleOrganizationSlugChange = (slug: string) => {
+    setJoinForm(prev => ({ ...prev, organizationSlug: slug }))
+    // Clear existing request state when slug changes
+    if (existingRequest) {
+      setExistingRequest(null)
+    }
+    if (joinRequestSubmitted) {
+      setJoinRequestSubmitted(false)
+    }
+  }
 
   // Handle organization creation
   const handleCreateOrganization = async (e: React.FormEvent) => {
@@ -94,13 +134,21 @@ export function OrganizationSetup() {
         return
       }
 
+      // Check for existing join request first
+      const existingRequest = await checkExistingJoinRequest(joinForm.organizationSlug)
+      if (existingRequest) {
+        setExistingRequest(existingRequest)
+        setLoading(false)
+        return
+      }
+
       // Get supabase client
       const { supabase } = await import('../lib/supabase')
       
       // First, get the organization ID from the slug
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .select('id')
+        .select('id, name')
         .eq('slug', joinForm.organizationSlug)
         .single()
 
@@ -125,6 +173,7 @@ export function OrganizationSetup() {
 
       // Success! Show waiting message
       setJoinRequestSubmitted(true)
+      // Don't set existingRequest here since this is a new request
     } catch (err) {
       console.error('Join organization error:', err)
       setError(err instanceof Error ? err.message : 'Failed to submit join request')
@@ -148,6 +197,51 @@ export function OrganizationSetup() {
       name,
       slug: generateSlug(name)
     }))
+  }
+
+  // Check for existing join request
+  const checkExistingJoinRequest = async (organizationSlug: string) => {
+    try {
+      const { supabase } = await import('../lib/supabase')
+      
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+
+      // Get organization details
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('id, name, slug')
+        .eq('slug', organizationSlug)
+        .single()
+
+      if (orgError || !orgData) return null
+
+      // Check for existing join request
+      const { data: existingRequestData, error: requestError } = await supabase
+        .from('organization_join_requests')
+        .select('*')
+        .eq('organization_id', orgData.id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (requestError && requestError.code !== 'PGRST116') {
+        console.error('Error checking existing request:', requestError)
+        return null
+      }
+
+      if (existingRequestData) {
+        return {
+          organizationName: orgData.name,
+          organizationSlug: orgData.slug
+        }
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error checking existing join request:', error)
+      return null
+    }
   }
 
   return (
@@ -301,7 +395,7 @@ export function OrganizationSetup() {
           )}
 
           {/* Join Organization */}
-          {mode === 'join' && !joinRequestSubmitted && (
+          {mode === 'join' && !joinRequestSubmitted && !existingRequest && (
             <Card>
               <CardHeader>
                 <VStack spacing={2} align="stretch">
@@ -323,7 +417,7 @@ export function OrganizationSetup() {
                         <Input
                           id="joinSlug"
                           value={joinForm.organizationSlug}
-                          onChange={(e) => setJoinForm(prev => ({ ...prev, organizationSlug: e.target.value }))}
+                          onChange={(e) => handleOrganizationSlugChange(e.target.value)}
                           placeholder="organization-slug"
                           size="lg"
                         />
@@ -357,6 +451,61 @@ export function OrganizationSetup() {
             </Card>
           )}
 
+          {/* Existing Join Request */}
+          {mode === 'join' && existingRequest && (
+            <Card>
+              <CardBody>
+                <VStack spacing={6} align="center" textAlign="center" py={8}>
+                  <Box
+                    as="div"
+                    boxSize="40px"
+                    borderRadius="full"
+                    bg="blue.500"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    color="white"
+                    fontSize="xl"
+                  >
+                    ⏳
+                  </Box>
+                  <Heading size="lg" color="blue.600">
+                    Join Request Already Submitted
+                  </Heading>
+                  <Text fontSize="lg" color="gray.600">
+                    You already have a pending request to join <strong>{existingRequest.organizationName}</strong>
+                  </Text>
+                  <Text fontSize="md" color="gray.500">
+                    Waiting for Organization Admin to accept your request to join...
+                  </Text>
+                  <Text fontSize="sm" color="gray.400">
+                    Organization: {existingRequest.organizationSlug}
+                  </Text>
+                  <HStack spacing={4}>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setExistingRequest(null)
+                        setJoinForm(prev => ({ ...prev, organizationSlug: '' }))
+                      }}
+                    >
+                      Try Different Organization
+                    </Button>
+                    <Button
+                      colorScheme="blue"
+                      onClick={() => {
+                        setExistingRequest(null)
+                        setMode('select')
+                      }}
+                    >
+                      Back to Selection
+                    </Button>
+                  </HStack>
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+
           {/* Join Request Submitted */}
           {mode === 'join' && joinRequestSubmitted && (
             <Card>
@@ -379,7 +528,7 @@ export function OrganizationSetup() {
                     Join Request Submitted!
                   </Heading>
                   <Text fontSize="lg" color="gray.600">
-                    Waiting for Organization Admin to accept your request to join...
+                    Waiting for Organization Admin to accept your request to join <strong>{existingRequest?.organizationName || 'the organization'}...</strong>
                   </Text>
                   <Text fontSize="md" color="gray.500">
                     You will receive an email notification when your request is approved.

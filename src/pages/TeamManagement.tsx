@@ -61,6 +61,19 @@ interface OrganizationMember {
   } | null
 }
 
+interface OrganizationJoinRequest {
+  id: string
+  organization_id: string
+  user_id: string
+  approved: boolean
+  created_at: string
+  profiles: {
+    first_name: string
+    last_name: string
+    email: string
+  } | null
+}
+
 interface Instrument {
   id: string
   organization_id: string
@@ -90,6 +103,12 @@ export function TeamManagement() {
   const [isLoadingInstruments, setIsLoadingInstruments] = useState(false)
   const [instrumentError, setInstrumentError] = useState('')
   const [instrumentSuccess, setInstrumentSuccess] = useState('')
+
+  // Join requests state
+  const [joinRequests, setJoinRequests] = useState<OrganizationJoinRequest[]>([])
+  const [isLoadingJoinRequests, setIsLoadingJoinRequests] = useState(false)
+  const [joinRequestError, setJoinRequestError] = useState('')
+  const [joinRequestSuccess, setJoinRequestSuccess] = useState('')
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -208,6 +227,69 @@ export function TeamManagement() {
     }
   }, [organization])
 
+  const loadJoinRequests = useCallback(async () => {
+    if (!organization) return
+
+    try {
+      setIsLoadingJoinRequests(true)
+      setJoinRequestError('')
+
+      // Get join requests for this organization that are not approved
+      const { data: requests, error: requestsError } = await supabase
+        .from('organization_join_requests')
+        .select(`
+          id,
+          organization_id,
+          user_id,
+          approved,
+          created_at
+        `)
+        .eq('organization_id', organization.organization_id)
+        .eq('approved', false)
+        .order('created_at', { ascending: true })
+
+      if (requestsError) {
+        console.error('Error loading join requests:', requestsError)
+        setJoinRequestError('Failed to load join requests')
+        return
+      }
+
+      if (!requests || requests.length === 0) {
+        setJoinRequests([])
+        return
+      }
+
+      // Get profiles for all user IDs
+      const userIds = requests.map(r => r.user_id)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+
+      if (profilesError) {
+        console.error('Error loading profiles for join requests:', profilesError)
+        setJoinRequestError('Failed to load user profiles')
+        return
+      }
+
+      // Combine the data
+      const requestsWithProfiles = requests.map(request => {
+        const profile = profiles?.find(p => p.id === request.user_id)
+        return {
+          ...request,
+          profiles: profile || null
+        }
+      })
+
+      setJoinRequests(requestsWithProfiles)
+    } catch (error) {
+      console.error('Error loading join requests:', error)
+      setJoinRequestError('Failed to load join requests')
+    } finally {
+      setIsLoadingJoinRequests(false)
+    }
+  }, [organization])
+
   useEffect(() => {
     checkUserAndOrganization()
   }, [checkUserAndOrganization])
@@ -216,8 +298,9 @@ export function TeamManagement() {
     if (organization) {
       loadInvites()
       loadMembers()
+      loadJoinRequests()
     }
-  }, [organization, loadInvites, loadMembers])
+  }, [organization, loadInvites, loadMembers, loadJoinRequests])
 
   const loadInstruments = useCallback(async () => {
     if (!organization) return
@@ -244,6 +327,62 @@ export function TeamManagement() {
       setIsLoadingInstruments(false)
     }
   }, [organization])
+
+  const handleApproveJoinRequest = async (requestId: string, userId: string) => {
+    if (!organization) return
+    if (!confirm('Are you sure you want to approve this join request?')) return
+
+    try {
+      setJoinRequestError('')
+      setJoinRequestSuccess('')
+
+      // Start a transaction by updating the join request first
+      const { error: updateError } = await supabase
+        .from('organization_join_requests')
+        .update({
+          approved: true
+        })
+        .eq('id', requestId)
+        .eq('organization_id', organization.organization_id)
+
+      if (updateError) {
+        console.error('Error updating join request:', updateError)
+        setJoinRequestError('Failed to approve join request')
+        return
+      }
+
+      // Create organization membership
+      const { error: membershipError } = await supabase
+        .from('organization_memberships')
+        .insert({
+          organization_id: organization.organization_id,
+          user_id: userId,
+          role: 'member',
+          status: 'active',
+          joined_at: new Date().toISOString()
+        })
+
+      if (membershipError) {
+        console.error('Error creating membership:', membershipError)
+        setJoinRequestError('Failed to create membership')
+        return
+      }
+
+      setJoinRequestSuccess('Join request approved successfully!')
+      
+      // Reload data
+      await Promise.all([
+        loadJoinRequests(),
+        loadMembers()
+      ])
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setJoinRequestSuccess(''), 3000)
+    } catch (error) {
+      console.error('Error approving join request:', error)
+      setJoinRequestError('Failed to approve join request')
+    }
+  }
 
   useEffect(() => {
     if (organization) loadInstruments()
@@ -868,6 +1007,82 @@ export function TeamManagement() {
                   </VStack>
                 )}
               </Box>
+            </Box>
+
+            {/* Join Requests Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Heading as="h3" size="md" color={textColor} mb={5}>
+                Join Requests ({joinRequests.length})
+              </Heading>
+
+              {joinRequestError && (
+                <Alert status="error" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  {joinRequestError}
+                </Alert>
+              )}
+
+              {joinRequestSuccess && (
+                <Alert status="success" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  {joinRequestSuccess}
+                </Alert>
+              )}
+
+              {isLoadingJoinRequests ? (
+                <HStack>
+                  <Spinner size="sm" />
+                  <Text color={textMutedColor}>Loading join requests...</Text>
+                </HStack>
+              ) : joinRequests.length === 0 ? (
+                <Box textAlign="center" py={8}>
+                  <Text color={textMutedColor}>No pending join requests</Text>
+                </Box>
+              ) : (
+                <VStack spacing={3} align="stretch">
+                  {joinRequests.map(request => (
+                    <Box
+                      key={request.id}
+                      bg={useColorModeValue('gray.50', 'gray.700')}
+                      borderRadius="md"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      p={4}
+                    >
+                      <Flex justify="space-between" align="center">
+                        <Box flex="1">
+                          <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
+                            {request.profiles?.first_name || 'Unknown'} {request.profiles?.last_name || 'User'}
+                          </Text>
+                          <HStack spacing={4} fontSize="sm">
+                            <Text color={textMutedColor}>
+                              {request.profiles?.email || 'No email'}
+                            </Text>
+                            <Text color={textMutedColor}>
+                              Requested {new Date(request.created_at).toLocaleDateString()}
+                            </Text>
+                          </HStack>
+                        </Box>
+                        
+                        <Button
+                          colorScheme="green"
+                          size="sm"
+                          onClick={() => handleApproveJoinRequest(request.id, request.user_id)}
+                        >
+                          Approve
+                        </Button>
+                      </Flex>
+                    </Box>
+                  ))}
+                </VStack>
+              )}
             </Box>
           </SimpleGrid>
         </Container>
