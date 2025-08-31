@@ -24,6 +24,7 @@ import {
   Badge,
   Flex,
   Center,
+  Select,
 } from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
 
@@ -112,6 +113,11 @@ export function TeamManagement() {
   const [joinRequestError, setJoinRequestError] = useState('')
   const [joinRequestSuccess, setJoinRequestSuccess] = useState('')
 
+  // Role management state
+  const [roleError, setRoleError] = useState('')
+  const [roleSuccess, setRoleSuccess] = useState('')
+  const [roleChangingMemberId, setRoleChangingMemberId] = useState<string | null>(null)
+
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
@@ -121,6 +127,7 @@ export function TeamManagement() {
   const textMutedColor = useColorModeValue('gray.500', 'gray.400')
   const titleColor = useColorModeValue('gray.800', 'white')
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
+  const isOwner = organization?.role === 'owner'
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -329,6 +336,56 @@ export function TeamManagement() {
       setIsLoadingInstruments(false)
     }
   }, [organization])
+
+  async function handleChangeMemberRole(member: OrganizationMember, newRole: 'owner' | 'admin' | 'member') {
+    if (!organization || !user) return
+    setRoleError('')
+    setRoleSuccess('')
+
+    if (!isOwner) {
+      setRoleError('Only owners can change member roles')
+      return
+    }
+
+    if (user.id === member.user_id) {
+      setRoleError('You cannot change your own role')
+      return
+    }
+
+    if (member.role === newRole) return
+
+    if (member.role === 'owner' && newRole !== 'owner') {
+      const ownerCount = members.filter(m => m.role === 'owner').length
+      if (ownerCount <= 1) {
+        setRoleError('At least one owner is required')
+        return
+      }
+    }
+
+    try {
+      setRoleChangingMemberId(member.id)
+      const { error } = await supabase
+        .from('organization_memberships')
+        .update({ role: newRole })
+        .eq('id', member.id)
+        .eq('organization_id', organization.organization_id)
+
+      if (error) {
+        console.error('Error updating member role:', error)
+        setRoleError('Failed to update role')
+        return
+      }
+
+      setRoleSuccess('Role updated')
+      await loadMembers()
+      setTimeout(() => setRoleSuccess(''), 2000)
+    } catch (e) {
+      console.error('Error changing role:', e)
+      setRoleError('Failed to change role')
+    } finally {
+      setRoleChangingMemberId(null)
+    }
+  }
 
   const handleApproveJoinRequest = async (requestId: string, userId: string) => {
     if (!organization) return
@@ -559,7 +616,7 @@ export function TeamManagement() {
       const organizationName = organization?.organizations ? 
         (Array.isArray(organization.organizations) ? 
           organization.organizations[0]?.name : 
-          organization.organizations.name) || 'Your Organization' : 
+          (organization.organizations as { name: string; slug: string }).name) || 'Your Organization' : 
         'Your Organization'
       const invitedByName = user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name || 'A team member'
 
@@ -709,6 +766,18 @@ export function TeamManagement() {
               <Heading as="h3" size="md" color={textColor} mb={5}>
                 Team Members ({members.length})
               </Heading>
+              {roleError && (
+                <Alert status="error" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  {roleError}
+                </Alert>
+              )}
+              {roleSuccess && (
+                <Alert status="success" borderRadius="md" mb={4}>
+                  <AlertIcon />
+                  {roleSuccess}
+                </Alert>
+              )}
               
               {members.length === 0 ? (
                 <Box textAlign="center" py={8}>
@@ -743,19 +812,36 @@ export function TeamManagement() {
                           </HStack>
                         </Box>
                         
-                        <Badge
-                          colorScheme={
-                            member.role === 'owner' ? 'yellow' : 
-                            member.role === 'admin' ? 'blue' : 'gray'
-                          }
-                          variant="subtle"
-                          textTransform="capitalize"
-                          fontSize="xs"
-                          px={3}
-                          py={1}
-                        >
-                          {member.role}
-                        </Badge>
+                        {isOwner && user && user.id !== member.user_id ? (
+                          <HStack spacing={2} align="center">
+                            <Select
+                              size="sm"
+                              value={member.role}
+                              onChange={e => handleChangeMemberRole(member, e.target.value as 'owner' | 'admin' | 'member')}
+                              isDisabled={roleChangingMemberId === member.id}
+                              minW="150px"
+                            >
+                              <option value="owner">Owner</option>
+                              <option value="admin">Admin</option>
+                              <option value="member">Member</option>
+                            </Select>
+                            {roleChangingMemberId === member.id && <Spinner size="sm" />}
+                          </HStack>
+                        ) : (
+                          <Badge
+                            colorScheme={
+                              member.role === 'owner' ? 'yellow' : 
+                              member.role === 'admin' ? 'blue' : 'gray'
+                            }
+                            variant="subtle"
+                            textTransform="capitalize"
+                            fontSize="xs"
+                            px={3}
+                            py={1}
+                          >
+                            {member.role}
+                          </Badge>
+                        )}
                       </Flex>
                     </Box>
                   ))}
