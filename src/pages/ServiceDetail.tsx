@@ -81,6 +81,18 @@ interface ServiceSong {
   songs: Song
 }
 
+interface Volunteer {
+  id: string
+  user_id: string
+  worship_service_id: string
+  created_at: string
+  profiles: {
+    first_name: string
+    last_name: string
+    email: string
+  }
+}
+
 interface OrganizationData {
   organization_id: string
   role: string
@@ -247,6 +259,8 @@ export function ServiceDetail() {
   const [songNotes, setSongNotes] = useState('')
   const [addingSong, setAddingSong] = useState(false)
   const [removingSong, setRemovingSong] = useState<string | null>(null)
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [loadingVolunteers, setLoadingVolunteers] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<string>('')
 
@@ -371,6 +385,60 @@ export function ServiceDetail() {
       console.error('Error loading available songs:', error)
     }
   }, [organization])
+
+  const loadVolunteers = useCallback(async () => {
+    if (!service) return
+
+    try {
+      setLoadingVolunteers(true)
+      console.log('Loading volunteers for service ID:', service.id)
+      
+      // First get the volunteer records
+      const { data: volunteerRecords, error: volunteerError } = await supabase
+        .from('worship_service_volunteers')
+        .select('*')
+        .eq('worship_service_id', service.id)
+        .order('created_at', { ascending: true })
+
+      if (volunteerError) {
+        console.error('Error loading volunteer records:', volunteerError)
+        return
+      }
+
+      if (!volunteerRecords || volunteerRecords.length === 0) {
+        setVolunteers([])
+        return
+      }
+
+      // Then get the profile information for each volunteer
+      const userIds = volunteerRecords.map(v => v.user_id)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError)
+        return
+      }
+
+      // Combine the data
+      const volunteersWithProfiles = volunteerRecords.map(volunteer => {
+        const profile = profiles?.find(p => p.id === volunteer.user_id)
+        return {
+          ...volunteer,
+          profiles: profile || { first_name: 'Unknown', last_name: 'User', email: 'N/A' }
+        }
+      })
+
+      console.log('Volunteers data:', volunteersWithProfiles)
+      setVolunteers(volunteersWithProfiles)
+    } catch (error) {
+      console.error('Error loading volunteers:', error)
+    } finally {
+      setLoadingVolunteers(false)
+    }
+  }, [service])
 
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -527,8 +595,9 @@ export function ServiceDetail() {
     if (service) {
       loadServiceSongs()
       loadAvailableSongs()
+      loadVolunteers()
     }
-  }, [service, loadServiceSongs, loadAvailableSongs])
+  }, [service, loadServiceSongs, loadAvailableSongs, loadVolunteers])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -888,6 +957,68 @@ export function ServiceDetail() {
                     </SortableContext>
                   </DndContext>
                 </Box>
+              )}
+            </Box>
+
+            {/* Volunteers Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Heading as="h3" size="md" color={textColor} mb={5}>
+                Volunteers
+              </Heading>
+              
+              {loadingVolunteers ? (
+                <Center py={8}>
+                  <VStack spacing={3}>
+                    <Spinner size="lg" />
+                    <Text color={textMutedColor}>Loading volunteers...</Text>
+                  </VStack>
+                </Center>
+              ) : volunteers.length === 0 ? (
+                <Box textAlign="center" py={10}>
+                  <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
+                    No volunteers yet
+                  </Text>
+                  <Text color={textMutedColor}>
+                    Share the volunteer link to get people to sign up for this service
+                  </Text>
+                </Box>
+              ) : (
+                <VStack spacing={3} align="stretch">
+                  {volunteers.map((volunteer) => (
+                    <Box
+                      key={volunteer.id}
+                      bg={useColorModeValue('gray.50', 'gray.700')}
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      borderRadius="lg"
+                      p={4}
+                    >
+                      <HStack justify="space-between" align="center">
+                        <VStack align="start" spacing={1}>
+                          <Text fontWeight="600" color={textColor}>
+                            {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                          </Text>
+                          <Text fontSize="sm" color={textSecondaryColor}>
+                            {volunteer.profiles.email}
+                          </Text>
+                        </VStack>
+                        <Text fontSize="xs" color={textMutedColor}>
+                          Joined {new Date(volunteer.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </HStack>
+                    </Box>
+                  ))}
+                </VStack>
               )}
             </Box>
 

@@ -89,6 +89,18 @@ interface ServiceSong {
   songs: Song
 }
 
+interface Volunteer {
+  id: string
+  user_id: string
+  worship_service_id: string
+  created_at: string
+  profiles: {
+    first_name: string
+    last_name: string
+    email: string
+  }
+}
+
 export function Dashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -149,6 +161,7 @@ export function Dashboard() {
   const [songNotesByService, setSongNotesByService] = useState<Record<string, string>>({})
   const [addingSongByService, setAddingSongByService] = useState<Record<string, boolean>>({})
   const [serviceErrorByService, setServiceErrorByService] = useState<Record<string, string>>({})
+  const [serviceIdToVolunteers, setServiceIdToVolunteers] = useState<Record<string, Volunteer[]>>({})
 
   // Volunteer link state
   const [volunteerLink, setVolunteerLink] = useState<string>('')
@@ -280,7 +293,10 @@ export function Dashboard() {
       }) as WorshipService[]
 
       setDayServices(sorted)
-      if (sorted.length) await loadSongsForServices(sorted.map(s => s.id))
+      if (sorted.length) {
+        await loadSongsForServices(sorted.map(s => s.id))
+        await loadVolunteersForServices(sorted.map(s => s.id))
+      }
     } catch (err) {
       console.error('Unexpected error loading day services:', err)
       setDayServices([])
@@ -333,6 +349,61 @@ export function Dashboard() {
         mapping[svcId].push(row as ServiceSong)
       })
       setServiceIdToSongs(mapping)
+    } catch {
+      // ignore
+    }
+  }, [organization])
+
+  const loadVolunteersForServices = useCallback(async (serviceIds: string[]) => {
+    if (!organization || serviceIds.length === 0) return
+    try {
+      console.log('Loading volunteers for service IDs:', serviceIds)
+      
+      // First get the volunteer records
+      const { data: volunteerRecords, error: volunteerError } = await supabase
+        .from('worship_service_volunteers')
+        .select('*')
+        .in('worship_service_id', serviceIds)
+        .order('created_at', { ascending: true })
+
+      if (volunteerError) {
+        console.error('Error loading volunteers:', volunteerError)
+        return
+      }
+
+      if (!volunteerRecords || volunteerRecords.length === 0) {
+        setServiceIdToVolunteers({})
+        return
+      }
+
+      // Then get the profile information for each volunteer
+      const userIds = [...new Set(volunteerRecords.map(v => v.user_id))]
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError)
+        return
+      }
+
+      // Combine the data and create the mapping
+      const mapping: Record<string, Volunteer[]> = {}
+      volunteerRecords.forEach((volunteer) => {
+        const profile = profiles?.find(p => p.id === volunteer.user_id)
+        const volunteerWithProfile = {
+          ...volunteer,
+          profiles: profile || { first_name: 'Unknown', last_name: 'User', email: 'N/A' }
+        }
+        
+        const svcId = volunteer.worship_service_id
+        if (!mapping[svcId]) mapping[svcId] = []
+        mapping[svcId].push(volunteerWithProfile as Volunteer)
+      })
+      
+      console.log('Volunteers mapping:', mapping)
+      setServiceIdToVolunteers(mapping)
     } catch {
       // ignore
     }
@@ -1049,6 +1120,32 @@ export function Dashboard() {
                                   </Box>
 
                                   <Box>
+                                    <Text fontWeight="700" mb={2} fontSize="md">Volunteers</Text>
+                                    {(serviceIdToVolunteers[svc.id] || []).length === 0 ? (
+                                      <Text color={mutedTextColor}>No volunteers yet</Text>
+                                    ) : (
+                                      <VStack spacing={2} align="stretch">
+                                        {(serviceIdToVolunteers[svc.id] || []).map(volunteer => (
+                                          <Box
+                                            key={volunteer.id}
+                                            border="1px"
+                                            borderColor={cardBorderColor}
+                                            borderRadius="lg"
+                                            p={3}
+                                          >
+                                            <Text fontWeight="600" fontSize="sm">
+                                              {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                                            </Text>
+                                            <Text color={mutedTextColor} fontSize="xs">
+                                              {volunteer.profiles.email}
+                                            </Text>
+                                          </Box>
+                                        ))}
+                                      </VStack>
+                                    )}
+                                  </Box>
+
+                                  <Box>
                                     <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
                                     {serviceErrorByService[svc.id] && (
                                       <Alert status="error" borderRadius="md" mb={3}>
@@ -1156,6 +1253,32 @@ export function Dashboard() {
                                             {songRow.notes && (
                                               <Text color={mutedTextColor} fontSize="sm">{songRow.notes}</Text>
                                             )}
+                                          </Box>
+                                        ))}
+                                      </VStack>
+                                    )}
+                                  </Box>
+
+                                  <Box>
+                                    <Text fontWeight="700" mb={2} fontSize="md">Volunteers</Text>
+                                    {(serviceIdToVolunteers[svc.id] || []).length === 0 ? (
+                                      <Text color={mutedTextColor}>No volunteers yet</Text>
+                                    ) : (
+                                      <VStack spacing={2} align="stretch">
+                                        {(serviceIdToVolunteers[svc.id] || []).map(volunteer => (
+                                          <Box
+                                            key={volunteer.id}
+                                            border="1px"
+                                            borderColor={cardBorderColor}
+                                            borderRadius="lg"
+                                            p={3}
+                                          >
+                                            <Text fontWeight="600" fontSize="sm">
+                                              {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                                            </Text>
+                                            <Text color={mutedTextColor} fontSize="xs">
+                                              {volunteer.profiles.email}
+                                            </Text>
                                           </Box>
                                         ))}
                                       </VStack>
