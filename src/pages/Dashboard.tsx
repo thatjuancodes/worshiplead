@@ -128,6 +128,10 @@ export function Dashboard() {
   const [isAddingServiceMode, setIsAddingServiceMode] = useState(false)
   const firstServiceRef = useRef<HTMLDivElement | null>(null)
 
+  // User volunteer dates
+  const [userVolunteerDates, setUserVolunteerDates] = useState<string[]>([])
+  const [loadingVolunteerDates, setLoadingVolunteerDates] = useState(false)
+
   // Recent songs usage
   interface RecentSongUsage {
     songId: string
@@ -571,6 +575,56 @@ export function Dashboard() {
     }
   }, [organization, toast])
 
+  const loadUserVolunteerDates = useCallback(async () => {
+    if (!organization || !user) return
+    try {
+      setLoadingVolunteerDates(true)
+      
+      // Get all services where the current user has volunteered
+      const { data: volunteerRecords, error: volunteerError } = await supabase
+        .from('worship_service_volunteers')
+        .select('worship_service_id')
+        .eq('user_id', user.id)
+
+      if (volunteerError) {
+        console.error('Error loading user volunteer dates:', volunteerError)
+        setUserVolunteerDates([])
+        return
+      }
+
+      if (!volunteerRecords || volunteerRecords.length === 0) {
+        setUserVolunteerDates([])
+        return
+      }
+
+      // Get the service dates for these volunteer records
+      const serviceIds = volunteerRecords.map(record => record.worship_service_id)
+      const { data: services, error: servicesError } = await supabase
+        .from('worship_services')
+        .select('service_date')
+        .in('id', serviceIds)
+        .eq('organization_id', organization.organization_id)
+
+      if (servicesError) {
+        console.error('Error loading service dates:', servicesError)
+        setUserVolunteerDates([])
+        return
+      }
+
+      // Extract the service dates
+      const dates = (services || [])
+        .map(service => service.service_date)
+        .filter(date => date) as string[]
+
+      setUserVolunteerDates(dates)
+    } catch (error) {
+      console.error('Error loading user volunteer dates:', error)
+      setUserVolunteerDates([])
+    } finally {
+      setLoadingVolunteerDates(false)
+    }
+  }, [organization, user])
+
   const copyVolunteerLink = async () => {
     try {
       setCopyingLink(true)
@@ -624,6 +678,10 @@ export function Dashboard() {
   useEffect(() => {
     loadVolunteerLink()
   }, [loadVolunteerLink])
+
+  useEffect(() => {
+    loadUserVolunteerDates()
+  }, [loadUserVolunteerDates])
 
   async function handleAddSongToService(serviceId: string) {
     if (!serviceId) return
@@ -782,26 +840,122 @@ export function Dashboard() {
       <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
         {/* Dashboard Content */}
         <VStack spacing={8}>
-          {/* Calendar and Songs Row */}
+          {/* Main Content Grid */}
           <Grid templateColumns={{ base: '1fr', md: 'repeat(12, 1fr)' }} gap={6} w="100%">
-            {/* Service Calendar Section (8/12) */}
+            {/* Left Column (8/12) - Upcoming + Calendar */}
             <GridItem colSpan={{ base: 12, md: 8 }}>
-              <Box
-                bg={cardBg}
-                borderRadius="xl"
-                p={{ base: 5, md: 6 }}
-                boxShadow="sm"
-                w="100%"
-              >
-                <Heading
-                  as="h3"
-                  size="lg"
-                  color={titleColor}
-                  mb={3}
-                  fontWeight="600"
+              <VStack spacing={6} align="stretch">
+                {/* Upcoming Section */}
+                <Box
+                  bg={cardBg}
+                  borderRadius="xl"
+                  p={{ base: 5, md: 6 }}
+                  boxShadow="sm"
+                  w="100%"
                 >
-                  Service Calendar
-                </Heading>
+                  <Heading
+                    as="h3"
+                    size="lg"
+                    color={titleColor}
+                    mb={4}
+                    fontWeight="600"
+                  >
+                    Upcoming
+                  </Heading>
+                  
+                  {userVolunteerDates.length === 0 ? (
+                    <Text color={mutedTextColor} textAlign="center" py={4}>
+                      You haven't volunteered for any services yet
+                    </Text>
+                  ) : (
+                    <VStack spacing={3} align="stretch">
+                      {userVolunteerDates
+                        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+                        .slice(0, 5) // Show only next 5 volunteer services
+                        .map((date) => {
+                          // Find the service for this date
+                          const service = services.find(s => s.service_date === date)
+                          if (!service) return null
+                          
+                          return (
+                            <Box
+                              key={service.id}
+                              bg={useColorModeValue('green.50', 'green.900')}
+                              borderRadius="lg"
+                              border="1px"
+                              borderColor="green.200"
+                              p={4}
+                              cursor="pointer"
+                              _hover={{ 
+                                borderColor: 'green.400',
+                                transform: 'translateY(-1px)',
+                                boxShadow: 'md'
+                              }}
+                              transition="all 0.2s"
+                              onClick={() => {
+                                setFormDate(service.service_date)
+                                setSelectedDate(service.service_date)
+                                loadServicesForDate(service.service_date)
+                                setIsAddingServiceMode(false)
+                                createDrawer.onOpen()
+                              }}
+                            >
+                              <HStack justify="space-between" align="center">
+                                <Box flex="1">
+                                  <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
+                                    {service.title}
+                                  </Text>
+                                  <HStack spacing={4} fontSize="sm">
+                                    <Text color={mutedTextColor}>
+                                      {new Date(service.service_date).toLocaleDateString('en-US', {
+                                        weekday: 'short',
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                      })}
+                                    </Text>
+                                    {service.service_time && (
+                                      <Text color={mutedTextColor}>
+                                        {service.service_time}
+                                      </Text>
+                                      )}
+                                  </HStack>
+                                </Box>
+                                
+                                <Box
+                                  w="8px"
+                                  h="8px"
+                                  borderRadius="full"
+                                  bg="green.400"
+                                  flexShrink={0}
+                                />
+                              </HStack>
+                            </Box>
+                          )
+                        })
+                        .filter(Boolean) // Remove any null entries
+                    }
+                    </VStack>
+                  )}
+                </Box>
+
+                {/* Service Calendar Section */}
+                <Box
+                  bg={cardBg}
+                  borderRadius="xl"
+                  p={{ base: 5, md: 6 }}
+                  boxShadow="sm"
+                  w="100%"
+                >
+                  <Heading
+                    as="h3"
+                    size="lg"
+                    color={titleColor}
+                    mb={3}
+                    fontWeight="600"
+                  >
+                    Service Calendar
+                  </Heading>
 
                 <HStack justify="center" mb={4}>
                   <IconButton
@@ -841,6 +995,7 @@ export function Dashboard() {
                   year={displayYear}
                   month={displayMonth}
                   scheduledDates={[...new Set(services.map(s => s.service_date))]}
+                  userVolunteerDates={userVolunteerDates}
                   onDateClick={(iso) => {
                     setFormDate(iso)
                     setSelectedDate(iso)
@@ -866,75 +1021,76 @@ export function Dashboard() {
                   Add New Service
                 </Button>
               </Box>
-            </GridItem>
+            </VStack>
+          </GridItem>
 
-            {/* Songs Section (4/12) */}
-            <GridItem colSpan={{ base: 12, md: 4 }}>
-              <VStack spacing={6} align="stretch">
-                {/* Volunteer Link Section */}
-                <Box
-                  bg={cardBg}
-                  borderRadius="xl"
-                  p={{ base: 5, md: 6 }}
-                  boxShadow="sm"
-                  w="100%"
+          {/* Right Column (4/12) - Volunteer Link + Songs */}
+          <GridItem colSpan={{ base: 12, md: 4 }}>
+            <VStack spacing={6} align="stretch">
+              {/* Volunteer Link Section */}
+              <Box
+                bg={cardBg}
+                borderRadius="xl"
+                p={{ base: 5, md: 6 }}
+                boxShadow="sm"
+                w="100%"
+              >
+                <Heading
+                  as="h3"
+                  size="lg"
+                  color={titleColor}
+                  mb={4}
+                  fontWeight="600"
                 >
-                  <Heading
-                    as="h3"
-                    size="lg"
-                    color={titleColor}
-                    mb={4}
-                    fontWeight="600"
-                  >
-                    Volunteer Link
-                  </Heading>
-                  
-                  <Text color={subtitleColor} fontSize="sm" mb={4}>
-                    Share this link with potential volunteers to let them sign up for services
-                  </Text>
+                  Volunteer Link
+                </Heading>
+                
+                <Text color={subtitleColor} fontSize="sm" mb={4}>
+                  Share this link with potential volunteers to let them sign up for services
+                </Text>
 
-                  <VStack spacing={3} align="stretch">
+                <VStack spacing={3} align="stretch">
+                  <Button
+                    size="md"
+                    colorScheme="green"
+                    variant="outline"
+                    onClick={copyVolunteerLink}
+                    isLoading={loadingVolunteerLink || copyingLink}
+                    loadingText={loadingVolunteerLink ? "Loading..." : "Copying..."}
+                    isDisabled={loadingVolunteerLink}
+                    w="100%"
+                  >
+                    {loadingVolunteerLink 
+                      ? "Loading..." 
+                      : volunteerLink 
+                        ? "Copy volunteer link" 
+                        : "Create volunteer link"
+                    }
+                  </Button>
+
+                  {volunteerLink && (
                     <Button
                       size="md"
-                      colorScheme="green"
+                      colorScheme="blue"
                       variant="outline"
-                      onClick={copyVolunteerLink}
-                      isLoading={loadingVolunteerLink || copyingLink}
-                      loadingText={loadingVolunteerLink ? "Loading..." : "Copying..."}
-                      isDisabled={loadingVolunteerLink}
+                      onClick={() => navigate(`/volunteer/${volunteerLink}`)}
                       w="100%"
                     >
-                      {loadingVolunteerLink 
-                        ? "Loading..." 
-                        : volunteerLink 
-                          ? "Copy volunteer link" 
-                          : "Create volunteer link"
-                      }
+                      Visit Volunteer Page
                     </Button>
+                  )}
+                </VStack>
+              </Box>
 
-                    {volunteerLink && (
-                      <Button
-                        size="md"
-                        colorScheme="blue"
-                        variant="outline"
-                        onClick={() => navigate(`/volunteer/${volunteerLink}`)}
-                        w="100%"
-                      >
-                        Visit Volunteer Page
-                      </Button>
-                    )}
-                  </VStack>
-                </Box>
-
-                {/* Songs Section */}
-                <Box
-                  bg={cardBg}
-                  borderRadius="xl"
-                  p={{ base: 5, md: 6 }}
-                  boxShadow="sm"
-                  w="100%"
-                >
-                  <Heading
+              {/* Songs Section */}
+              <Box
+                bg={cardBg}
+                borderRadius="xl"
+                p={{ base: 5, md: 6 }}
+                boxShadow="sm"
+                w="100%"
+              >
+                <Heading
                     as="h3"
                     size="lg"
                     color={titleColor}
@@ -1562,10 +1718,11 @@ interface CalendarProps {
   year: number
   month: number // 0-11
   scheduledDates: string[]
+  userVolunteerDates: string[]
   onDateClick?: (isoDate: string) => void
 }
 
-function CalendarGrid({ year, month, scheduledDates, onDateClick }: CalendarProps) {
+function CalendarGrid({ year, month, scheduledDates, userVolunteerDates, onDateClick }: CalendarProps) {
 
   const firstOfMonth = new Date(year, month, 1)
   const startWeekday = firstOfMonth.getDay()
@@ -1583,6 +1740,7 @@ function CalendarGrid({ year, month, scheduledDates, onDateClick }: CalendarProp
   const cells: (number | null)[] = [...prefixEmptyCells, ...monthDays]
 
   const scheduledSet = new Set(scheduledDates)
+  const volunteerSet = new Set(userVolunteerDates)
 
   function toISO(y: number, mZeroIndexed: number, d: number) {
     const mm = String(mZeroIndexed + 1).padStart(2, '0')
@@ -1618,6 +1776,7 @@ function CalendarGrid({ year, month, scheduledDates, onDateClick }: CalendarProp
 
           const iso = toISO(year, month, day)
           const hasEvent = scheduledSet.has(iso)
+          const hasVolunteered = volunteerSet.has(iso)
 
           return (
             <Box
@@ -1637,13 +1796,13 @@ function CalendarGrid({ year, month, scheduledDates, onDateClick }: CalendarProp
                 {day}
               </Text>
 
-              {hasEvent && (
+              {hasVolunteered && (
                 <Box position="absolute" top="6px" right="6px">
                   <Box
                     w="12px"
                     h="12px"
                     borderRadius="full"
-                    bg="blue.400"
+                    bg="green.400"
                     animation={`${pulse} 1.2s ease-in-out infinite, ${ringPulse} 1.2s ease-out infinite`}
                   />
                 </Box>
