@@ -518,6 +518,73 @@ export function TeamManagement() {
 
           {/* Content Grid */}
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
+
+            {/* Team Members Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Heading as="h3" size="md" color={textColor} mb={5}>
+                Team Members ({members.length})
+              </Heading>
+              
+              {members.length === 0 ? (
+                <Box textAlign="center" py={8}>
+                  <Text color={textMutedColor}>No members found</Text>
+                  <Text fontSize="xs" color={textMutedColor} mt={2}>
+                    Debug: Members data: {JSON.stringify(members, null, 2)}
+                  </Text>
+                </Box>
+              ) : (
+                <VStack spacing={3} align="stretch">
+                  {members.map(member => (
+                    <Box
+                      key={member.id}
+                      bg={useColorModeValue('gray.50', 'gray.700')}
+                      borderRadius="md"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      p={4}
+                    >
+                      <Flex justify="space-between" align="center">
+                        <Box flex="1">
+                          <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
+                            {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
+                          </Text>
+                          <HStack spacing={4} fontSize="sm">
+                            <Text color={textMutedColor}>
+                              {member.profiles?.email || 'No email'}
+                            </Text>
+                            <Text color={textMutedColor}>
+                              Joined {new Date(member.joined_at).toLocaleDateString()}
+                            </Text>
+                          </HStack>
+                        </Box>
+                        
+                        <Badge
+                          colorScheme={
+                            member.role === 'owner' ? 'yellow' : 
+                            member.role === 'admin' ? 'blue' : 'gray'
+                          }
+                          variant="subtle"
+                          textTransform="capitalize"
+                          fontSize="xs"
+                          px={3}
+                          py={1}
+                        >
+                          {member.role}
+                        </Badge>
+                      </Flex>
+                    </Box>
+                  ))}
+                </VStack>
+              )}
+            </Box>
+
             <VStack align="start" spacing={4}>
               <Heading as="h3" size="md" color={titleColor}>
                 Invite New Member
@@ -659,72 +726,6 @@ export function TeamManagement() {
                 )}
               </Box>
             </VStack>
-
-            {/* Team Members Section */}
-            <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
-            >
-              <Heading as="h3" size="md" color={textColor} mb={5}>
-                Team Members ({members.length})
-              </Heading>
-              
-              {members.length === 0 ? (
-                <Box textAlign="center" py={8}>
-                  <Text color={textMutedColor}>No members found</Text>
-                  <Text fontSize="xs" color={textMutedColor} mt={2}>
-                    Debug: Members data: {JSON.stringify(members, null, 2)}
-                  </Text>
-                </Box>
-              ) : (
-                <VStack spacing={3} align="stretch">
-                  {members.map(member => (
-                    <Box
-                      key={member.id}
-                      bg={useColorModeValue('gray.50', 'gray.700')}
-                      borderRadius="md"
-                      border="1px"
-                      borderColor={cardBorderColor}
-                      p={4}
-                    >
-                      <Flex justify="space-between" align="center">
-                        <Box flex="1">
-                          <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                            {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
-                          </Text>
-                          <HStack spacing={4} fontSize="sm">
-                            <Text color={textMutedColor}>
-                              {member.profiles?.email || 'No email'}
-                            </Text>
-                            <Text color={textMutedColor}>
-                              Joined {new Date(member.joined_at).toLocaleDateString()}
-                            </Text>
-                          </HStack>
-                        </Box>
-                        
-                        <Badge
-                          colorScheme={
-                            member.role === 'owner' ? 'yellow' : 
-                            member.role === 'admin' ? 'blue' : 'gray'
-                          }
-                          variant="subtle"
-                          textTransform="capitalize"
-                          fontSize="xs"
-                          px={3}
-                          py={1}
-                        >
-                          {member.role}
-                        </Badge>
-                      </Flex>
-                    </Box>
-                  ))}
-                </VStack>
-              )}
-            </Box>
 
             {/* Instruments Section */}
             <Box
