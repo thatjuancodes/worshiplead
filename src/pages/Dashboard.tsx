@@ -34,7 +34,8 @@ import {
   AccordionIcon,
   useColorModeValue,
   useDisclosure,
-  Center
+  Center,
+  useToast
 } from '@chakra-ui/react'
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
 import { keyframes } from '@emotion/react'
@@ -148,6 +149,12 @@ export function Dashboard() {
   const [songNotesByService, setSongNotesByService] = useState<Record<string, string>>({})
   const [addingSongByService, setAddingSongByService] = useState<Record<string, boolean>>({})
   const [serviceErrorByService, setServiceErrorByService] = useState<Record<string, string>>({})
+
+  // Volunteer link state
+  const [volunteerLink, setVolunteerLink] = useState<string>('')
+  const [loadingVolunteerLink, setLoadingVolunteerLink] = useState(false)
+  const [copyingLink, setCopyingLink] = useState(false)
+  const toast = useToast()
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -418,9 +425,134 @@ export function Dashboard() {
     }
   }, [organization])
 
+  const loadVolunteerLink = useCallback(async () => {
+    if (!organization) return
+    try {
+      setLoadingVolunteerLink(true)
+      console.log('Loading volunteer link for organization:', organization.organization_id)
+      
+      // Check if organization already has a volunteer link
+      const { data: existingLink, error: fetchError } = await supabase
+        .from('organization_volunteer_links')
+        .select('public_url')
+        .eq('organization_id', organization.organization_id)
+        .single()
+
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          // PGRST116 is "no rows returned" - that's expected if no link exists
+          console.log('No existing volunteer link found, creating new one...')
+        } else {
+          console.error('Error fetching volunteer link:', fetchError)
+          toast({
+            title: 'Error',
+            description: 'Failed to check existing volunteer link',
+            status: 'error',
+            duration: 3000,
+            isClosable: true
+          })
+          return
+        }
+      }
+
+      if (existingLink) {
+        console.log('Found existing volunteer link:', existingLink.public_url)
+        setVolunteerLink(existingLink.public_url)
+        return
+      }
+
+      // Create new volunteer link if none exists
+      const publicUrl = `volunteer-${organization.organization_id.slice(0, 8)}`
+      console.log('Creating new volunteer link:', publicUrl)
+      
+      const { error: createError } = await supabase
+        .from('organization_volunteer_links')
+        .insert({
+          organization_id: organization.organization_id,
+          public_url: publicUrl
+        })
+
+      if (createError) {
+        console.error('Error creating volunteer link:', createError)
+        toast({
+          title: 'Error',
+          description: `Failed to create volunteer link: ${createError.message}`,
+          status: 'error',
+          duration: 5000,
+          isClosable: true
+        })
+        return
+      }
+
+      console.log('Successfully created volunteer link:', publicUrl)
+      setVolunteerLink(publicUrl)
+    } catch (err) {
+      console.error('Unexpected error loading volunteer link:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to load volunteer link',
+        status: 'error',
+        duration: 3000,
+        isClosable: true
+      })
+    } finally {
+      setLoadingVolunteerLink(false)
+    }
+  }, [organization, toast])
+
+  const copyVolunteerLink = async () => {
+    try {
+      setCopyingLink(true)
+      
+      // If no volunteer link exists, create one first
+      if (!volunteerLink) {
+        await loadVolunteerLink()
+        // Wait a moment for the state to update
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+      
+      if (!volunteerLink) {
+        toast({
+          title: 'Error',
+          description: 'Failed to create volunteer link',
+          status: 'error',
+          duration: 3000,
+          isClosable: true
+        })
+        return
+      }
+      
+      const fullUrl = `${window.location.origin}/volunteer/${volunteerLink}`
+      await navigator.clipboard.writeText(fullUrl)
+      
+      toast({
+        title: 'Link copied!',
+        description: 'Volunteer link copied to clipboard',
+        status: 'success',
+        duration: 3000,
+        isClosable: true
+      })
+    } catch (err) {
+      console.error('Failed to copy link:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to copy link to clipboard',
+        status: 'error',
+        duration: 3000,
+        isClosable: true
+      })
+    } finally {
+      setCopyingLink(false)
+    }
+  }
+
   useEffect(() => {
     loadRecentSongs()
   }, [loadRecentSongs])
+
+  useEffect(() => {
+    loadVolunteerLink()
+  }, [loadVolunteerLink])
 
   async function handleAddSongToService(serviceId: string) {
     if (!serviceId) return
@@ -668,24 +800,67 @@ export function Dashboard() {
 
             {/* Songs Section (4/12) */}
             <GridItem colSpan={{ base: 12, md: 4 }}>
-          <Box
-            bg={cardBg}
-            borderRadius="xl"
-            p={{ base: 5, md: 6 }}
-            boxShadow="sm"
-            w="100%"
-          >
-            <Heading
-              as="h3"
-              size="lg"
-              color={titleColor}
-              mb={5}
-              fontWeight="600"
-            >
-                  Songs
-            </Heading>
+              <VStack spacing={6} align="stretch">
+                {/* Volunteer Link Section */}
+                <Box
+                  bg={cardBg}
+                  borderRadius="xl"
+                  p={{ base: 5, md: 6 }}
+                  boxShadow="sm"
+                  w="100%"
+                >
+                  <Heading
+                    as="h3"
+                    size="lg"
+                    color={titleColor}
+                    mb={4}
+                    fontWeight="600"
+                  >
+                    Volunteer Link
+                  </Heading>
+                  
+                  <Text color={subtitleColor} fontSize="sm" mb={4}>
+                    Share this link with potential volunteers to let them sign up for services
+                  </Text>
 
-                {recentSongsError && (
+                  <Button
+                    size="md"
+                    colorScheme="green"
+                    variant="outline"
+                    onClick={copyVolunteerLink}
+                    isLoading={loadingVolunteerLink || copyingLink}
+                    loadingText={loadingVolunteerLink ? "Loading..." : "Copying..."}
+                    isDisabled={loadingVolunteerLink}
+                    w="100%"
+                  >
+                    {loadingVolunteerLink 
+                      ? "Loading..." 
+                      : volunteerLink 
+                        ? "Copy volunteer link" 
+                        : "Create volunteer link"
+                    }
+                  </Button>
+                </Box>
+
+                {/* Songs Section */}
+                <Box
+                  bg={cardBg}
+                  borderRadius="xl"
+                  p={{ base: 5, md: 6 }}
+                  boxShadow="sm"
+                  w="100%"
+                >
+                  <Heading
+                    as="h3"
+                    size="lg"
+                    color={titleColor}
+                    mb={5}
+                    fontWeight="600"
+                  >
+                    Songs
+                  </Heading>
+
+                  {recentSongsError && (
                   <Alert status="error" borderRadius="md" mb={4}>
                     <AlertIcon />
                     {recentSongsError}
@@ -781,7 +956,8 @@ export function Dashboard() {
                 <Button mt={3} w="100%" variant="outline" colorScheme="blue" onClick={() => navigate('/songbank')}>
                   Manage songs
                 </Button>
-                </Box>
+              </Box>
+            </VStack>
             </GridItem>
           </Grid>
 

@@ -22,6 +22,7 @@ import { ScheduleService } from './pages/ScheduleService'
 import { ServiceDetail } from './pages/ServiceDetail'
 import { ServiceEdit } from './pages/ServiceEdit'
 import { OnboardingFlow } from './pages/OnboardingFlow'
+import { VolunteerPage } from './pages/VolunteerPage'
 
 // Component to handle onboarding for authenticated users
 function AuthenticatedHome() {
@@ -122,6 +123,7 @@ function App() {
           <Route path="/service/:id" element={<ServiceDetail />} />
           <Route path="/service/:id/edit" element={<ServiceEdit />} />
           <Route path="/onboarding" element={<OnboardingFlow />} />
+          <Route path="/volunteer/:publicUrl" element={<VolunteerPage />} />
         </Routes>
       </Router>
     </Box>
