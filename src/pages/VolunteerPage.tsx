@@ -16,7 +16,7 @@ import {
   AlertIcon
 } from '@chakra-ui/react'
 import { supabase } from '../lib/supabase'
-import { signInWithGoogleFromVolunteer } from '../lib/auth'
+import { signInWithGoogleFromVolunteer, ensureUserProfileAndMembership } from '../lib/auth'
 
 interface OrganizationData {
   id: string
@@ -289,6 +289,23 @@ export function VolunteerPage() {
       
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
+        
+        // Ensure user has profile and organization membership
+        try {
+          if (organization) {
+            await ensureUserProfileAndMembership(session.user, organization.id)
+            console.log('User profile and membership ensured')
+          }
+        } catch (error) {
+          console.error('Error ensuring user profile and membership:', error)
+          toast({
+            title: 'Warning',
+            description: 'Failed to create user profile. Some features may not work properly.',
+            status: 'warning',
+            duration: 5000,
+            isClosable: true
+          })
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
@@ -299,13 +316,23 @@ export function VolunteerPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         setUser(session.user)
+        
+        // Ensure user has profile and organization membership for existing sessions
+        try {
+          if (organization) {
+            await ensureUserProfileAndMembership(session.user, organization.id)
+            console.log('Existing user profile and membership ensured')
+          }
+        } catch (error) {
+          console.error('Error ensuring existing user profile and membership:', error)
+        }
       }
     }
     
     checkInitialSession()
     
     return () => subscription.unsubscribe()
-  }, [])
+  }, [organization, toast])
 
   useEffect(() => {
     if (publicUrl) {

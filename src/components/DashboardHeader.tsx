@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { signOut } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { 
   Box, 
   Flex, 
@@ -27,6 +28,7 @@ import {
 } from '@chakra-ui/react'
 import { ChevronDownIcon, HamburgerIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 
 interface OrganizationData {
   organization_id: string
@@ -38,6 +40,13 @@ interface OrganizationData {
     name: string
     slug: string
   }[]
+}
+
+interface UserProfile {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
 }
 
 interface DashboardHeaderProps {
@@ -59,6 +68,7 @@ const getOrganizationName = (organization: OrganizationData | null): string => {
 export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
   const navigate = useNavigate()
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
 
   // Color mode values
   const headerBg = useColorModeValue('white', 'gray.800')
@@ -72,6 +82,40 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
   const drawerBg = useColorModeValue('white', 'gray.900')
   const drawerHeaderBg = useColorModeValue('blue.500', 'blue.600')
   const drawerHeaderColor = 'white'
+
+  // Fetch user profile from the profiles table
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user?.id) return
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .eq('id', user.id)
+          .single()
+
+        if (error) {
+          console.error('Error fetching user profile:', error)
+          return
+        }
+
+        setUserProfile(profile)
+      } catch (error) {
+        console.error('Error fetching user profile:', error)
+      }
+    }
+
+    fetchUserProfile()
+  }, [user?.id])
+
+  // Fallback to user metadata if profile is not available
+  const displayName = userProfile 
+    ? `${userProfile.first_name} ${userProfile.last_name}`
+    : user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'User'
+
+  const firstName = userProfile?.first_name || user?.user_metadata?.first_name || 'U'
+  const lastName = userProfile?.last_name || user?.user_metadata?.last_name || 's'
 
   const handleSignOut = async () => {
     try {
@@ -166,7 +210,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                     <Flex align="center" gap={2}>
                       <Avatar
                         size="sm"
-                        name={user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name}
+                        name={displayName}
                         bg="blue.500"
                         color="white"
                         fontSize="xs"
@@ -177,7 +221,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                         whiteSpace="nowrap"
                         fontSize="sm"
                       >
-                        {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
+                        {displayName}
                       </Text>
                     </Flex>
                   </MenuButton>
@@ -240,7 +284,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
             <VStack spacing={4} align="center">
               <Avatar
                 size="xl"
-                name={user?.user_metadata?.first_name + ' ' + user?.user_metadata?.last_name}
+                name={displayName}
                 bg="white"
                 color="blue.500"
                 fontSize="2xl"
@@ -248,10 +292,10 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
               />
               <VStack spacing={1}>
                 <Text fontSize="lg" fontWeight="600">
-                  {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
+                  {displayName}
                 </Text>
                 <Text fontSize="sm" opacity={0.9}>
-                  {user?.email}
+                  {userProfile?.email || user?.email}
                 </Text>
               </VStack>
               <Box

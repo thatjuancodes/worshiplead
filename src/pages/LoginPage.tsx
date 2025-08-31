@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { signIn, signInWithGoogle } from '../lib/auth'
+import { signIn, signInWithGoogle, ensureUserProfileAndMembership } from '../lib/auth'
+import { supabase } from '../lib/supabase'
 import { 
   Box, 
   VStack, 
@@ -28,6 +29,46 @@ export function LoginPage() {
   const cardBorder = useColorModeValue('gray.200', 'gray.600')
   const titleColor = useColorModeValue('gray.800', 'white')
   const textColor = useColorModeValue('gray.600', 'gray.300')
+
+  // Handle OAuth redirects and profile creation
+  useEffect(() => {
+    const handleOAuthRedirect = async () => {
+      try {
+        // Check if we're returning from OAuth
+        const urlParams = new URLSearchParams(window.location.search)
+        const hasOAuthParams = urlParams.has('code') || urlParams.has('access_token') || urlParams.has('error')
+        
+        if (hasOAuthParams) {
+          // Wait for Supabase to process the OAuth callback
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          // Check for the current session
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.user) {
+            console.log('LoginPage: OAuth user detected, ensuring profile exists')
+            
+            try {
+              // Create basic profile (without organization membership since we don't know which org yet)
+              await ensureUserProfileAndMembership(session.user)
+              console.log('LoginPage: User profile ensured, redirecting to dashboard')
+              
+              // Clear OAuth parameters and redirect to dashboard
+              window.history.replaceState({}, document.title, window.location.pathname)
+              navigate('/dashboard')
+            } catch (error) {
+              console.error('LoginPage: Error ensuring user profile:', error)
+              // Still redirect to dashboard, profile creation will be handled there
+              navigate('/dashboard')
+            }
+          }
+        }
+      } catch (error) {
+        console.error('LoginPage: Error handling OAuth redirect:', error)
+      }
+    }
+    
+    handleOAuthRedirect()
+  }, [navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,6 +98,7 @@ export function LoginPage() {
     try {
       await signInWithGoogle()
       // The redirect will happen automatically via Supabase OAuth
+      // Profile creation will be handled in the useEffect above
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google')
       setGoogleLoading(false)

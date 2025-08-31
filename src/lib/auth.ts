@@ -324,6 +324,91 @@ export async function signInWithGoogleFromVolunteer() {
   }
 }
 
+// Function to ensure user has profile and organization membership
+export async function ensureUserProfileAndMembership(user: any, organizationId?: string) {
+  try {
+    console.log('Ensuring user profile and membership for:', user.id)
+    
+    // Check if user profile exists
+    const { data: existingProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error('Error checking existing profile:', profileError)
+      throw profileError
+    }
+
+    // Create profile if it doesn't exist
+    if (!existingProfile) {
+      console.log('Creating user profile for:', user.id)
+      
+      const { error: createProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          email: user.email,
+          first_name: user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.name?.split(' ')[0] || 'Unknown',
+          last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || user.user_metadata?.name?.split(' ').slice(1).join(' ') || 'User'
+        })
+
+      if (createProfileError) {
+        console.error('Error creating user profile:', createProfileError)
+        throw createProfileError
+      }
+
+      console.log('User profile created successfully')
+    } else {
+      console.log('User profile already exists')
+    }
+
+    // If organizationId is provided, ensure membership exists
+    if (organizationId) {
+      const { data: existingMembership, error: membershipError } = await supabase
+        .from('organization_memberships')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (membershipError && membershipError.code !== 'PGRST116') {
+        console.error('Error checking existing membership:', membershipError)
+        throw membershipError
+      }
+
+      // Create membership if it doesn't exist
+      if (!existingMembership) {
+        console.log('Creating organization membership for:', user.id)
+        
+        const { error: createMembershipError } = await supabase
+          .from('organization_memberships')
+          .insert({
+            organization_id: organizationId,
+            user_id: user.id,
+            role: 'member',
+            status: 'active'
+          })
+
+        if (createMembershipError) {
+          console.error('Error creating organization membership:', createMembershipError)
+          throw createMembershipError
+        }
+
+        console.log('Organization membership created successfully')
+      } else {
+        console.log('Organization membership already exists')
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error ensuring user profile and membership:', error)
+    throw error
+  }
+}
+
 export async function signOut() {
   try {
     const { error } = await supabase.auth.signOut()

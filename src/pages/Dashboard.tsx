@@ -40,7 +40,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
 import { keyframes } from '@emotion/react'
 import { supabase } from '../lib/supabase'
-import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
+import { getCurrentUser, getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
 
@@ -677,6 +677,21 @@ export function Dashboard() {
       }
       setUser(currentUser)
 
+      // Ensure user has profile and basic setup
+      try {
+        await ensureUserProfileAndMembership(currentUser)
+        console.log('Dashboard: User profile and membership ensured')
+      } catch (error) {
+        console.error('Dashboard: Error ensuring user profile and membership:', error)
+        toast({
+          title: 'Warning',
+          description: 'Failed to create user profile. Some features may not work properly.',
+          status: 'warning',
+          duration: 5000,
+          isClosable: true
+        })
+      }
+
       const userOrg = await getUserPrimaryOrganization(currentUser.id)
       console.log('User organization data:', userOrg) // Debug log
       if (!userOrg) {
@@ -689,7 +704,7 @@ export function Dashboard() {
       console.error('Error checking user and organization:', error)
       navigate('/login')
     }
-  }, [navigate])
+  }, [navigate, toast])
 
   useEffect(() => {
     checkUserAndOrganization()
