@@ -25,6 +25,7 @@ import {
   Flex,
   Center,
   Select,
+  Grid,
 } from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
 
@@ -752,363 +753,45 @@ export function TeamManagement() {
           )}
 
           {/* Content Grid */}
-          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
-
-            {/* Team Members Section */}
-            <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
-            >
-              <Heading as="h3" size="md" color={textColor} mb={5}>
-                Team Members ({members.length})
-              </Heading>
-              {roleError && (
-                <Alert status="error" borderRadius="md" mb={4}>
-                  <AlertIcon />
-                  {roleError}
-                </Alert>
-              )}
-              {roleSuccess && (
-                <Alert status="success" borderRadius="md" mb={4}>
-                  <AlertIcon />
-                  {roleSuccess}
-                </Alert>
-              )}
-              
-              {members.length === 0 ? (
-                <Box textAlign="center" py={8}>
-                  <Text color={textMutedColor}>No members found</Text>
-                  <Text fontSize="xs" color={textMutedColor} mt={2}>
-                    Debug: Members data: {JSON.stringify(members, null, 2)}
-                  </Text>
-                </Box>
-              ) : (
-                <VStack spacing={3} align="stretch">
-                  {members.map(member => (
-                    <Box
-                      key={member.id}
-                      bg={useColorModeValue('gray.50', 'gray.700')}
-                      borderRadius="md"
-                      border="1px"
-                      borderColor={cardBorderColor}
-                      p={4}
-                    >
-                      <Flex justify="space-between" align="center">
-                        <Box flex="1">
-                          <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                            {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
-                          </Text>
-                          <HStack spacing={4} fontSize="sm">
-                            <Text color={textMutedColor}>
-                              {member.profiles?.email || 'No email'}
-                            </Text>
-                            <Text color={textMutedColor}>
-                              Joined {new Date(member.joined_at).toLocaleDateString()}
-                            </Text>
-                          </HStack>
-                        </Box>
-                        
-                        {isOwner && user && user.id !== member.user_id ? (
-                          <HStack spacing={2} align="center">
-                            <Select
-                              size="sm"
-                              value={member.role}
-                              onChange={e => handleChangeMemberRole(member, e.target.value as 'owner' | 'admin' | 'member')}
-                              isDisabled={roleChangingMemberId === member.id}
-                              minW="150px"
-                            >
-                              <option value="owner">Owner</option>
-                              <option value="admin">Admin</option>
-                              <option value="member">Member</option>
-                            </Select>
-                            {roleChangingMemberId === member.id && <Spinner size="sm" />}
-                          </HStack>
-                        ) : (
-                          <Badge
-                            colorScheme={
-                              member.role === 'owner' ? 'yellow' : 
-                              member.role === 'admin' ? 'blue' : 'gray'
-                            }
-                            variant="subtle"
-                            textTransform="capitalize"
-                            fontSize="xs"
-                            px={3}
-                            py={1}
-                          >
-                            {member.role}
-                          </Badge>
-                        )}
-                      </Flex>
-                    </Box>
-                  ))}
-                </VStack>
-              )}
-            </Box>
-
-            <VStack align="start" spacing={4}>
-              {canManagePrimary ? (
-                <>
-                  <Heading as="h3" size="md" color={titleColor}>
-                    Invite New Member
-                  </Heading>
-                  <Text color={subtitleColor} fontSize="sm">
-                    Send an invitation to join your organization
-                  </Text>
-                  
-                  <form onSubmit={handleInviteUser}>
-                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
-                      <FormControl>
-                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                          Email Address
-                        </FormLabel>
-                        <Input
-                          type="email"
-                          value={inviteEmail}
-                          onChange={(e) => setInviteEmail(e.target.value)}
-                          placeholder="Enter email address"
-                          required
-                          size="md"
-                        />
-                      </FormControl>
-                      
-                      <Button
-                        type="submit"
-                        colorScheme="blue"
-                        isLoading={inviting}
-                        loadingText="Sending..."
-                        disabled={!inviteEmail.trim()}
-                        size="md"
-                        h="40px"
-                      >
-                        Send Invitation
-                      </Button>
-                    </SimpleGrid>
-                  </form>
-                </>
-              ) : (
-                <Box>
-                  <Heading as="h3" size="md" color={titleColor}>
-                    Invite New Member
-                  </Heading>
-                  <Text color={subtitleColor} fontSize="sm">
-                    Only admins and owners can invite new members to the organization.
-                  </Text>
-                </Box>
-              )}
-
-              {error && (
-                <Alert status="error" borderRadius="md" mt={4}>
-                  <AlertIcon />
-                  {error}
-                </Alert>
-              )}
-
-              {success && (
-                <Alert status="success" borderRadius="md" mt={4}>
-                  <AlertIcon />
-                  <Box flex="1">
-                    <Text>{success}</Text>
-                    {success.includes('Copy and share this link:') && (
-                      <Button
-                        variant="outline"
-                        colorScheme="gray"
-                        size="sm"
-                        onClick={() => {
-                          const url = success.split('Copy and share this link: ')[1]
-                          navigator.clipboard.writeText(url)
-                          setSuccess('Link copied to clipboard!')
-                        }}
-                        ml={3}
-                        mt={2}
-                      >
-                        Copy Link
-                      </Button>
-                    )}
-                  </Box>
-                </Alert>
-              )}
-
-              {/* Pending Invitations */}
-              <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
-                <Heading as="h4" size="sm" color={textColor} mb={4}>
-                  Pending Invitations
+          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8} alignItems="start">
+            <VStack spacing={8} align="stretch">
+              {/* Team Members Section */}
+              <Box
+                bg={cardBg}
+                borderRadius="lg"
+                boxShadow="sm"
+                border="1px"
+                borderColor={cardBorderColor}
+                p={6}
+              >
+                <Heading as="h3" size="md" color={textColor} mb={5}>
+                  Team Members ({members.length})
                 </Heading>
-                
-                {invites.length === 0 ? (
-                  <Box textAlign="center" py={8}>
-                    <Text color={textMutedColor}>No pending invitations</Text>
-                  </Box>
-                ) : (
-                  <VStack spacing={3} align="stretch">
-                    {invites.map(invite => (
-                      <Box
-                        key={invite.id}
-                        bg={useColorModeValue('gray.50', 'gray.700')}
-                        borderRadius="md"
-                        border="1px"
-                        borderColor={cardBorderColor}
-                        p={4}
-                      >
-                        <Flex justify="space-between" align="center">
-                          <Box flex="1">
-                            <Text fontWeight="500" color={textColor} fontSize="md" mb={1}>
-                              {invite.email}
-                            </Text>
-                            <HStack spacing={3} fontSize="sm">
-                              <Text color={textMutedColor}>
-                                Sent {new Date(invite.created_at).toLocaleDateString()}
-                              </Text>
-                              <Badge
-                                colorScheme={
-                                  invite.status === 'pending' ? 'yellow' : 
-                                  invite.status === 'accepted' ? 'green' : 'red'
-                                }
-                                variant="subtle"
-                                textTransform="capitalize"
-                                fontSize="xs"
-                                px={2}
-                                py={1}
-                              >
-                                {invite.status}
-                              </Badge>
-                            </HStack>
-                          </Box>
-                          
-                          <HStack spacing={2}>
-                            <Button
-                              variant="outline"
-                              colorScheme="gray"
-                              size="sm"
-                              onClick={() => handleCopyInviteLink(invite.id)}
-                            >
-                              Copy Link
-                            </Button>
-                            {canManagePrimary && (
-                              <Button
-                                variant="outline"
-                                colorScheme="red"
-                                size="sm"
-                                onClick={() => handleCancelInvite(invite.id)}
-                              >
-                                Cancel
-                              </Button>
-                            )}
-                          </HStack>
-                        </Flex>
-                      </Box>
-                    ))}
-                  </VStack>
+                {roleError && (
+                  <Alert status="error" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    {roleError}
+                  </Alert>
                 )}
-              </Box>
-            </VStack>
-
-            {/* Instruments Section */}
-            <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
-            >
-              <Heading as="h3" size="md" color={textColor} mb={5}>
-                Instruments ({instruments.length})
-              </Heading>
-
-              {canManagePrimary ? (
-                <form onSubmit={handleSaveInstrument}>
-                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
-                    <FormControl>
-                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Name
-                      </FormLabel>
-                      <Input
-                        type="text"
-                        value={instrumentForm.name}
-                        onChange={e => setInstrumentForm(v => ({ ...v, name: e.target.value }))}
-                        placeholder="e.g. Acoustic Guitar"
-                        required
-                        size="md"
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Description (optional)
-                      </FormLabel>
-                      <Textarea
-                        value={instrumentForm.description}
-                        onChange={e => setInstrumentForm(v => ({ ...v, description: e.target.value }))}
-                        placeholder="Details or notes"
-                        size="md"
-                        rows={1}
-                      />
-                    </FormControl>
-                  </SimpleGrid>
-
-                  <HStack spacing={3} mb={4}>
-                    <Button
-                      type="submit"
-                      colorScheme="blue"
-                      isLoading={isSavingInstrument}
-                      loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
-                      disabled={!instrumentForm.name.trim()}
-                      size="md"
-                    >
-                      {editingInstrumentId ? 'Save Changes' : 'Add Instrument'}
-                    </Button>
-
-                    {editingInstrumentId && (
-                      <Button
-                        variant="outline"
-                        colorScheme="gray"
-                        onClick={handleCancelEditInstrument}
-                        size="md"
-                      >
-                        Cancel
-                      </Button>
-                    )}
-                  </HStack>
-                </form>
-              ) : (
-                <Text color={subtitleColor} fontSize="sm" mb={4}>
-                  Only admins and owners can manage instruments.
-                </Text>
-              )}
-
-              {instrumentError && (
-                <Alert status="error" borderRadius="md" mt={2}>
-                  <AlertIcon />
-                  {instrumentError}
-                </Alert>
-              )}
-
-              {instrumentSuccess && (
-                <Alert status="success" borderRadius="md" mt={2}>
-                  <AlertIcon />
-                  {instrumentSuccess}
-                </Alert>
-              )}
-
-              <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
-                {isLoadingInstruments ? (
-                  <HStack>
-                    <Spinner size="sm" />
-                    <Text color={textMutedColor}>Loading instruments...</Text>
-                  </HStack>
-                ) : instruments.length === 0 ? (
-                  <Box textAlign="center" py={4}>
-                    <Text color={textMutedColor}>No instruments added</Text>
+                {roleSuccess && (
+                  <Alert status="success" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    {roleSuccess}
+                  </Alert>
+                )}
+                
+                {members.length === 0 ? (
+                  <Box textAlign="center" py={8}>
+                    <Text color={textMutedColor}>No members found</Text>
+                    <Text fontSize="xs" color={textMutedColor} mt={2}>
+                      Debug: Members data: {JSON.stringify(members, null, 2)}
+                    </Text>
                   </Box>
                 ) : (
                   <VStack spacing={3} align="stretch">
-                    {instruments.map(instrument => (
+                    {members.map(member => (
                       <Box
-                        key={instrument.id}
+                        key={member.id}
                         bg={useColorModeValue('gray.50', 'gray.700')}
                         borderRadius="md"
                         border="1px"
@@ -1118,122 +801,456 @@ export function TeamManagement() {
                         <Flex justify="space-between" align="center">
                           <Box flex="1">
                             <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                              {instrument.name}
+                              {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
                             </Text>
-
-                            {instrument.description && (
-                              <Text color={textMutedColor} fontSize="sm">
-                                {instrument.description}
+                            <VStack spacing={0} align="start" fontSize="sm">
+                              <Text color={textMutedColor}>
+                                {member.profiles?.email || 'No email'}
                               </Text>
-                            )}
+                              <Text color={textMutedColor}>
+                                Joined {new Date(member.joined_at).toLocaleDateString()}
+                              </Text>
+                            </VStack>
                           </Box>
-
-                          <HStack spacing={2}>
-                            {canManagePrimary && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  colorScheme="gray"
-                                  size="sm"
-                                  onClick={() => handleEditInstrument(instrument)}
-                                >
-                                  Edit
-                                </Button>
-
-                                <Button
-                                  variant="outline"
-                                  colorScheme="red"
-                                  size="sm"
-                                  onClick={() => handleDeleteInstrument(instrument.id)}
-                                >
-                                  Delete
-                                </Button>
-                              </>
-                            )}
-                          </HStack>
+                          
+                          {isOwner && user && user.id !== member.user_id ? (
+                            <HStack spacing={2} align="center">
+                              <Select
+                                size="sm"
+                                value={member.role}
+                                onChange={e => handleChangeMemberRole(member, e.target.value as 'owner' | 'admin' | 'member')}
+                                isDisabled={roleChangingMemberId === member.id}
+                                minW="150px"
+                              >
+                                <option value="owner">Owner</option>
+                                <option value="admin">Admin</option>
+                                <option value="member">Member</option>
+                              </Select>
+                              {roleChangingMemberId === member.id && <Spinner size="sm" />}
+                            </HStack>
+                          ) : (
+                            <Badge
+                              colorScheme={
+                                member.role === 'owner' ? 'yellow' : 
+                                member.role === 'admin' ? 'blue' : 'gray'
+                              }
+                              variant="subtle"
+                              textTransform="capitalize"
+                              fontSize="xs"
+                              px={3}
+                              py={1}
+                            >
+                              {member.role}
+                            </Badge>
+                          )}
                         </Flex>
                       </Box>
                     ))}
                   </VStack>
                 )}
               </Box>
-            </Box>
 
-            {/* Join Requests Section */}
-            <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
-            >
-              <Heading as="h3" size="md" color={textColor} mb={5}>
-                Join Requests ({joinRequests.length})
-              </Heading>
+              {/* Instruments Section */}
+              <Box
+                bg={cardBg}
+                borderRadius="lg"
+                boxShadow="sm"
+                border="1px"
+                borderColor={cardBorderColor}
+                p={6}
+              >
+                <Heading as="h3" size="md" color={textColor} mb={5}>
+                  Instruments ({instruments.length})
+                </Heading>
 
-              {joinRequestError && (
-                <Alert status="error" borderRadius="md" mb={4}>
-                  <AlertIcon />
-                  {joinRequestError}
-                </Alert>
-              )}
+                {canManagePrimary ? (
+                  <form onSubmit={handleSaveInstrument}>
+                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
+                      <FormControl>
+                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                          Name
+                        </FormLabel>
+                        <Input
+                          type="text"
+                          value={instrumentForm.name}
+                          onChange={e => setInstrumentForm(v => ({ ...v, name: e.target.value }))}
+                          placeholder="e.g. Acoustic Guitar"
+                          required
+                          size="md"
+                        />
+                      </FormControl>
 
-              {joinRequestSuccess && (
-                <Alert status="success" borderRadius="md" mb={4}>
-                  <AlertIcon />
-                  {joinRequestSuccess}
-                </Alert>
-              )}
+                      <FormControl>
+                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                          Description (optional)
+                        </FormLabel>
+                        <Textarea
+                          value={instrumentForm.description}
+                          onChange={e => setInstrumentForm(v => ({ ...v, description: e.target.value }))}
+                          placeholder="Details or notes"
+                          size="md"
+                          rows={1}
+                        />
+                      </FormControl>
+                    </SimpleGrid>
 
-              {isLoadingJoinRequests ? (
-                <HStack>
-                  <Spinner size="sm" />
-                  <Text color={textMutedColor}>Loading join requests...</Text>
-                </HStack>
-              ) : joinRequests.length === 0 ? (
-                <Box textAlign="center" py={8}>
-                  <Text color={textMutedColor}>No pending join requests</Text>
-                </Box>
-              ) : (
-                <VStack spacing={3} align="stretch">
-                  {joinRequests.map(request => (
-                    <Box
-                      key={request.id}
-                      bg={useColorModeValue('gray.50', 'gray.700')}
-                      borderRadius="md"
-                      border="1px"
-                      borderColor={cardBorderColor}
-                      p={4}
-                    >
-                      <Flex justify="space-between" align="center">
-                        <Box flex="1">
-                          <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                            {request.profiles?.first_name || 'Unknown'} {request.profiles?.last_name || 'User'}
-                          </Text>
-                          <HStack spacing={4} fontSize="sm">
-                            <Text color={textMutedColor}>
-                              {request.profiles?.email || 'No email'}
-                            </Text>
-                            <Text color={textMutedColor}>
-                              Requested {new Date(request.created_at).toLocaleDateString()}
-                            </Text>
-                          </HStack>
-                        </Box>
-                        
+                    <HStack spacing={3} mb={4}>
+                      <Button
+                        type="submit"
+                        colorScheme="blue"
+                        isLoading={isSavingInstrument}
+                        loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
+                        disabled={!instrumentForm.name.trim()}
+                        size="md"
+                      >
+                        {editingInstrumentId ? 'Save Changes' : 'Add Instrument'}
+                      </Button>
+
+                      {editingInstrumentId && (
                         <Button
-                          colorScheme="green"
-                          size="sm"
-                          onClick={() => handleApproveJoinRequest(request.id, request.user_id)}
+                          variant="outline"
+                          colorScheme="gray"
+                          onClick={handleCancelEditInstrument}
+                          size="md"
                         >
-                          Approve
+                          Cancel
                         </Button>
-                      </Flex>
+                      )}
+                    </HStack>
+                  </form>
+                ) : (
+                  <Text color={subtitleColor} fontSize="sm" mb={4}>
+                    Only admins and owners can manage instruments.
+                  </Text>
+                )}
+
+                {instrumentError && (
+                  <Alert status="error" borderRadius="md" mt={2}>
+                    <AlertIcon />
+                    {instrumentError}
+                  </Alert>
+                )}
+
+                {instrumentSuccess && (
+                  <Alert status="success" borderRadius="md" mt={2}>
+                    <AlertIcon />
+                    {instrumentSuccess}
+                  </Alert>
+                )}
+
+                <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
+                  {isLoadingInstruments ? (
+                    <HStack>
+                      <Spinner size="sm" />
+                      <Text color={textMutedColor}>Loading instruments...</Text>
+                    </HStack>
+                  ) : instruments.length === 0 ? (
+                    <Box textAlign="center" py={4}>
+                      <Text color={textMutedColor}>No instruments added</Text>
                     </Box>
-                  ))}
+                  ) : (
+                    <VStack spacing={3} align="stretch">
+                      {instruments.map(instrument => (
+                        <Box
+                          key={instrument.id}
+                          bg={useColorModeValue('gray.50', 'gray.700')}
+                          borderRadius="md"
+                          border="1px"
+                          borderColor={cardBorderColor}
+                          p={4}
+                        >
+                          <Flex justify="space-between" align="center">
+                            <Box flex="1">
+                              <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
+                                {instrument.name}
+                              </Text>
+
+                              {instrument.description && (
+                                <Text color={textMutedColor} fontSize="sm">
+                                  {instrument.description}
+                                </Text>
+                              )}
+                            </Box>
+
+                            <HStack spacing={2}>
+                              {canManagePrimary && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    colorScheme="gray"
+                                    size="sm"
+                                    onClick={() => handleEditInstrument(instrument)}
+                                  >
+                                    Edit
+                                  </Button>
+
+                                  <Button
+                                    variant="outline"
+                                    colorScheme="red"
+                                    size="sm"
+                                    onClick={() => handleDeleteInstrument(instrument.id)}
+                                  >
+                                    Delete
+                                  </Button>
+                                </>
+                              )}
+                            </HStack>
+                          </Flex>
+                        </Box>
+                      ))}
+                    </VStack>
+                  )}
+                </Box>
+              </Box>
+            </VStack>
+
+            <VStack spacing={8} align="stretch">
+              {/* Invite New Member Section */}
+              <Box
+                bg={cardBg}
+                borderRadius="lg"
+                boxShadow="sm"
+                border="1px"
+                borderColor={cardBorderColor}
+                p={6}
+                alignSelf="start"
+              >
+                <VStack align="start" spacing={4}>
+                {canManagePrimary ? (
+                  <>
+                    <Heading as="h3" size="md" color={titleColor}>
+                      Invite New Member
+                    </Heading>
+                    <Text color={subtitleColor} fontSize="sm">
+                      Send an invitation to join your organization
+                    </Text>
+                    
+                    <form onSubmit={handleInviteUser}>
+                      <Grid templateColumns={{ base: '1fr', md: 'minmax(420px, 1fr) auto' }} gap={4} alignItems="end" mb={4}>
+                        <FormControl>
+                          <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                            Email Address
+                          </FormLabel>
+                          <Input
+                            type="email"
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                            placeholder="Enter email address"
+                            required
+                            size="md"
+                            h="40px"
+                          />
+                        </FormControl>
+
+                        <Button
+                          type="submit"
+                          colorScheme="blue"
+                          isLoading={inviting}
+                          loadingText="Sending..."
+                          disabled={!inviteEmail.trim()}
+                          size="md"
+                          h="40px"
+                          alignSelf={{ base: 'stretch', md: 'end' }}
+                        >
+                          Invite
+                        </Button>
+                      </Grid>
+                    </form>
+                  </>
+                ) : (
+                  <Box>
+                    <Heading as="h3" size="md" color={titleColor}>
+                      Invite New Member
+                    </Heading>
+                    <Text color={subtitleColor} fontSize="sm">
+                      Only admins and owners can invite new members to the organization.
+                    </Text>
+                  </Box>
+                )}
+
+                {error && (
+                  <Alert status="error" borderRadius="md" mt={4}>
+                    <AlertIcon />
+                    {error}
+                  </Alert>
+                )}
+
+                {success && (
+                  <Alert status="success" borderRadius="md" mt={4}>
+                    <AlertIcon />
+                    <Box flex="1">
+                      <Text>{success}</Text>
+                      {success.includes('Copy and share this link:') && (
+                        <Button
+                          variant="outline"
+                          colorScheme="gray"
+                          size="sm"
+                          onClick={() => {
+                            const url = success.split('Copy and share this link: ')[1]
+                            navigator.clipboard.writeText(url)
+                            setSuccess('Link copied to clipboard!')
+                          }}
+                          ml={3}
+                          mt={2}
+                        >
+                          Copy Link
+                        </Button>
+                      )}
+                    </Box>
+                  </Alert>
+                )}
+
+                {/* Pending Invitations */}
+                <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
+                  <Heading as="h4" size="sm" color={textColor} mb={4}>
+                    Pending Invitations
+                  </Heading>
+                  
+                  {invites.length === 0 ? (
+                    <Box textAlign="center" py={8}>
+                      <Text color={textMutedColor}>No pending invitations</Text>
+                    </Box>
+                  ) : (
+                    <VStack spacing={3} align="stretch">
+                      {invites.map(invite => (
+                        <Box
+                          key={invite.id}
+                          bg={useColorModeValue('gray.50', 'gray.700')}
+                          borderRadius="md"
+                          border="1px"
+                          borderColor={cardBorderColor}
+                          p={4}
+                        >
+                          <Flex justify="space-between" align="center">
+                            <Box flex="1">
+                              <Text fontWeight="500" color={textColor} fontSize="md" mb={1}>
+                                {invite.email}
+                              </Text>
+                              <HStack spacing={3} fontSize="sm">
+                                <Text color={textMutedColor}>
+                                  Sent {new Date(invite.created_at).toLocaleDateString()}
+                                </Text>
+                                <Badge
+                                  colorScheme={
+                                    invite.status === 'pending' ? 'yellow' : 
+                                    invite.status === 'accepted' ? 'green' : 'red'
+                                  }
+                                  variant="subtle"
+                                  textTransform="capitalize"
+                                  fontSize="xs"
+                                  px={2}
+                                  py={1}
+                                >
+                                  {invite.status}
+                                </Badge>
+                              </HStack>
+                            </Box>
+                            
+                            <HStack spacing={2}>
+                              <Button
+                                variant="outline"
+                                colorScheme="gray"
+                                size="sm"
+                                onClick={() => handleCopyInviteLink(invite.id)}
+                              >
+                                Copy Link
+                              </Button>
+                              {canManagePrimary && (
+                                <Button
+                                  variant="outline"
+                                  colorScheme="red"
+                                  size="sm"
+                                  onClick={() => handleCancelInvite(invite.id)}
+                                >
+                                  Cancel
+                                </Button>
+                              )}
+                            </HStack>
+                          </Flex>
+                        </Box>
+                      ))}
+                    </VStack>
+                  )}
+                </Box>
                 </VStack>
-              )}
-            </Box>
+              </Box>
+
+              {/* Join Requests Section */}
+              <Box
+                bg={cardBg}
+                borderRadius="lg"
+                boxShadow="sm"
+                border="1px"
+                borderColor={cardBorderColor}
+                p={6}
+              >
+                <Heading as="h3" size="md" color={textColor} mb={5}>
+                  Join Requests ({joinRequests.length})
+                </Heading>
+
+                {joinRequestError && (
+                  <Alert status="error" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    {joinRequestError}
+                  </Alert>
+                )}
+
+                {joinRequestSuccess && (
+                  <Alert status="success" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    {joinRequestSuccess}
+                  </Alert>
+                )}
+
+                {isLoadingJoinRequests ? (
+                  <HStack>
+                    <Spinner size="sm" />
+                    <Text color={textMutedColor}>Loading join requests...</Text>
+                  </HStack>
+                ) : joinRequests.length === 0 ? (
+                  <Box textAlign="center" py={8}>
+                    <Text color={textMutedColor}>No pending join requests</Text>
+                  </Box>
+                ) : (
+                  <VStack spacing={3} align="stretch">
+                    {joinRequests.map(request => (
+                      <Box
+                        key={request.id}
+                        bg={useColorModeValue('gray.50', 'gray.700')}
+                        borderRadius="md"
+                        border="1px"
+                        borderColor={cardBorderColor}
+                        p={4}
+                      >
+                        <Flex justify="space-between" align="center">
+                          <Box flex="1">
+                            <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
+                              {request.profiles?.first_name || 'Unknown'} {request.profiles?.last_name || 'User'}
+                            </Text>
+                            <HStack spacing={4} fontSize="sm">
+                              <Text color={textMutedColor}>
+                                {request.profiles?.email || 'No email'}
+                              </Text>
+                              <Text color={textMutedColor}>
+                                Requested {new Date(request.created_at).toLocaleDateString()}
+                              </Text>
+                            </HStack>
+                          </Box>
+                          
+                          <Button
+                            colorScheme="green"
+                            size="sm"
+                            onClick={() => handleApproveJoinRequest(request.id, request.user_id)}
+                          >
+                            Approve
+                          </Button>
+                        </Flex>
+                      </Box>
+                    ))}
+                  </VStack>
+                )}
+              </Box>
+            </VStack>
           </SimpleGrid>
         </Container>
       </Box>
