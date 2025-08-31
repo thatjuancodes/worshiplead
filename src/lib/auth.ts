@@ -286,6 +286,44 @@ export async function signIn({ email, password }: LoginData) {
   }
 }
 
+export async function signInWithGoogle() {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`
+      }
+    })
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    throw error
+  }
+}
+
+export async function signInWithGoogleFromVolunteer() {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.href
+      }
+    })
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    throw error
+  }
+}
+
 export async function signOut() {
   try {
     const { error } = await supabase.auth.signOut()
@@ -304,14 +342,11 @@ export async function getCurrentUser() {
   try {
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error) {
-      throw error
+      return null
     }
     return user
   } catch (error) {
-    if (error instanceof AuthError) {
-      throw new Error(getAuthErrorMessage(error.message))
-    }
-    throw error
+    return null
   }
 }
 
@@ -319,14 +354,11 @@ export async function getCurrentSession() {
   try {
     const { data: { session }, error } = await supabase.auth.getSession()
     if (error) {
-      throw error
+      return null
     }
     return session
   } catch (error) {
-    if (error instanceof AuthError) {
-      throw new Error(getAuthErrorMessage(error.message))
-    }
-    throw error
+    return null
   }
 }
 

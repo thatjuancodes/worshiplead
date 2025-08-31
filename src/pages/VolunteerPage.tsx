@@ -16,7 +16,7 @@ import {
   AlertIcon
 } from '@chakra-ui/react'
 import { supabase } from '../lib/supabase'
-import { getCurrentUser } from '../lib/auth'
+import { getCurrentUser, signInWithGoogleFromVolunteer } from '../lib/auth'
 
 interface OrganizationData {
   id: string
@@ -52,6 +52,7 @@ export function VolunteerPage() {
   const [loadingServices, setLoadingServices] = useState(false)
   const [userVolunteerAssignments, setUserVolunteerAssignments] = useState<VolunteerAssignment[]>([])
   const [assigningService, setAssigningService] = useState<string | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
 
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -266,43 +267,57 @@ export function VolunteerPage() {
     }
   }
 
-  // Check for existing auth session immediately
+  const handleGoogleSignIn = async () => {
+    if (!organization) return
+    
+    setGoogleLoading(true)
+    setError('')
+
+    try {
+      await signInWithGoogleFromVolunteer()
+      // The redirect will happen automatically via Supabase OAuth
+    } catch (error: any) {
+      setError(error.message || 'Failed to sign in with Google')
+      setGoogleLoading(false)
+    }
+  }
+
+  // Simple auth state listener
   useEffect(() => {
-    const checkExistingSession = async () => {
-      try {
-        console.log('Checking for existing auth session...')
-        const currentUser = await getCurrentUser()
-        if (currentUser) {
-          console.log('Found existing user:', currentUser.id)
-          setUser(currentUser)
-        } else {
-          console.log('No existing user found')
-        }
-      } catch (error) {
-        console.error('Error checking existing session:', error)
-      } finally {
-        console.log('Finished checking auth session')
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('VolunteerPage: Auth state change:', event, session?.user?.id)
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user)
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
+    })
+
+    // Check initial session
+    const checkInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
       }
     }
     
-    checkExistingSession()
+    checkInitialSession()
+    
+    return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
     if (publicUrl) {
-      console.log('Loading organization for publicUrl:', publicUrl)
       loadOrganization()
     }
   }, [publicUrl, loadOrganization])
 
   useEffect(() => {
-    console.log('Organization or user changed:', { organization: !!organization, user: !!user })
     if (organization && user) {
-      console.log('Loading services and assignments for authenticated user')
       loadAvailableServices()
       loadUserVolunteerAssignments()
     } else if (organization) {
-      console.log('Loading services for organization (no user yet)')
       loadAvailableServices()
     }
   }, [organization, user, loadAvailableServices, loadUserVolunteerAssignments])
@@ -373,16 +388,39 @@ export function VolunteerPage() {
                 Volunteer for {organization.name}
               </Heading>
               <Text color={textColor} textAlign="center">
-                Please log in to volunteer for services
+                Please sign in with Google to volunteer for services
               </Text>
-              <HStack spacing={4}>
-                <Button colorScheme="blue" onClick={() => navigate('/login')}>
-                  Log In
-                </Button>
-                <Button variant="outline" onClick={() => navigate('/signup')}>
-                  Sign Up
-                </Button>
-              </HStack>
+              
+              <Button
+                onClick={handleGoogleSignIn}
+                isLoading={googleLoading}
+                loadingText="Signing in..."
+                size="lg"
+                w="full"
+                colorScheme="blue"
+                leftIcon={
+                  <Box as="svg" viewBox="0 0 24 24" w={5} h={5}>
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
+                  </Box>
+                }
+              >
+                Continue with Google
+              </Button>
             </VStack>
           </Box>
         )}
