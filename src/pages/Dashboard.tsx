@@ -44,7 +44,6 @@ import { getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../l
 import { DashboardHeader } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { useAuth } from '../contexts'
-import type { User } from '@supabase/supabase-js'
 
 interface OrganizationData {
   organization_id: string
