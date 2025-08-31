@@ -17,6 +17,7 @@ import {
   FormControl,
   FormLabel,
   Input,
+  Textarea,
   Alert,
   AlertIcon,
   Badge,
@@ -60,6 +61,15 @@ interface OrganizationMember {
   } | null
 }
 
+interface Instrument {
+  id: string
+  organization_id: string
+  name: string
+  description: string | null
+  created_at: string
+  updated_at?: string
+}
+
 export function TeamManagement() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -71,6 +81,15 @@ export function TeamManagement() {
   const [inviting, setInviting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Instruments state
+  const [instruments, setInstruments] = useState<Instrument[]>([])
+  const [instrumentForm, setInstrumentForm] = useState({ name: '', description: '' })
+  const [editingInstrumentId, setEditingInstrumentId] = useState<string | null>(null)
+  const [isSavingInstrument, setIsSavingInstrument] = useState(false)
+  const [isLoadingInstruments, setIsLoadingInstruments] = useState(false)
+  const [instrumentError, setInstrumentError] = useState('')
+  const [instrumentSuccess, setInstrumentSuccess] = useState('')
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -199,6 +218,137 @@ export function TeamManagement() {
       loadMembers()
     }
   }, [organization, loadInvites, loadMembers])
+
+  const loadInstruments = useCallback(async () => {
+    if (!organization) return
+
+    try {
+      setIsLoadingInstruments(true)
+      const { data, error } = await supabase
+        .from('instruments')
+        .select('*')
+        .eq('organization_id', organization.organization_id)
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('Error loading instruments:', error)
+        setInstrumentError('Failed to load instruments')
+        return
+      }
+
+      setInstruments(data || [])
+    } catch (error) {
+      console.error('Error loading instruments:', error)
+      setInstrumentError('Failed to load instruments')
+    } finally {
+      setIsLoadingInstruments(false)
+    }
+  }, [organization])
+
+  useEffect(() => {
+    if (organization) loadInstruments()
+  }, [organization, loadInstruments])
+
+  async function handleSaveInstrument(e: React.FormEvent) {
+    e.preventDefault()
+    if (!organization) return
+    if (!instrumentForm.name.trim()) {
+      setInstrumentError('Name is required')
+      return
+    }
+
+    setIsSavingInstrument(true)
+    setInstrumentError('')
+    setInstrumentSuccess('')
+
+    try {
+      if (editingInstrumentId) {
+        const { error } = await supabase
+          .from('instruments')
+          .update({
+            name: instrumentForm.name.trim(),
+            description: instrumentForm.description.trim() || null,
+          })
+          .eq('id', editingInstrumentId)
+          .eq('organization_id', organization.organization_id)
+
+        if (error) {
+          console.error('Error updating instrument:', error)
+          setInstrumentError('Failed to update instrument')
+          return
+        }
+
+        setInstrumentSuccess('Instrument updated')
+      } else {
+        const { error } = await supabase
+          .from('instruments')
+          .insert({
+            organization_id: organization.organization_id,
+            name: instrumentForm.name.trim(),
+            description: instrumentForm.description.trim() || null,
+          })
+
+        if (error) {
+          console.error('Error creating instrument:', error)
+          setInstrumentError('Failed to create instrument')
+          return
+        }
+
+        setInstrumentSuccess('Instrument created')
+      }
+
+      setInstrumentForm({ name: '', description: '' })
+      setEditingInstrumentId(null)
+      await loadInstruments()
+    } catch (error) {
+      console.error('Error saving instrument:', error)
+      setInstrumentError('Failed to save instrument')
+    } finally {
+      setIsSavingInstrument(false)
+      setTimeout(() => setInstrumentSuccess(''), 2000)
+    }
+  }
+
+  async function handleEditInstrument(instrument: Instrument) {
+    setEditingInstrumentId(instrument.id)
+    setInstrumentForm({ name: instrument.name, description: instrument.description || '' })
+    setInstrumentError('')
+    setInstrumentSuccess('')
+  }
+
+  async function handleCancelEditInstrument() {
+    setEditingInstrumentId(null)
+    setInstrumentForm({ name: '', description: '' })
+    setInstrumentError('')
+    setInstrumentSuccess('')
+  }
+
+  async function handleDeleteInstrument(instrumentId: string) {
+    if (!organization) return
+    if (!confirm('Delete this instrument?')) return
+
+    try {
+      const { error } = await supabase
+        .from('instruments')
+        .delete()
+        .eq('id', instrumentId)
+        .eq('organization_id', organization.organization_id)
+
+      if (error) {
+        console.error('Error deleting instrument:', error)
+        setInstrumentError('Failed to delete instrument')
+        return
+      }
+
+      setInstrumentSuccess('Instrument deleted')
+      await loadInstruments()
+    } catch (error) {
+      console.error('Error deleting instrument:', error)
+      setInstrumentError('Failed to delete instrument')
+    } finally {
+      setTimeout(() => setInstrumentSuccess(''), 2000)
+    }
+  }
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -574,6 +724,149 @@ export function TeamManagement() {
                   ))}
                 </VStack>
               )}
+            </Box>
+
+            {/* Instruments Section */}
+            <Box
+              bg={cardBg}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
+              p={6}
+            >
+              <Heading as="h3" size="md" color={textColor} mb={5}>
+                Instruments ({instruments.length})
+              </Heading>
+
+              <form onSubmit={handleSaveInstrument}>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                      Name
+                    </FormLabel>
+                    <Input
+                      type="text"
+                      value={instrumentForm.name}
+                      onChange={e => setInstrumentForm(v => ({ ...v, name: e.target.value }))}
+                      placeholder="e.g. Acoustic Guitar"
+                      required
+                      size="md"
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
+                      Description (optional)
+                    </FormLabel>
+                    <Textarea
+                      value={instrumentForm.description}
+                      onChange={e => setInstrumentForm(v => ({ ...v, description: e.target.value }))}
+                      placeholder="Details or notes"
+                      size="md"
+                      rows={1}
+                    />
+                  </FormControl>
+                </SimpleGrid>
+
+                <HStack spacing={3} mb={4}>
+                  <Button
+                    type="submit"
+                    colorScheme="blue"
+                    isLoading={isSavingInstrument}
+                    loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
+                    disabled={!instrumentForm.name.trim()}
+                    size="md"
+                  >
+                    {editingInstrumentId ? 'Save Changes' : 'Add Instrument'}
+                  </Button>
+
+                  {editingInstrumentId && (
+                    <Button
+                      variant="outline"
+                      colorScheme="gray"
+                      onClick={handleCancelEditInstrument}
+                      size="md"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </HStack>
+              </form>
+
+              {instrumentError && (
+                <Alert status="error" borderRadius="md" mt={2}>
+                  <AlertIcon />
+                  {instrumentError}
+                </Alert>
+              )}
+
+              {instrumentSuccess && (
+                <Alert status="success" borderRadius="md" mt={2}>
+                  <AlertIcon />
+                  {instrumentSuccess}
+                </Alert>
+              )}
+
+              <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
+                {isLoadingInstruments ? (
+                  <HStack>
+                    <Spinner size="sm" />
+                    <Text color={textMutedColor}>Loading instruments...</Text>
+                  </HStack>
+                ) : instruments.length === 0 ? (
+                  <Box textAlign="center" py={4}>
+                    <Text color={textMutedColor}>No instruments added</Text>
+                  </Box>
+                ) : (
+                  <VStack spacing={3} align="stretch">
+                    {instruments.map(instrument => (
+                      <Box
+                        key={instrument.id}
+                        bg={useColorModeValue('gray.50', 'gray.700')}
+                        borderRadius="md"
+                        border="1px"
+                        borderColor={cardBorderColor}
+                        p={4}
+                      >
+                        <Flex justify="space-between" align="center">
+                          <Box flex="1">
+                            <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
+                              {instrument.name}
+                            </Text>
+
+                            {instrument.description && (
+                              <Text color={textMutedColor} fontSize="sm">
+                                {instrument.description}
+                              </Text>
+                            )}
+                          </Box>
+
+                          <HStack spacing={2}>
+                            <Button
+                              variant="outline"
+                              colorScheme="gray"
+                              size="sm"
+                              onClick={() => handleEditInstrument(instrument)}
+                            >
+                              Edit
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              colorScheme="red"
+                              size="sm"
+                              onClick={() => handleDeleteInstrument(instrument.id)}
+                            >
+                              Delete
+                            </Button>
+                          </HStack>
+                        </Flex>
+                      </Box>
+                    ))}
+                  </VStack>
+                )}
+              </Box>
             </Box>
           </SimpleGrid>
         </Container>
