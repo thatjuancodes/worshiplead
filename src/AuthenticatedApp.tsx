@@ -66,6 +66,10 @@ function AuthenticatedHome() {
       navigate('/onboarding', { replace: true })
       return null // Don't render anything while redirecting
     }
+    
+    // Authenticated users should go to dashboard, not homepage
+    navigate('/dashboard', { replace: true })
+    return null // Don't render anything while redirecting
   }
 
   return <HomePage />

@@ -718,7 +718,7 @@ export function Dashboard() {
       const serviceIds = volunteerRecords.map(record => record.worship_service_id)
       const { data: services, error: servicesError } = await supabase
         .from('worship_services')
-        .select('service_date')
+        .select('id, service_date')
         .in('id', serviceIds)
         .eq('organization_id', organization.organization_id)
 
@@ -734,6 +734,9 @@ export function Dashboard() {
         .filter(date => date) as string[]
 
       setUserVolunteerDates(dates)
+
+      // Ensure volunteer and instrument data is loaded for these upcoming services
+      if (serviceIds.length) await loadVolunteersForServices(serviceIds)
 
       // Find the next upcoming volunteer service and set calendar to that month
       if (dates.length > 0) {
@@ -772,7 +775,7 @@ export function Dashboard() {
       console.error('Error loading user volunteer dates:', error)
       setUserVolunteerDates([])
     }
-  }, [organization, user, displayYear, displayMonth])
+  }, [organization, user, displayYear, displayMonth, loadVolunteersForServices])
 
   const copyVolunteerLink = async () => {
     try {
@@ -1075,7 +1078,7 @@ export function Dashboard() {
                                   <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
                                     {service.title}
                                   </Text>
-                                  <HStack spacing={4} fontSize="sm">
+                                  <HStack spacing={4} fontSize="sm" flexWrap="wrap" align="center">
                                     <Text color={mutedTextColor}>
                                       {new Date(service.service_date).toLocaleDateString('en-US', {
                                         weekday: 'short',
@@ -1089,6 +1092,26 @@ export function Dashboard() {
                                         {service.service_time}
                                       </Text>
                                       )}
+                                    {(() => {
+                                      const volunteers = serviceIdToVolunteers[service.id] || []
+                                      const mine = volunteers.find(v => v.user_id === user?.id)
+                                      if (!mine) return null
+                                      const assignedIds = volunteerToInstrumentIds[mine.id] || []
+                                      if (!assignedIds.length) return null
+                                      const names = assignedIds
+                                        .map(id => instruments.find(i => i.id === id)?.name)
+                                        .filter((n): n is string => Boolean(n))
+                                      if (!names.length) return null
+                                      return (
+                                        <HStack spacing={2}>
+                                          {names.map(name => (
+                                            <Badge key={`${mine.id}-${name}`} colorScheme="blue" variant="subtle">
+                                              {name}
+                                            </Badge>
+                                          ))}
+                                        </HStack>
+                                      )
+                                    })()}
                                   </HStack>
                                 </Box>
                                 

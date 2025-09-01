@@ -99,6 +99,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   useEffect(() => {
+    // Set up proactive token refresh (refresh 5 minutes before expiry)
+    let refreshInterval: NodeJS.Timeout | null = null
+    
+    const setupTokenRefresh = (currentSession: Session) => {
+      if (refreshInterval) clearInterval(refreshInterval)
+      
+      if (currentSession?.expires_at) {
+        const expiresAt = currentSession.expires_at * 1000
+        const now = Date.now()
+        const refreshTime = expiresAt - now - (5 * 60 * 1000) // 5 minutes before expiry
+        
+        if (refreshTime > 0) {
+          refreshInterval = setTimeout(async () => {
+            try {
+              const { data, error } = await supabase.auth.refreshSession()
+              if (error) console.error('Token refresh failed:', error)
+              else if (data.session) setupTokenRefresh(data.session)
+            } catch (err) {
+              console.error('Error refreshing token:', err)
+            }
+          }, refreshTime)
+        }
+      }
+    }
+
     // Get initial session quickly from storage
     const getInitialSession = async () => {
       try {
@@ -107,6 +132,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         setSession(session)
         setUser(session?.user ?? null)
+
+        // Set up token refresh for initial session
+        if (session) setupTokenRefresh(session)
 
         // Do not block UI on profile fetch
         if (session?.user) fetchProfile(session.user.id).catch(() => {})
@@ -129,6 +157,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
           if (session?.user) fetchProfile(session.user.id).catch(() => {})
           else setProfile(null)
+
+          // Setup token refresh for new session
+          if (session) setupTokenRefresh(session)
+          else if (refreshInterval) clearInterval(refreshInterval)
         } catch (err) {
           console.error('Error handling auth state change:', err)
           setError(err instanceof Error ? err.message : 'Failed to handle authentication change')
@@ -138,6 +170,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return () => {
       subscription.unsubscribe()
+      if (refreshInterval) clearInterval(refreshInterval)
     }
   }, [])
 
