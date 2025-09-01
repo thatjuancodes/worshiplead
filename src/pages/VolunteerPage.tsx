@@ -9,12 +9,12 @@ import {
   Button,
   Spinner,
   Center,
-  Badge,
   useColorModeValue,
   useToast,
   Alert,
   AlertIcon
 } from '@chakra-ui/react'
+import { CheckIcon } from '@chakra-ui/icons'
 import { supabase } from '../lib/supabase'
 import { signInWithGoogleFromVolunteer, ensureUserProfileAndMembership } from '../lib/auth'
 
@@ -295,6 +295,10 @@ export function VolunteerPage() {
           if (organization) {
             await ensureUserProfileAndMembership(session.user, organization.id)
             console.log('User profile and membership ensured')
+            
+            // Reload services and assignments after successful auth
+            loadAvailableServices()
+            loadUserVolunteerAssignments()
           }
         } catch (error) {
           console.error('Error ensuring user profile and membership:', error)
@@ -341,11 +345,14 @@ export function VolunteerPage() {
   }, [publicUrl, loadOrganization])
 
   useEffect(() => {
-    if (organization && user) {
+    // Load services immediately when organization is available
+    if (organization) {
       loadAvailableServices()
-      loadUserVolunteerAssignments()
-    } else if (organization) {
-      loadAvailableServices()
+      
+      // Load user assignments only if user is authenticated
+      if (user) {
+        loadUserVolunteerAssignments()
+      }
     }
   }, [organization, user, loadAvailableServices, loadUserVolunteerAssignments])
 
@@ -393,15 +400,15 @@ export function VolunteerPage() {
   }
 
   return (
-    <Box minH="100vh" bg={bgColor} display="flex" alignItems="center" justifyContent="center">
-      <Box as="main" maxW="800px" mx="auto" p={{ base: 6, md: 8 }}>
+    <Box minH="100vh" bg={bgColor}>
+      <Box as="main" maxW="800px" mx="auto" p={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
         {/* Header */}
         {user && (
-          <VStack spacing={4} mb={8} mt={8} textAlign="center">
-            <Heading as="h1" size="xl" color={titleColor} fontWeight="600">
+          <VStack spacing={4} mb={{ base: 6, md: 8 }} mt={{ base: 4, md: 8 }} textAlign="center">
+            <Heading as="h1" size={{ base: "lg", md: "xl" }} color={titleColor} fontWeight="600">
               Volunteer for {organization.name}
             </Heading>
-            <Text color={subtitleColor} fontSize="lg">
+            <Text color={subtitleColor} fontSize={{ base: "md", md: "lg" }}>
               Choose a service to volunteer for
             </Text>
           </VStack>
@@ -409,12 +416,12 @@ export function VolunteerPage() {
 
         {/* Login Section */}
         {!user && (
-          <Box bg={cardBg} mb={6} p={6} borderRadius="lg">
+          <Box bg={cardBg} mb={6} p={{ base: 4, md: 6 }} borderRadius="lg">
             <VStack spacing={4}>
-              <Heading as="h1" size="lg" color={titleColor} fontWeight="600" textAlign="center">
+              <Heading as="h1" size={{ base: "md", md: "lg" }} color={titleColor} fontWeight="600" textAlign="center">
                 Volunteer for {organization.name}
               </Heading>
-              <Text color={textColor} textAlign="center">
+              <Text color={textColor} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
                 Please sign in with Google to volunteer for services
               </Text>
               
@@ -422,7 +429,7 @@ export function VolunteerPage() {
                 onClick={handleGoogleSignIn}
                 isLoading={googleLoading}
                 loadingText="Signing in..."
-                size="lg"
+                size={{ base: "md", md: "lg" }}
                 w="full"
                 colorScheme="blue"
                 leftIcon={
@@ -454,11 +461,7 @@ export function VolunteerPage() {
 
         {/* Services Section */}
         {user && (
-          <VStack spacing={6} align="stretch">
-            <Heading as="h2" size="lg" color={titleColor} fontWeight="600">
-              Available Services
-            </Heading>
-
+          <VStack spacing={6} align="stretch" pb={{ base: 24, md: 8 }}>
             {loadingServices ? (
               <Center py={8}>
                 <VStack spacing={3}>
@@ -467,13 +470,14 @@ export function VolunteerPage() {
                 </VStack>
               </Center>
             ) : availableServices.length === 0 ? (
-              <Box bg={cardBg} p={6} borderRadius="lg">
-                <Text color={subtitleColor} textAlign="center">
+              <Box bg={cardBg} p={{ base: 4, md: 6 }} borderRadius="lg">
+                <Text color={subtitleColor} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
                   No services available for volunteering at the moment
                 </Text>
               </Box>
             ) : (
-              availableServices.map(service => {
+              <VStack spacing={4} align="stretch">
+                {availableServices.map(service => {
                 const isAssigned = userVolunteerAssignments.some(
                   assignment => assignment.worship_service_id === service.id
                 )
@@ -481,77 +485,97 @@ export function VolunteerPage() {
                 return (
                   <Box
                     key={service.id}
-                    bg={cardBg}
-                    border="1px"
-                    borderColor={useColorModeValue('gray.200', 'gray.600')}
+                    bg={isAssigned ? useColorModeValue('green.50', 'green.900') : cardBg}
+                    border="2px"
+                    borderColor={isAssigned ? useColorModeValue('green.300', 'green.600') : useColorModeValue('gray.200', 'gray.600')}
                     borderRadius="lg"
-                    p={4}
+                    py={{ base: 6, md: 7 }}
+                    px={{ base: 4, md: 5 }}
+                    cursor={assigningService === service.id ? 'not-allowed' : 'pointer'}
+                    opacity={assigningService === service.id ? 0.6 : 1}
+                    onClick={() => assigningService !== service.id && toggleVolunteerStatus(service.id, isAssigned)}
+                    _hover={assigningService !== service.id ? {
+                      transform: 'translateY(-2px)',
+                      boxShadow: 'lg',
+                      borderColor: isAssigned ? useColorModeValue('green.400', 'green.500') : useColorModeValue('blue.300', 'blue.400')
+                    } : {}}
+                    transition="all 0.2s ease-in-out"
+                    position="relative"
                   >
+                    {assigningService === service.id && (
+                      <Box
+                        position="absolute"
+                        top="50%"
+                        left="50%"
+                        transform="translate(-50%, -50%)"
+                        zIndex={2}
+                      >
+                        <Spinner size="lg" color="blue.500" />
+                      </Box>
+                    )}
+                    
                     <HStack justify="space-between" align="center" w="100%">
-                      <HStack spacing={6} flex={1}>
-                        <HStack spacing={2} minW="140px">
-                          <Text color={textColor} fontWeight="500">
-                            {new Date(service.service_date).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </Text>
-                          
-                          {service.service_time && (
-                            <Text color={textColor} fontWeight="500">
-                              {new Date(`2000-01-01T${service.service_time}`).toLocaleTimeString('en-US', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                                hour12: true
-                              })}
-                            </Text>
-                          )}
-                        </HStack>
-                        
-                        <Text color={titleColor} fontWeight="600" flex={1}>
-                          {service.title}
-                        </Text>
-                      </HStack>
+                      <Text color={titleColor} fontWeight="700" fontSize={{ base: "lg", md: "xl" }} flex={1}>
+                        {new Date(service.service_date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                        {service.service_time && (
+                          ` ${new Date(`2000-01-01T${service.service_time}`).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}`
+                        )} - {service.title}
+                      </Text>
                       
-                      <HStack spacing={3}>
+                      {/* Check Circle */}
+                      <Box
+                        w="28px"
+                        h="28px"
+                        borderRadius="full"
+                        bg={isAssigned ? "green.500" : "transparent"}
+                        border={isAssigned ? "none" : "2px"}
+                        borderColor={useColorModeValue('gray.300', 'gray.600')}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        flexShrink={0}
+                      >
                         {isAssigned && (
-                          <Badge colorScheme="blue" size="sm">
-                            Assigned
-                          </Badge>
+                          <CheckIcon color="white" w={4} h={4} />
                         )}
-                        
-                        <Box
-                          as="input"
-                          type="checkbox"
-                          checked={isAssigned}
-                          onChange={() => toggleVolunteerStatus(service.id, isAssigned)}
-                          disabled={assigningService === service.id}
-                          opacity={assigningService === service.id ? 0.5 : 1}
-                          cursor={assigningService === service.id ? 'not-allowed' : 'pointer'}
-                          w="20px"
-                          h="20px"
-                          accentColor={useColorModeValue('blue.500', 'blue.300')}
-                          _disabled={{
-                            cursor: 'not-allowed',
-                            opacity: 0.5
-                          }}
-                        />
-                      </HStack>
+                      </Box>
                     </HStack>
                   </Box>
                 )
-              })
+                })}
+              </VStack>
             )}
 
-            <Button
-              size="md"
-              colorScheme="blue"
-              variant="outline"
-              onClick={() => navigate('/dashboard')}
+            <Box
+              position={{ base: "fixed", md: "static" }}
+              bottom={{ base: 4, md: "auto" }}
+              left={{ base: 4, md: "auto" }}
+              right={{ base: 4, md: "auto" }}
+              zIndex={10}
+              bg={{ base: useColorModeValue('white', 'gray.800'), md: "transparent" }}
+              pt={{ base: 4, md: 0 }}
+              borderTop={{ base: "1px", md: "none" }}
+              borderColor={{ base: useColorModeValue('gray.200', 'gray.700'), md: "transparent" }}
             >
-              View {organization.name} Dashboard
-            </Button>
+              <Button
+                size="lg"
+                colorScheme="blue"
+                onClick={() => navigate('/dashboard')}
+                w="full"
+                fontSize={{ base: "lg", md: "xl" }}
+                py={{ base: 6, md: 6 }}
+              >
+                View {organization.name} Dashboard
+              </Button>
+            </Box>
           </VStack>
         )}
       </Box>
