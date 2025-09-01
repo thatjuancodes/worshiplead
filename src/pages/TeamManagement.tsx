@@ -860,7 +860,7 @@ export function TeamManagement() {
                 p={6}
               >
                 <Heading as="h3" size="md" color={textColor} mb={5}>
-                  Instruments ({instruments.length})
+                  Roles ({instruments.length})
                 </Heading>
 
                 {canManagePrimary ? (
@@ -903,7 +903,7 @@ export function TeamManagement() {
                         disabled={!instrumentForm.name.trim()}
                         size="md"
                       >
-                        {editingInstrumentId ? 'Save Changes' : 'Add Instrument'}
+                        {editingInstrumentId ? 'Save Changes' : 'Add Role'}
                       </Button>
 
                       {editingInstrumentId && (
@@ -942,11 +942,11 @@ export function TeamManagement() {
                   {isLoadingInstruments ? (
                     <HStack>
                       <Spinner size="sm" />
-                      <Text color={textMutedColor}>Loading instruments...</Text>
+                      <Text color={textMutedColor}>Loading roles...</Text>
                     </HStack>
                   ) : instruments.length === 0 ? (
                     <Box textAlign="center" py={4}>
-                      <Text color={textMutedColor}>No instruments added</Text>
+                      <Text color={textMutedColor}>No roles added</Text>
                     </Box>
                   ) : (
                     <VStack spacing={3} align="stretch">

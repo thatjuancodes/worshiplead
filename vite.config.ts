@@ -11,6 +11,7 @@ export default defineConfig({
       https: 'https-browserify',
       url: 'url',
       zlib: 'browserify-zlib',
+      assert: 'assert',
       buffer: 'buffer',
       util: 'util',
       events: 'events',
