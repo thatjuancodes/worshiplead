@@ -35,10 +35,28 @@ import {
   useColorModeValue,
   useDisclosure,
   Center,
-  useToast
+  useToast,
+  Tooltip
 } from '@chakra-ui/react'
 import { CloseButton } from '@chakra-ui/react'
-import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons'
+import { ChevronLeftIcon, ChevronRightIcon, WarningTwoIcon, CloseIcon } from '@chakra-ui/icons'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { keyframes } from '@emotion/react'
 import { supabase } from '../lib/supabase'
 import { getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../lib/auth'
@@ -171,11 +189,27 @@ export function Dashboard() {
   // Songs data
   const [availableSongs, setAvailableSongs] = useState<Song[]>([])
   const [serviceIdToSongs, setServiceIdToSongs] = useState<Record<string, ServiceSong[]>>({})
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+  const [removingServiceSongId, setRemovingServiceSongId] = useState<string | null>(null)
   const [selectedSongByService, setSelectedSongByService] = useState<Record<string, string>>({})
   const [songNotesByService, setSongNotesByService] = useState<Record<string, string>>({})
   const [addingSongByService, setAddingSongByService] = useState<Record<string, boolean>>({})
   const [serviceErrorByService, setServiceErrorByService] = useState<Record<string, string>>({})
   const [serviceIdToVolunteers, setServiceIdToVolunteers] = useState<Record<string, Volunteer[]>>({})
+
+  // Enhanced Add Song inline search/create state
+  const [songSearchByService, setSongSearchByService] = useState<Record<string, string>>({})
+  const [showSongSuggestionsByService, setShowSongSuggestionsByService] = useState<Record<string, boolean>>({})
+  const [inlineCreateSongOpenByService, setInlineCreateSongOpenByService] = useState<Record<string, boolean>>({})
+  const [inlineCreateArtistByService, setInlineCreateArtistByService] = useState<Record<string, string>>({})
+  const [inlineCreateDescriptionByService, setInlineCreateDescriptionByService] = useState<Record<string, string>>({})
+  const [inlineCreatingSongByService, setInlineCreatingSongByService] = useState<Record<string, boolean>>({})
+  const [showAddSongFormByService, setShowAddSongFormByService] = useState<Record<string, boolean>>({})
 
   // Instruments and assignments
   const [instruments, setInstruments] = useState<Instrument[]>([])
@@ -241,6 +275,96 @@ export function Dashboard() {
       // ignore
     }
   }, [organization])
+
+  function SortableServiceSongItem({ serviceSong, canManage, onRemove }: { serviceSong: ServiceSong, canManage: boolean, onRemove: (id: string) => void }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: serviceSong.id })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.6 : 1,
+    }
+
+    const cardBgLocal = useColorModeValue('gray.50', 'gray.700')
+    const textColorLocal = useColorModeValue('gray.800', 'white')
+    const textMutedLocal = useColorModeValue('gray.500', 'gray.400')
+
+    return (
+      <Box
+        ref={setNodeRef}
+        style={style}
+        bg={cardBgLocal}
+        border="1px"
+        borderColor={cardBorderColor}
+        borderRadius="md"
+        p={3}
+        display="flex"
+        alignItems="center"
+        gap={3}
+        transition="all 0.2s ease"
+        _hover={{ borderColor: useColorModeValue('gray.300', 'gray.500') }}
+        cursor={canManage ? 'grab' : 'default'}
+        userSelect="none"
+        {...attributes}
+      >
+        <Box
+          bg="blue.500"
+          color="white"
+          borderRadius="full"
+          w={7}
+          h={7}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          fontWeight="600"
+          fontSize="xs"
+          flexShrink={0}
+          position="relative"
+          {...(canManage ? listeners : {})}
+        >
+          {serviceSong.position}
+        </Box>
+
+        <Box flex="1" minW="0" cursor={canManage ? 'grab' : 'default'} {...(canManage ? listeners : {})}>
+          <Text fontWeight="600" color={textColorLocal} fontSize="sm" mb={0} noOfLines={1}>
+            {serviceSong.songs.title} - {serviceSong.songs.artist}
+          </Text>
+          {serviceSong.notes && (
+            <Text color={textMutedLocal} fontSize="xs" fontStyle="italic" noOfLines={2}>
+              {serviceSong.notes}
+            </Text>
+          )}
+        </Box>
+
+        {canManage && (
+          <Tooltip label="Remove song from service">
+            <IconButton
+              aria-label="Remove song from service"
+              icon={removingServiceSongId === serviceSong.id ? <Spinner size="xs" /> : <CloseIcon boxSize="3" />}
+              variant="ghost"
+              colorScheme="gray"
+              size="sm"
+              opacity={0.5}
+              _hover={{ opacity: 1, bg: useColorModeValue('gray.200', 'gray.600') }}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onRemove(serviceSong.id)
+              }}
+              isDisabled={removingServiceSongId === serviceSong.id}
+            />
+          </Tooltip>
+        )}
+      </Box>
+    )
+  }
 
   async function handleCreateServiceSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -386,6 +510,60 @@ export function Dashboard() {
       // ignore
     }
   }, [organization])
+
+  const handleRemoveServiceSong = useCallback(async (serviceSongId: string, serviceId: string) => {
+    try {
+      setRemovingServiceSongId(serviceSongId)
+      const { error } = await supabase
+        .from('service_songs')
+        .delete()
+        .eq('id', serviceSongId)
+
+      if (error) return
+      await loadSongsForServices([serviceId])
+    } catch {
+      // ignore
+    } finally {
+      setRemovingServiceSongId(null)
+    }
+  }, [loadSongsForServices])
+
+  const handleReorderServiceSongs = useCallback(async (serviceId: string, event: DragEndEvent) => {
+    const songs = serviceIdToSongs[serviceId] || []
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = songs.findIndex(s => s.id === String(active.id))
+    const newIndex = songs.findIndex(s => s.id === String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reordered = arrayMove(songs, oldIndex, newIndex).map((s, idx) => ({ ...s, position: idx + 1 }))
+    setServiceIdToSongs(prev => ({ ...prev, [serviceId]: reordered }))
+
+    try {
+      // two-phase update to avoid unique conflicts
+      for (let i = 0; i < reordered.length; i++) {
+        const song = reordered[i]
+        const tempPos = -(i + 1)
+        const { error } = await supabase
+          .from('service_songs')
+          .update({ position: tempPos })
+          .eq('id', song.id)
+        if (error) return
+      }
+      for (let i = 0; i < reordered.length; i++) {
+        const song = reordered[i]
+        const finalPos = i + 1
+        const { error } = await supabase
+          .from('service_songs')
+          .update({ position: finalPos })
+          .eq('id', song.id)
+        if (error) return
+      }
+    } catch {
+      // ignore
+    }
+  }, [serviceIdToSongs])
 
   const loadVolunteersForServices = useCallback(async (serviceIds: string[]) => {
     if (!organization || serviceIds.length === 0) return
@@ -748,8 +926,13 @@ export function Dashboard() {
 
       setUserVolunteerDates(dates)
 
-      // Ensure volunteer and instrument data is loaded for these upcoming services
-      if (serviceIds.length) await loadVolunteersForServices(serviceIds)
+      // Ensure volunteer, instrument, and song data is loaded for these services
+      if (serviceIds.length) {
+        await Promise.all([
+          loadVolunteersForServices(serviceIds),
+          loadSongsForServices(serviceIds)
+        ])
+      }
 
       // Find the next upcoming volunteer service and set calendar to that month
       if (dates.length > 0) {
@@ -956,7 +1139,7 @@ export function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('worship_services')
-        .select('id, service_date')
+        .select('id, service_date, service_time, title')
         .eq('organization_id', organization.organization_id)
 
       if (error) {
@@ -993,6 +1176,21 @@ export function Dashboard() {
   function getRankColor(index: number) {
     return rankColors[index] || 'blue.100'
   }
+  const addSongPulse = keyframes`
+    0% { box-shadow: 0 0 0 0 rgba(49, 130, 206, 0.45) }
+    70% { box-shadow: 0 0 0 10px rgba(49, 130, 206, 0) }
+    100% { box-shadow: 0 0 0 0 rgba(49, 130, 206, 0) }
+  `
+  const mobileTextSx = {
+    '@media (max-width: 48em)': {
+      '& .chakra-text': { fontSize: 'lg' },
+      '& .chakra-heading': { fontSize: 'xl' },
+      '& .chakra-button': { fontSize: 'md' },
+      '& .chakra-badge': { fontSize: 'sm' },
+      '& .chakra-input, & .chakra-select, & .chakra-textarea': { fontSize: 'md' },
+      '& .chakra-icon': { width: '1.1em', height: '1.1em' }
+    }
+  }
   // Removed unused activity styles after replacing Recent Activity with Songs
 
   if (authLoading) {
@@ -1023,10 +1221,10 @@ export function Dashboard() {
   }
 
   return (
-    <Box minH="100vh" bg={bgColor}>
+    <Box minH="100vh" bg={bgColor} sx={mobileTextSx}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }} pb={{ base: '200px', md: 8 }} sx={mobileTextSx}>
         {/* Dashboard Content */}
         <VStack spacing={8}>
           {/* Main Content Grid */}
@@ -1091,44 +1289,72 @@ export function Dashboard() {
                             >
                               <HStack justify="space-between" align="center">
                                 <Box flex="1">
-                                  <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                                    {service.title}
-                                  </Text>
-                                  <HStack spacing={4} fontSize="sm" flexWrap="wrap" align="center">
-                                    <Text color={mutedTextColor}>
-                                      {new Date(service.service_date).toLocaleDateString('en-US', {
-                                        weekday: 'short',
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                      })}
-                                    </Text>
-                                    {service.service_time && (
-                                      <Text color={mutedTextColor}>
-                                        {service.service_time}
+                                  {(() => {
+                                    const dateStr = new Date(service.service_date).toLocaleDateString('en-US', {
+                                      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+                                    })
+                                    const timePart = service.service_time ? (() => {
+                                      const [hStr, mStr] = service.service_time.split(':')
+                                      const hours = parseInt(hStr || '', 10)
+                                      const minutes = parseInt(mStr || '', 10)
+                                      if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
+                                      const d = new Date()
+                                      d.setHours(hours, minutes, 0, 0)
+                                      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                    })() : ''
+                                    const titleLine = `${dateStr}${timePart ? ` ${timePart}` : ''} - ${service.title}`
+                                    return (
+                                      <Text fontWeight={{ base: '700', md: '600' }} color={textColor} fontSize={{ base: 'lg', md: 'md' }} mb={2}>
+                                        {titleLine}
                                       </Text>
-                                      )}
-                                    {(() => {
-                                      const volunteers = serviceIdToVolunteers[service.id] || []
-                                      const mine = volunteers.find(v => v.user_id === user?.id)
-                                      if (!mine) return null
-                                      const assignedIds = volunteerToInstrumentIds[mine.id] || []
-                                      if (!assignedIds.length) return null
-                                      const names = assignedIds
-                                        .map(id => instruments.find(i => i.id === id)?.name)
-                                        .filter((n): n is string => Boolean(n))
-                                      if (!names.length) return null
-                                      return (
-                                        <HStack spacing={2}>
-                                          {names.map(name => (
-                                            <Badge key={`${mine.id}-${name}`} colorScheme="blue" variant="subtle">
-                                              {name}
-                                            </Badge>
-                                          ))}
-                                        </HStack>
-                                      )
-                                    })()}
-                                  </HStack>
+                                    )
+                                  })()}
+
+                                  {(() => {
+                                    const volunteers = serviceIdToVolunteers[service.id] || []
+                                    const mine = volunteers.find(v => v.user_id === user?.id)
+                                    const assignedIds = mine ? (volunteerToInstrumentIds[mine.id] || []) : []
+                                    const names = assignedIds
+                                      .map(id => instruments.find(i => i.id === id)?.name)
+                                      .filter((n): n is string => Boolean(n))
+                                    const songs = serviceIdToSongs[service.id] || []
+
+                                    if (!(names.length || songs.length === 0)) return null
+
+                                    return (
+                                      <HStack spacing={2} mb={2} align="center" flexWrap="wrap">
+                                        {names.map(name => (
+                                          <Badge
+                                            key={`${service.id}-${name}`}
+                                            colorScheme="blue"
+                                            variant="subtle"
+                                            fontSize="xs"
+                                            px={2}
+                                            py={0.5}
+                                            borderRadius="md"
+                                          >
+                                            {name}
+                                          </Badge>
+                                        ))}
+                                        {songs.length === 0 && (
+                                          <Badge
+                                            colorScheme="yellow"
+                                            variant="subtle"
+                                            display="inline-flex"
+                                            alignItems="center"
+                                            gap={1}
+                                            fontSize="xs"
+                                            px={2}
+                                            py={0.5}
+                                            borderRadius="md"
+                                          >
+                                            <WarningTwoIcon boxSize="3" />
+                                            No songs assigned yet
+                                          </Badge>
+                                        )}
+                                      </HStack>
+                                    )
+                                  })()}
                                 </Box>
                                 
                                 <Box
@@ -1155,6 +1381,7 @@ export function Dashboard() {
                   p={{ base: 5, md: 6 }}
                   boxShadow="sm"
                   w="100%"
+                  display={{ base: "none", md: "block" }}
                 >
                   <Heading
                     as="h3"
@@ -1249,11 +1476,18 @@ export function Dashboard() {
             <VStack spacing={6} align="stretch">
               {/* Volunteer Link Section */}
               <Box
-                bg={cardBg}
-                borderRadius="xl"
-                p={{ base: 5, md: 6 }}
-                boxShadow="sm"
-                w="100%"
+                bg={{ base: useColorModeValue('white', 'gray.800'), md: cardBg }}
+                borderRadius={{ base: '0', md: 'xl' }}
+                p={{ base: 4, md: 6 }}
+                boxShadow={{ base: 'lg', md: 'sm' }}
+                w={{ base: '100%', md: '100%' }}
+                position={{ base: 'fixed', md: 'static' }}
+                bottom={{ base: 0, md: 'auto' }}
+                left={{ base: 0, md: 'auto' }}
+                right={{ base: 0, md: 'auto' }}
+                zIndex={{ base: 1000, md: 'auto' }}
+                borderTop={{ base: '1px', md: 'none' }}
+                borderColor={{ base: 'gray.200', md: 'transparent' }}
               >
                 <Heading
                   as="h3"
@@ -1265,7 +1499,7 @@ export function Dashboard() {
                   Volunteer Link
                 </Heading>
                 
-                <Text color={subtitleColor} fontSize="sm" mb={4}>
+                <Text color={subtitleColor} fontSize="sm" mb={4} display={{ base: 'none', md: 'block' }}>
                   Share this link with potential volunteers to let them sign up for services
                 </Text>
 
@@ -1309,6 +1543,7 @@ export function Dashboard() {
                 p={{ base: 5, md: 6 }}
                 boxShadow="sm"
                 w="100%"
+                display={{ base: "none", md: "block" }}
               >
                 <Heading
                     as="h3"
@@ -1426,14 +1661,29 @@ export function Dashboard() {
           {/* Create Service Drawer */}
           <Drawer isOpen={createDrawer.isOpen} placement="right" onClose={createDrawer.onClose} size="lg">
             <DrawerOverlay />
-            <DrawerContent>
-              <DrawerCloseButton />
+            <DrawerContent sx={mobileTextSx}>
+              <DrawerCloseButton display={{ base: 'none', md: 'inline-flex' }} />
               <DrawerHeader>
-                {selectedDate && dayServices.length > 0
-                  ? `${new Date(selectedDate).toLocaleDateString('en-US', {
-                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                    })} - Services`
-                  : 'Schedule New Service'}
+                <HStack justify="space-between" align="center">
+                  <Text m={0} fontWeight="800" fontSize={{ base: 'xl', md: 'lg' }}>
+                    {selectedDate && dayServices.length > 0
+                      ? `${new Date(selectedDate).toLocaleDateString('en-US', {
+                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                        })}`
+                      : 'Schedule New Service'}
+                  </Text>
+                  <IconButton
+                    aria-label="Close drawer"
+                    icon={<CloseIcon boxSize="4" />}
+                    variant="solid"
+                    colorScheme="gray"
+                    size="md"
+                    borderRadius="md"
+                    display={{ base: 'inline-flex', md: 'none' }}
+                    onClick={createDrawer.onClose}
+                    h="auto"
+                  />
+                </HStack>
               </DrawerHeader>
               <DrawerBody>
                 {selectedDate && !isAddingServiceMode && (
@@ -1454,16 +1704,40 @@ export function Dashboard() {
                           {dayServices.map((svc, idx) => (
                             <AccordionItem
                               key={svc.id}
-                              borderColor={cardBorderColor}
+                              border="none"
+                              borderRadius="lg"
+                              overflow="hidden"
+                              mt={3}
                               mb={3}
+                              bg={useColorModeValue('gray.50', 'gray.700')}
+                              boxShadow="sm"
                               ref={idx === 0 ? firstServiceRef : undefined}
                             >
                               <h2>
-                                <AccordionButton>
+                                <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor}>
                                   <Box as="span" flex='1' textAlign='left'>
-                                    <Text m={0} fontWeight="600" fontSize="lg">
-                                      {(svc.service_time ? svc.service_time : 'All day') + ' - ' + svc.title}
-                  </Text>
+                                    {(() => {
+                                      const timePart = svc.service_time ? (() => {
+                                        const [hStr, mStr] = svc.service_time.split(':')
+                                        const hours = parseInt(hStr || '', 10)
+                                        const minutes = parseInt(mStr || '', 10)
+                                        if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
+                                        const d = new Date()
+                                        d.setHours(hours, minutes, 0, 0)
+                                        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                      })() : 'All day'
+                                      const statusLabel = svc.status.charAt(0).toUpperCase() + svc.status.slice(1)
+                                      return (
+                                        <HStack spacing={3} align="center">
+                                          <Text m={0} fontWeight="800" fontSize="lg" color="blue.800">
+                                            {`${timePart} - ${svc.title}`}
+                                          </Text>
+                                          <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
+                                            {statusLabel}
+                                          </Badge>
+                                        </HStack>
+                                      )
+                                    })()}
                                   </Box>
                                   <AccordionIcon />
                                 </AccordionButton>
@@ -1475,47 +1749,211 @@ export function Dashboard() {
                                       {svc.description && (
                                         <Text color={mutedTextColor} whiteSpace="pre-wrap" fontSize="md">{svc.description}</Text>
                                       )}
-                                      <HStack>
-                                        <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
-                                          {svc.status}
-                                        </Badge>
-                                        <Button size="sm" variant="outline" onClick={() => navigate(`/service/${svc.id}`)}>
-                                          Open Full Page
-                                        </Button>
-                                      </HStack>
                                     </VStack>
                                   </Box>
 
                                   <Box>
-                                    <Text fontWeight="700" mb={2} fontSize="md">Songs</Text>
+                                    <Text fontWeight="700" mb={2} fontSize="lg">Songs</Text>
                                     {(serviceIdToSongs[svc.id] || []).length === 0 ? (
                                       <Text color={mutedTextColor}>No songs added yet</Text>
                                     ) : (
-                                      <VStack spacing={2} align="stretch">
-                                        {(serviceIdToSongs[svc.id] || []).map(songRow => (
-                                          <Box
-                                            key={songRow.id}
-                                            border="1px"
-                                            borderColor={cardBorderColor}
-                                            borderRadius="lg"
-                                            p={4}
+                                      <DndContext
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        onDragEnd={(event) => handleReorderServiceSongs(svc.id, event)}
+                                      >
+                                        <SortableContext
+                                          items={(serviceIdToSongs[svc.id] || []).map(row => row.id)}
+                                          strategy={verticalListSortingStrategy}
+                                        >
+                                          <VStack spacing={2} align="stretch">
+                                            {(serviceIdToSongs[svc.id] || []).map(songRow => (
+                                              <SortableServiceSongItem
+                                                key={songRow.id}
+                                                serviceSong={songRow}
+                                                canManage={canManagePrimary}
+                                                onRemove={(id) => handleRemoveServiceSong(id, svc.id)}
+                                              />
+                                            ))}
+                                          </VStack>
+                                        </SortableContext>
+                                      </DndContext>
+                                    )}
+                                    {canManagePrimary && (
+                                      <Box mt={3}>
+                                        {!showAddSongFormByService[svc.id] && (
+                                          <Button
+                                            variant="outline"
+                                            colorScheme="blue"
+                                            w="100%"
+                                            borderWidth="1px"
+                                            onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: true }))}
+                                            animation={`${addSongPulse} 2.5s ease-out infinite`}
                                           >
-                                            <Text fontWeight="600" fontSize="md">{songRow.songs.title} - {songRow.songs.artist}</Text>
-                                            {songRow.notes && (
-                                              <Text color={mutedTextColor} fontSize="sm">{songRow.notes}</Text>
+                                            Add song
+                                          </Button>
+                                        )}
+                                        {showAddSongFormByService[svc.id] && (
+                                          <VStack spacing={3} align="stretch">
+                                            {serviceErrorByService[svc.id] && (
+                                              <Alert status="error" borderRadius="md" mb={0}>
+                                                <AlertIcon />
+                                                {serviceErrorByService[svc.id]}
+                                              </Alert>
                                             )}
-                                          </Box>
-                                        ))}
-                                      </VStack>
+                                            <Box>
+                                              <Input
+                                                type="text"
+                                                placeholder="Type to search songs..."
+                                                size="md"
+                                                value={songSearchByService[svc.id] || ''}
+                                                onChange={(e) => {
+                                                  const value = e.target.value
+                                                  setSongSearchByService(prev => ({ ...prev, [svc.id]: value }))
+                                                  setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: value.trim().length > 0 }))
+                                                  setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: false }))
+                                                  setSelectedSongByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                }}
+                                              />
+                                              {showSongSuggestionsByService[svc.id] && !inlineCreateSongOpenByService[svc.id] && (
+                                                <Box mt={2} border="1px" borderColor={cardBorderColor} borderRadius="md" overflow="hidden">
+                                                  {(() => {
+                                                    const q = (songSearchByService[svc.id] || '').trim().toLowerCase()
+                                                    const matches = q
+                                                      ? availableSongs.filter(s => `${s.title} ${s.artist}`.toLowerCase().includes(q)).slice(0, 6)
+                                                      : []
+                                                    if (!matches.length) {
+                                                      return (
+                                                        <Button variant="ghost" w="100%" justifyContent="flex-start" onClick={() => setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: true }))}>
+                                                          Add new song
+                                                        </Button>
+                                                      )
+                                                    }
+                                                    return (
+                                                      <VStack align="stretch" spacing={0}>
+                                                        {matches.map(s => (
+                                                          <Button
+                                                            key={s.id}
+                                                            variant="ghost"
+                                                            justifyContent="flex-start"
+                                                            onClick={() => {
+                                                              setSelectedSongByService(prev => ({ ...prev, [svc.id]: s.id }))
+                                                              setSongSearchByService(prev => ({ ...prev, [svc.id]: `${s.title} - ${s.artist}` }))
+                                                              setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: false }))
+                                                            }}
+                                                          >
+                                                            {s.title} - {s.artist}
+                                                          </Button>
+                                                        ))}
+                                                        <Button variant="ghost" justifyContent="flex-start" onClick={() => setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: true }))}>
+                                                          Add new song
+                                                        </Button>
+                                                      </VStack>
+                                                    )
+                                                  })()}
+                                                </Box>
+                                              )}
+                                            </Box>
+
+                                            {inlineCreateSongOpenByService[svc.id] && (
+                                              <VStack spacing={3} align="stretch">
+                                                <Input
+                                                  type="text"
+                                                  placeholder="Artist"
+                                                  size="md"
+                                                  value={inlineCreateArtistByService[svc.id] || ''}
+                                                  onChange={(e) => setInlineCreateArtistByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                                />
+                                                <Textarea
+                                                  placeholder="Description"
+                                                  size="md"
+                                                  value={inlineCreateDescriptionByService[svc.id] || ''}
+                                                  onChange={(e) => setInlineCreateDescriptionByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                                />
+                                                <HStack justify="flex-end">
+                                                  <Button variant="outline" onClick={() => setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: false }))}>Cancel</Button>
+                                                  <Button
+                                                    colorScheme="blue"
+                                                    isLoading={!!inlineCreatingSongByService[svc.id]}
+                                                    onClick={async () => {
+                                                      if (!organization) return
+                                                      const title = (songSearchByService[svc.id] || '').trim()
+                                                      const artist = (inlineCreateArtistByService[svc.id] || '').trim()
+                                                      const description = (inlineCreateDescriptionByService[svc.id] || '').trim()
+                                                      if (!title || !artist) {
+                                                        setServiceErrorByService(prev => ({ ...prev, [svc.id]: 'Title and Artist are required.' }))
+                                                        return
+                                                      }
+                                                      try {
+                                                        setInlineCreatingSongByService(prev => ({ ...prev, [svc.id]: true }))
+                                                        setServiceErrorByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                        const { data: created, error } = await supabase
+                                                          .from('songs')
+                                                          .insert({
+                                                            organization_id: organization.organization_id,
+                                                            title,
+                                                            artist,
+                                                            lyrics: description || null,
+                                                            created_by: user?.id || null
+                                                          })
+                                                          .select()
+                                                          .single()
+                                                        if (error) {
+                                                          setServiceErrorByService(prev => ({ ...prev, [svc.id]: 'Failed to create song. Please try again.' }))
+                                                          return
+                                                        }
+                                                        setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: false }))
+                                                        setInlineCreateArtistByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                        setInlineCreateDescriptionByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                        await loadAvailableSongs()
+                                                        if (created) {
+                                                          setSelectedSongByService(prev => ({ ...prev, [svc.id]: created.id }))
+                                                          setSongSearchByService(prev => ({ ...prev, [svc.id]: `${created.title} - ${created.artist}` }))
+                                                        }
+                                                        setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: false }))
+                                                      } finally {
+                                                        setInlineCreatingSongByService(prev => ({ ...prev, [svc.id]: false }))
+                                                      }
+                                                    }}
+                                                  >
+                                                    Create song
+                                                  </Button>
+                                                </HStack>
+                                              </VStack>
+                                            )}
+
+                                            <Input
+                                              type="text"
+                                              placeholder="Notes (optional)"
+                                              size="md"
+                                              value={songNotesByService[svc.id] || ''}
+                                              onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                            />
+                                            <HStack>
+                                              <Button
+                                                size="md"
+                                                colorScheme="blue"
+                                                onClick={() => handleAddSongToService(svc.id)}
+                                                isLoading={!!addingSongByService[svc.id]}
+                                                loadingText="Adding..."
+                                                isDisabled={!selectedSongByService[svc.id]}
+                                              >
+                                                Add Song
+                                              </Button>
+                                              <Button variant="outline" onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: false }))}>Cancel</Button>
+                                            </HStack>
+                                          </VStack>
+                                        )}
+                                      </Box>
                                     )}
                                   </Box>
 
                                   <Box>
-                                    <Text fontWeight="700" mb={2} fontSize="md">Volunteers</Text>
+                                    <Text fontWeight="700" mb={2} mt={2} fontSize="lg">Volunteers</Text>
                                     {(serviceIdToVolunteers[svc.id] || []).length === 0 ? (
-                                      <Text color={mutedTextColor}>No volunteers yet</Text>
+                                      <Text color={mutedTextColor} mb={3}>No volunteers yet</Text>
                                     ) : (
-                                      <VStack spacing={2} align="stretch">
+                                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} alignItems="stretch" mb={3}>
                                         {(serviceIdToVolunteers[svc.id] || []).map(volunteer => (
                                           <Box
                                             key={volunteer.id}
@@ -1523,8 +1961,9 @@ export function Dashboard() {
                                             borderColor={cardBorderColor}
                                             borderRadius="lg"
                                             p={3}
+                                            h="100%"
                                           >
-                                            <VStack align="stretch" spacing={1}>
+                                            <VStack align="stretch" spacing={1} h="100%">
                                               <HStack spacing={2} align="center">
                                                 <Text fontWeight="600" fontSize="sm" m={0}>
                                                   {volunteer.profiles.first_name} {volunteer.profiles.last_name}
@@ -1570,12 +2009,9 @@ export function Dashboard() {
                                                   )
                                                 }).filter(Boolean)}
                                               </HStack>
-                                              <Text color={mutedTextColor} fontSize="xs" m={0}>
-                                                {volunteer.profiles.email}
-                                              </Text>
                                               <HStack spacing={2} align="center" mt={2}>
                                                 <Select
-                                                  placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign instrument'}
+                                                  placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign role'}
                                                   size="sm"
                                                   value={selectedInstrumentByVolunteer[volunteer.id] || ''}
                                                   onChange={async (e) => {
@@ -1600,52 +2036,14 @@ export function Dashboard() {
                                             </VStack>
                                           </Box>
                                         ))}
-                                      </VStack>
+                                      </SimpleGrid>
                                     )}
+                                    <Button size="md" w="100%" colorScheme="gray" onClick={() => navigate(`/service/${svc.id}`)}>
+                                      Open Full Page
+                                    </Button>
                                   </Box>
 
-                                  {canManagePrimary && (
-                                    <Box>
-                                      <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
-                                      {serviceErrorByService[svc.id] && (
-                                        <Alert status="error" borderRadius="md" mb={3}>
-                                          <AlertIcon />
-                                          {serviceErrorByService[svc.id]}
-                                        </Alert>
-                                      )}
-                                      <VStack spacing={3} align="stretch">
-                                        <Select
-                                          placeholder="Choose a song..."
-                                          value={selectedSongByService[svc.id] || ''}
-                                          onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                          size="md"
-                                        >
-                                          {availableSongs.map(song => (
-                                            <option key={song.id} value={song.id}>
-                                              {song.title} - {song.artist}
-                                            </option>
-                                          ))}
-                                        </Select>
-                                        <Input
-                                          type="text"
-                                          placeholder="Notes (optional)"
-                                          size="md"
-                                          value={songNotesByService[svc.id] || ''}
-                                          onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                        />
-                                        <Button
-                                          size="md"
-                                          colorScheme="blue"
-                                          onClick={() => handleAddSongToService(svc.id)}
-                                          isLoading={!!addingSongByService[svc.id]}
-                                          loadingText="Adding..."
-                                          isDisabled={!availableSongs.length}
-                                        >
-                                          Add Song
-                                        </Button>
-                                      </VStack>
-                                    </Box>
-                                  )}
+                                  {/* Moved Add Song into Songs section above */}
                                 </VStack>
                               </AccordionPanel>
                             </AccordionItem>
@@ -1664,17 +2062,41 @@ export function Dashboard() {
                           {dayServices.map((svc, idx) => (
                             <AccordionItem
                               key={svc.id}
-                              borderColor={cardBorderColor}
+                              border="none"
+                              borderRadius="lg"
+                              overflow="hidden"
+                              mt={3}
                               mb={3}
+                              bg={useColorModeValue('gray.50', 'gray.700')}
+                              boxShadow="sm"
                               ref={idx === 0 ? firstServiceRef : undefined}
                             >
                               <h2>
-                                <AccordionButton>
+                                <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor}>
                                   <Box as="span" flex='1' textAlign='left'>
-                                    <Text m={0} fontWeight="600" fontSize="lg">
-                                      {(svc.service_time ? svc.service_time : 'All day') + ' - ' + svc.title}
-                  </Text>
-                </Box>
+                                    {(() => {
+                                      const timePart = svc.service_time ? (() => {
+                                        const [hStr, mStr] = svc.service_time.split(':')
+                                        const hours = parseInt(hStr || '', 10)
+                                        const minutes = parseInt(mStr || '', 10)
+                                        if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
+                                        const d = new Date()
+                                        d.setHours(hours, minutes, 0, 0)
+                                        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                      })() : 'All day'
+                                      const statusLabel = svc.status.charAt(0).toUpperCase() + svc.status.slice(1)
+                                      return (
+                                        <HStack spacing={3} align="center">
+                                          <Text m={0} fontWeight="600" fontSize="lg">
+                                            {`${timePart} - ${svc.title}`}
+                                          </Text>
+                                          <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
+                                            {statusLabel}
+                                          </Badge>
+                                        </HStack>
+                                      )
+                                    })()}
+                                  </Box>
                                   <AccordionIcon />
                                 </AccordionButton>
                               </h2>
@@ -1685,47 +2107,212 @@ export function Dashboard() {
                                       {svc.description && (
                                         <Text color={mutedTextColor} whiteSpace="pre-wrap" fontSize="md">{svc.description}</Text>
                                       )}
-                                      <HStack>
-                                        <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
-                                          {svc.status}
-                                        </Badge>
-                                        <Button size="sm" variant="outline" onClick={() => navigate(`/service/${svc.id}`)}>
-                                          Open Full Page
-                                        </Button>
-              </HStack>
-            </VStack>
-          </Box>
+                                    </VStack>
+                                  </Box>
 
                                   <Box>
-                                    <Text fontWeight="700" mb={2} fontSize="md">Songs</Text>
+                                    <Text fontWeight="800" mb={2} fontSize="lg">Songs</Text>
                                     {(serviceIdToSongs[svc.id] || []).length === 0 ? (
                                       <Text color={mutedTextColor}>No songs added yet</Text>
                                     ) : (
-                                      <VStack spacing={2} align="stretch">
-                                        {(serviceIdToSongs[svc.id] || []).map(songRow => (
-                                          <Box
-                                            key={songRow.id}
-                                            border="1px"
-                                            borderColor={cardBorderColor}
-                                            borderRadius="lg"
-                                            p={4}
+                                      <DndContext
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        onDragEnd={(event) => handleReorderServiceSongs(svc.id, event)}
+                                      >
+                                        <SortableContext
+                                          items={(serviceIdToSongs[svc.id] || []).map(row => row.id)}
+                                          strategy={verticalListSortingStrategy}
+                                        >
+                                          <VStack spacing={2} align="stretch">
+                                            {(serviceIdToSongs[svc.id] || []).map(songRow => (
+                                              <SortableServiceSongItem
+                                                key={songRow.id}
+                                                serviceSong={songRow}
+                                                canManage={canManagePrimary}
+                                                onRemove={(id) => handleRemoveServiceSong(id, svc.id)}
+                                              />
+                                            ))}
+                                          </VStack>
+                                        </SortableContext>
+                                      </DndContext>
+                                    )}
+
+                                    {canManagePrimary && (
+                                      <Box mt={3}>
+                                        {!showAddSongFormByService[svc.id] && (
+                                          <Button
+                                            variant="outline"
+                                            colorScheme="blue"
+                                            w="100%"
+                                            borderWidth="1px"
+                                            onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: true }))}
+                                            animation={`${addSongPulse} 2.5s ease-out infinite`}
                                           >
-                                            <Text fontWeight="600" fontSize="md">{songRow.songs.title} - {songRow.songs.artist}</Text>
-                                            {songRow.notes && (
-                                              <Text color={mutedTextColor} fontSize="sm">{songRow.notes}</Text>
+                                            Add song
+                                          </Button>
+                                        )}
+                                        {showAddSongFormByService[svc.id] && (
+                                          <VStack spacing={3} align="stretch">
+                                            {serviceErrorByService[svc.id] && (
+                                              <Alert status="error" borderRadius="md" mb={0}>
+                                                <AlertIcon />
+                                                {serviceErrorByService[svc.id]}
+                                              </Alert>
                                             )}
-                                          </Box>
-                                        ))}
-                                      </VStack>
+                                            <Box>
+                                              <Input
+                                                type="text"
+                                                placeholder="Type to search songs..."
+                                                size="md"
+                                                value={songSearchByService[svc.id] || ''}
+                                                onChange={(e) => {
+                                                  const value = e.target.value
+                                                  setSongSearchByService(prev => ({ ...prev, [svc.id]: value }))
+                                                  setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: value.trim().length > 0 }))
+                                                  setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: false }))
+                                                  setSelectedSongByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                }}
+                                              />
+                                              {showSongSuggestionsByService[svc.id] && !inlineCreateSongOpenByService[svc.id] && (
+                                                <Box mt={2} border="1px" borderColor={cardBorderColor} borderRadius="md" overflow="hidden">
+                                                  {(() => {
+                                                    const q = (songSearchByService[svc.id] || '').trim().toLowerCase()
+                                                    const matches = q
+                                                      ? availableSongs.filter(s => `${s.title} ${s.artist}`.toLowerCase().includes(q)).slice(0, 6)
+                                                      : []
+                                                    if (!matches.length) {
+                                                      return (
+                                                        <Button variant="ghost" w="100%" justifyContent="flex-start" onClick={() => setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: true }))}>
+                                                          Add new song
+                                                        </Button>
+                                                      )
+                                                    }
+                                                    return (
+                                                      <VStack align="stretch" spacing={0}>
+                                                        {matches.map(s => (
+                                                          <Button
+                                                            key={s.id}
+                                                            variant="ghost"
+                                                            justifyContent="flex-start"
+                                                            onClick={() => {
+                                                              setSelectedSongByService(prev => ({ ...prev, [svc.id]: s.id }))
+                                                              setSongSearchByService(prev => ({ ...prev, [svc.id]: `${s.title} - ${s.artist}` }))
+                                                              setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: false }))
+                                                            }}
+                                                          >
+                                                            {s.title} - {s.artist}
+                                                          </Button>
+                                                        ))}
+                                                        <Button variant="ghost" justifyContent="flex-start" onClick={() => setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: true }))}>
+                                                          Add new song
+                                                        </Button>
+                                                      </VStack>
+                                                    )
+                                                  })()}
+                                                </Box>
+                                              )}
+                                            </Box>
+
+                                            {inlineCreateSongOpenByService[svc.id] && (
+                                              <VStack spacing={3} align="stretch">
+                                                <Input
+                                                  type="text"
+                                                  placeholder="Artist"
+                                                  size="md"
+                                                  value={inlineCreateArtistByService[svc.id] || ''}
+                                                  onChange={(e) => setInlineCreateArtistByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                                />
+                                                <Textarea
+                                                  placeholder="Description"
+                                                  size="md"
+                                                  value={inlineCreateDescriptionByService[svc.id] || ''}
+                                                  onChange={(e) => setInlineCreateDescriptionByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                                />
+                                                <HStack justify="flex-end">
+                                                  <Button variant="outline" onClick={() => setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: false }))}>Cancel</Button>
+                                                  <Button
+                                                    colorScheme="blue"
+                                                    isLoading={!!inlineCreatingSongByService[svc.id]}
+                                                    onClick={async () => {
+                                                      if (!organization) return
+                                                      const title = (songSearchByService[svc.id] || '').trim()
+                                                      const artist = (inlineCreateArtistByService[svc.id] || '').trim()
+                                                      const description = (inlineCreateDescriptionByService[svc.id] || '').trim()
+                                                      if (!title || !artist) {
+                                                        setServiceErrorByService(prev => ({ ...prev, [svc.id]: 'Title and Artist are required.' }))
+                                                        return
+                                                      }
+                                                      try {
+                                                        setInlineCreatingSongByService(prev => ({ ...prev, [svc.id]: true }))
+                                                        setServiceErrorByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                        const { data: created, error } = await supabase
+                                                          .from('songs')
+                                                          .insert({
+                                                            organization_id: organization.organization_id,
+                                                            title,
+                                                            artist,
+                                                            lyrics: description || null,
+                                                            created_by: user?.id || null
+                                                          })
+                                                          .select()
+                                                          .single()
+                                                        if (error) {
+                                                          setServiceErrorByService(prev => ({ ...prev, [svc.id]: 'Failed to create song. Please try again.' }))
+                                                          return
+                                                        }
+                                                        setInlineCreateSongOpenByService(prev => ({ ...prev, [svc.id]: false }))
+                                                        setInlineCreateArtistByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                        setInlineCreateDescriptionByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                        await loadAvailableSongs()
+                                                        if (created) {
+                                                          setSelectedSongByService(prev => ({ ...prev, [svc.id]: created.id }))
+                                                          setSongSearchByService(prev => ({ ...prev, [svc.id]: `${created.title} - ${created.artist}` }))
+                                                        }
+                                                        setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: false }))
+                                                      } finally {
+                                                        setInlineCreatingSongByService(prev => ({ ...prev, [svc.id]: false }))
+                                                      }
+                                                    }}
+                                                  >
+                                                    Create song
+                                                  </Button>
+                                                </HStack>
+                                              </VStack>
+                                            )}
+
+                                            <Input
+                                              type="text"
+                                              placeholder="Notes (optional)"
+                                              size="md"
+                                              value={songNotesByService[svc.id] || ''}
+                                              onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                                            />
+                                            <HStack>
+                                              <Button
+                                                size="md"
+                                                colorScheme="blue"
+                                                onClick={() => handleAddSongToService(svc.id)}
+                                                isLoading={!!addingSongByService[svc.id]}
+                                                loadingText="Adding..."
+                                                isDisabled={!selectedSongByService[svc.id]}
+                                              >
+                                                Add Song
+                                              </Button>
+                                              <Button variant="outline" onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: false }))}>Cancel</Button>
+                                            </HStack>
+                                          </VStack>
+                                        )}
+                                      </Box>
                                     )}
                                   </Box>
 
                                   <Box>
-                                    <Text fontWeight="700" mb={2} fontSize="md">Volunteers</Text>
+                                    <Text fontWeight="800" mb={2} fontSize="lg">Volunteers</Text>
                                     {(serviceIdToVolunteers[svc.id] || []).length === 0 ? (
-                                      <Text color={mutedTextColor}>No volunteers yet</Text>
+                                      <Text color={mutedTextColor} mb={3}>No volunteers yet</Text>
                                     ) : (
-                                      <VStack spacing={2} align="stretch">
+                                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} alignItems="stretch" mb={3}>
                                         {(serviceIdToVolunteers[svc.id] || []).map(volunteer => (
                                           <Box
                                             key={volunteer.id}
@@ -1733,8 +2320,9 @@ export function Dashboard() {
                                             borderColor={cardBorderColor}
                                             borderRadius="lg"
                                             p={3}
+                                            h="100%"
                                           >
-                                            <VStack align="stretch" spacing={1}>
+                                            <VStack align="stretch" spacing={1} h="100%">
                                               <HStack spacing={2} align="center">
                                                 <Text fontWeight="600" fontSize="sm" m={0}>
                                                   {volunteer.profiles.first_name} {volunteer.profiles.last_name}
@@ -1780,9 +2368,6 @@ export function Dashboard() {
                                                   )
                                                 }).filter(Boolean)}
                                               </HStack>
-                                              <Text color={mutedTextColor} fontSize="xs" m={0}>
-                                                {volunteer.profiles.email}
-                                              </Text>
                                               <HStack spacing={2} align="center" mt={2}>
                                                 <Select
                                                   placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign instrument'}
@@ -1807,52 +2392,14 @@ export function Dashboard() {
                                             </VStack>
                                           </Box>
                                         ))}
-                                      </VStack>
+                                      </SimpleGrid>
                                     )}
+                                    <Button size="md" w="100%" colorScheme="gray" onClick={() => navigate(`/service/${svc.id}`)}>
+                                      Open Full Page
+                                    </Button>
                                   </Box>
 
-                                  {canManagePrimary && (
-                                    <Box>
-                                      <Text fontWeight="700" mb={2} fontSize="md">Add Song</Text>
-                                      {serviceErrorByService[svc.id] && (
-                                        <Alert status="error" borderRadius="md" mb={3}>
-                                          <AlertIcon />
-                                          {serviceErrorByService[svc.id]}
-                                        </Alert>
-                                      )}
-                                      <VStack spacing={3} align="stretch">
-                                        <Select
-                                          placeholder="Choose a song..."
-                                          value={selectedSongByService[svc.id] || ''}
-                                          onChange={(e) => setSelectedSongByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                          size="md"
-                                        >
-                                          {availableSongs.map(song => (
-                                            <option key={song.id} value={song.id}>
-                                              {song.title} - {song.artist}
-                                            </option>
-                                          ))}
-                                        </Select>
-                                        <Input
-                                          type="text"
-                                          placeholder="Notes (optional)"
-                                          size="md"
-                                          value={songNotesByService[svc.id] || ''}
-                                          onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
-                                        />
-                                        <Button
-                                          size="md"
-                                          colorScheme="blue"
-                                          onClick={() => handleAddSongToService(svc.id)}
-                                          isLoading={!!addingSongByService[svc.id]}
-                                          loadingText="Adding..."
-                                          isDisabled={!availableSongs.length}
-                                        >
-                                          Add Song
-                                        </Button>
-                                      </VStack>
-                                    </Box>
-                                  )}
+                                  {/* Moved Add Song into Songs section above */}
                                 </VStack>
                               </AccordionPanel>
                             </AccordionItem>
@@ -1940,11 +2487,11 @@ export function Dashboard() {
                 <DrawerFooter>
                   <HStack w="100%" justify="space-between">
                     {canManagePrimary && (
-                      <Button variant="outline" onClick={() => setIsAddingServiceMode(true)}>
+                      <Button display={{ base: 'none', md: 'inline-flex' }} variant="outline" onClick={() => setIsAddingServiceMode(true)}>
                         Add Service
                       </Button>
                     )}
-                    <Button colorScheme="blue" onClick={createDrawer.onClose}>
+                    <Button display={{ base: 'none', md: 'inline-flex' }} colorScheme="blue" onClick={createDrawer.onClose}>
                       Close
                     </Button>
                   </HStack>
@@ -1956,9 +2503,24 @@ export function Dashboard() {
           {/* Add Song Drawer */}
           <Drawer isOpen={addSongDrawer.isOpen} placement="right" onClose={addSongDrawer.onClose} size="lg">
             <DrawerOverlay />
-            <DrawerContent>
+            <DrawerContent sx={mobileTextSx}>
               <DrawerCloseButton />
-              <DrawerHeader>Add New Song</DrawerHeader>
+              <DrawerHeader>
+                <HStack justify="space-between" align="center">
+                  <Text m={0} fontWeight="800" fontSize={{ base: 'xl', md: 'lg' }}>Add New Song</Text>
+                  <IconButton
+                    aria-label="Close drawer"
+                    icon={<CloseIcon boxSize="4" />}
+                    variant="solid"
+                    colorScheme="gray"
+                    size="md"
+                    borderRadius="md"
+                    display={{ base: 'inline-flex', md: 'none' }}
+                    onClick={addSongDrawer.onClose}
+                    h="auto"
+                  />
+                </HStack>
+              </DrawerHeader>
               <DrawerBody>
                 {songError && (
                   <Alert status="error" borderRadius="md" mb={4}>
