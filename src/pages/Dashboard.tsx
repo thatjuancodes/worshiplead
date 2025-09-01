@@ -198,7 +198,7 @@ export function Dashboard() {
   const [removingServiceSongId, setRemovingServiceSongId] = useState<string | null>(null)
   const [selectedSongByService, setSelectedSongByService] = useState<Record<string, string>>({})
   const [songNotesByService, setSongNotesByService] = useState<Record<string, string>>({})
-  const [addingSongByService, setAddingSongByService] = useState<Record<string, boolean>>({})
+  const [, setAddingSongByService] = useState<Record<string, boolean>>({})
   const [serviceErrorByService, setServiceErrorByService] = useState<Record<string, string>>({})
   const [serviceIdToVolunteers, setServiceIdToVolunteers] = useState<Record<string, Volunteer[]>>({})
 
