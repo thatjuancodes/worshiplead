@@ -18,6 +18,24 @@ import { CheckIcon } from '@chakra-ui/icons'
 import { supabase } from '../lib/supabase'
 import { signInWithGoogleFromVolunteer, ensureUserProfileAndMembership } from '../lib/auth'
 
+// Module-level cache to persist across component remounts
+const cache = new Map<string, {
+  organization: OrganizationData | null
+  services: WorshipService[]
+  assignments: VolunteerAssignment[]
+  loaded: {
+    organization: boolean
+    services: boolean
+    assignments: boolean
+  }
+}>()
+
+// Clear cache function for debugging
+;(window as any).clearVolunteerCache = () => {
+  cache.clear()
+  console.log('Volunteer cache cleared')
+}
+
 interface OrganizationData {
   id: string
   name: string
@@ -45,24 +63,39 @@ export function VolunteerPage() {
   const navigate = useNavigate()
   const toast = useToast()
   
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `volunteer-${publicUrl}`
+  const cached = cache.get(cacheKey)
+  
+  const [loading, setLoading] = useState(!cached?.loaded.organization)
   const [user, setUser] = useState<any>(null)
-  const [organization, setOrganization] = useState<OrganizationData | null>(null)
-  const [availableServices, setAvailableServices] = useState<WorshipService[]>([])
+  const [organization, setOrganization] = useState<OrganizationData | null>(cached?.organization || null)
+  const [availableServices, setAvailableServices] = useState<WorshipService[]>(cached?.services || [])
   const [loadingServices, setLoadingServices] = useState(false)
-  const [userVolunteerAssignments, setUserVolunteerAssignments] = useState<VolunteerAssignment[]>([])
+  const [userVolunteerAssignments, setUserVolunteerAssignments] = useState<VolunteerAssignment[]>(cached?.assignments || [])
   const [assigningService, setAssigningService] = useState<string | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
+  const [organizationLoaded, setOrganizationLoaded] = useState(cached?.loaded.organization || false)
+  const [servicesLoaded, setServicesLoaded] = useState(cached?.loaded.services || false)
+  const [assignmentsLoaded, setAssignmentsLoaded] = useState(cached?.loaded.assignments || false)
 
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
   const titleColor = useColorModeValue('gray.800', 'white')
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
   const textColor = useColorModeValue('gray.700', 'gray.200')
+  const greenBg = useColorModeValue('green.50', 'green.900')
+  const greenBorder = useColorModeValue('green.300', 'green.600')
+  const grayBorder = useColorModeValue('gray.200', 'gray.600')
+  const greenHover = useColorModeValue('green.400', 'green.500')
+  const blueHover = useColorModeValue('blue.300', 'blue.400')
+  const grayCheckBorder = useColorModeValue('gray.300', 'gray.600')
+  const whiteCardBg = useColorModeValue('white', 'gray.800')
+  const grayBorderTop = useColorModeValue('gray.200', 'gray.700')
 
   const loadOrganization = useCallback(async () => {
     if (!publicUrl) return
+    if (organizationLoaded) return
     
     try {
       setLoading(true)
@@ -95,6 +128,11 @@ export function VolunteerPage() {
       if (orgData && typeof orgData === 'object' && 'id' in orgData) {
         console.log('Found organization:', orgData.name)
         setOrganization(orgData as OrganizationData)
+        setOrganizationLoaded(true)
+        
+        // Update cache
+        const current = cache.get(cacheKey) || { organization: null, services: [], assignments: [], loaded: { organization: false, services: false, assignments: false } }
+        cache.set(cacheKey, { ...current, organization: orgData as OrganizationData, loaded: { ...current.loaded, organization: true } })
       } else {
         console.error('Invalid organization data structure:', orgData)
         setError('Invalid organization data')
@@ -112,6 +150,7 @@ export function VolunteerPage() {
 
   const loadAvailableServices = useCallback(async () => {
     if (!organization) return
+    if (servicesLoaded) return
     
     try {
       setLoadingServices(true)
@@ -130,6 +169,11 @@ export function VolunteerPage() {
       }
 
       setAvailableServices(services || [])
+      setServicesLoaded(true)
+      
+      // Update cache
+      const current = cache.get(cacheKey) || { organization: null, services: [], assignments: [], loaded: { organization: false, services: false, assignments: false } }
+      cache.set(cacheKey, { ...current, services: services || [], loaded: { ...current.loaded, services: true } })
     } catch (err) {
       console.error('Unexpected error loading services:', err)
     } finally {
@@ -139,6 +183,7 @@ export function VolunteerPage() {
 
   const loadUserVolunteerAssignments = useCallback(async () => {
     if (!user || !organization) return
+    if (assignmentsLoaded) return
     
     try {
       // First, ensure user is a member of this organization
@@ -183,6 +228,11 @@ export function VolunteerPage() {
       }
 
       setUserVolunteerAssignments(assignments || [])
+      setAssignmentsLoaded(true)
+      
+      // Update cache
+      const current = cache.get(cacheKey) || { organization: null, services: [], assignments: [], loaded: { organization: false, services: false, assignments: false } }
+      cache.set(cacheKey, { ...current, assignments: assignments || [], loaded: { ...current.loaded, assignments: true } })
     } catch (err) {
       console.error('Unexpected error loading volunteer assignments:', err)
     }
@@ -251,7 +301,16 @@ export function VolunteerPage() {
         })
       }
 
-      // Refresh assignments
+      // Refresh assignments by clearing cache and reloading
+      setAssignmentsLoaded(false)
+      setUserVolunteerAssignments([])
+      
+      // Clear cache for assignments
+      const current = cache.get(cacheKey)
+      if (current) {
+        cache.set(cacheKey, { ...current, assignments: [], loaded: { ...current.loaded, assignments: false } })
+      }
+      
       await loadUserVolunteerAssignments()
     } catch (err) {
       console.error('Unexpected error toggling volunteer status:', err)
@@ -336,13 +395,13 @@ export function VolunteerPage() {
     checkInitialSession()
     
     return () => subscription.unsubscribe()
-  }, [organization, toast])
+  }, [toast])
 
   useEffect(() => {
     if (publicUrl) {
       loadOrganization()
     }
-  }, [publicUrl, loadOrganization])
+  }, [publicUrl])
 
   useEffect(() => {
     // Load services immediately when organization is available
@@ -354,7 +413,7 @@ export function VolunteerPage() {
         loadUserVolunteerAssignments()
       }
     }
-  }, [organization, user, loadAvailableServices, loadUserVolunteerAssignments])
+  }, [organization, user])
 
   // Only show loading spinner if we're still loading the organization
   if (loading && !organization) {
@@ -485,9 +544,9 @@ export function VolunteerPage() {
                 return (
                   <Box
                     key={service.id}
-                    bg={isAssigned ? useColorModeValue('green.50', 'green.900') : cardBg}
+                    bg={isAssigned ? greenBg : cardBg}
                     border="2px"
-                    borderColor={isAssigned ? useColorModeValue('green.300', 'green.600') : useColorModeValue('gray.200', 'gray.600')}
+                    borderColor={isAssigned ? greenBorder : grayBorder}
                     borderRadius="lg"
                     py={{ base: 6, md: 7 }}
                     px={{ base: 4, md: 5 }}
@@ -497,7 +556,7 @@ export function VolunteerPage() {
                     _hover={assigningService !== service.id ? {
                       transform: 'translateY(-2px)',
                       boxShadow: 'lg',
-                      borderColor: isAssigned ? useColorModeValue('green.400', 'green.500') : useColorModeValue('blue.300', 'blue.400')
+                      borderColor: isAssigned ? greenHover : blueHover
                     } : {}}
                     transition="all 0.2s ease-in-out"
                     position="relative"
@@ -537,7 +596,7 @@ export function VolunteerPage() {
                         borderRadius="full"
                         bg={isAssigned ? "green.500" : "transparent"}
                         border={isAssigned ? "none" : "2px"}
-                        borderColor={useColorModeValue('gray.300', 'gray.600')}
+                        borderColor={grayCheckBorder}
                         display="flex"
                         alignItems="center"
                         justifyContent="center"
@@ -560,10 +619,10 @@ export function VolunteerPage() {
               left={{ base: 4, md: "auto" }}
               right={{ base: 4, md: "auto" }}
               zIndex={10}
-              bg={{ base: useColorModeValue('white', 'gray.800'), md: "transparent" }}
+              bg={{ base: whiteCardBg, md: "transparent" }}
               pt={{ base: 4, md: 0 }}
               borderTop={{ base: "1px", md: "none" }}
-              borderColor={{ base: useColorModeValue('gray.200', 'gray.700'), md: "transparent" }}
+              borderColor={{ base: grayBorderTop, md: "transparent" }}
             >
               <Button
                 size="lg"

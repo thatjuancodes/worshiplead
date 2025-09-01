@@ -188,6 +188,11 @@ export function Dashboard() {
   const [volunteerLink, setVolunteerLink] = useState<string>('')
   const [loadingVolunteerLink, setLoadingVolunteerLink] = useState(false)
   const [copyingLink, setCopyingLink] = useState(false)
+  const [servicesLoaded, setServicesLoaded] = useState(false)
+  const [recentSongsLoaded, setRecentSongsLoaded] = useState(false)
+  const [volunteerLinkLoaded, setVolunteerLinkLoaded] = useState(false)
+  const [userVolunteerDatesLoaded, setUserVolunteerDatesLoaded] = useState(false)
+  const [instrumentsLoaded, setInstrumentsLoaded] = useState(false)
   const toast = useToast()
 
   const monthNames = [
@@ -443,6 +448,7 @@ export function Dashboard() {
 
   const loadOrganizationInstruments = useCallback(async () => {
     if (!organization) return
+    if (instrumentsLoaded) return
     try {
       setLoadingInstruments(true)
       const { data, error } = await supabase
@@ -453,6 +459,7 @@ export function Dashboard() {
 
       if (error) return
       setInstruments(data || [])
+      setInstrumentsLoaded(true)
     } catch {
       // ignore
     } finally {
@@ -538,6 +545,7 @@ export function Dashboard() {
 
   const loadRecentSongs = useCallback(async () => {
     if (!organization) return
+    if (recentSongsLoaded) return
     try {
       setLoadingRecentSongs(true)
       setRecentSongsError('')
@@ -611,6 +619,7 @@ export function Dashboard() {
         return a.lastUsedDate < b.lastUsedDate ? 1 : -1
       })
       setRecentSongs(aggregated.slice(0, 5))
+      setRecentSongsLoaded(true)
     } catch (err) {
       setRecentSongsError('Failed to load recent songs')
       setRecentSongs([])
@@ -621,6 +630,7 @@ export function Dashboard() {
 
   const loadVolunteerLink = useCallback(async () => {
     if (!organization) return
+    if (volunteerLinkLoaded) return
     try {
       setLoadingVolunteerLink(true)
       console.log('Loading volunteer link for organization:', organization.organization_id)
@@ -652,6 +662,7 @@ export function Dashboard() {
       if (existingLink) {
         console.log('Found existing volunteer link:', existingLink.public_url)
         setVolunteerLink(existingLink.public_url)
+        setVolunteerLinkLoaded(true)
         return
       }
 
@@ -680,6 +691,7 @@ export function Dashboard() {
 
       console.log('Successfully created volunteer link:', publicUrl)
       setVolunteerLink(publicUrl)
+      setVolunteerLinkLoaded(true)
     } catch (err) {
       console.error('Unexpected error loading volunteer link:', err)
       toast({
@@ -696,6 +708,7 @@ export function Dashboard() {
 
   const loadUserVolunteerDates = useCallback(async () => {
     if (!organization || !user) return
+    if (userVolunteerDatesLoaded) return
     try {
       // Get all services where the current user has volunteered
       const { data: volunteerRecords, error: volunteerError } = await supabase
@@ -771,6 +784,7 @@ export function Dashboard() {
           setDisplayMonth(now.getMonth())
         }
       }
+      setUserVolunteerDatesLoaded(true)
     } catch (error) {
       console.error('Error loading user volunteer dates:', error)
       setUserVolunteerDates([])
@@ -937,6 +951,7 @@ export function Dashboard() {
 
   const loadServices = useCallback(async () => {
     if (!organization) return
+    if (servicesLoaded) return
 
     try {
       const { data, error } = await supabase
@@ -950,6 +965,7 @@ export function Dashboard() {
       }
 
       setServices((data || []) as unknown as WorshipService[])
+      setServicesLoaded(true)
     } catch (err) {
       console.error('Unexpected error loading services:', err)
     }
@@ -963,7 +979,7 @@ export function Dashboard() {
     loadVolunteerLink()
     loadUserVolunteerDates()
     loadOrganizationInstruments()
-  }, [organization, loadServices, loadRecentSongs, loadVolunteerLink, loadUserVolunteerDates, loadOrganizationInstruments])
+  }, [organization])
 
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
