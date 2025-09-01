@@ -1022,7 +1022,7 @@ export function Dashboard() {
 
   
 
-  async function handleAddSongToService(serviceId: string) {
+  async function handleAddSongToService(serviceId: string, overrideSongId?: string) {
     if (!serviceId) return
     
     if (!canManagePrimary) {
@@ -1030,7 +1030,7 @@ export function Dashboard() {
       return
     }
     
-    const selectedSongId = selectedSongByService[serviceId]
+    const selectedSongId = overrideSongId || selectedSongByService[serviceId]
     const notes = (songNotesByService[serviceId] || '').trim()
     if (!selectedSongId) {
       setServiceErrorByService(prev => ({ ...prev, [serviceId]: 'Please select a song.' }))
@@ -1383,15 +1383,6 @@ export function Dashboard() {
                   w="100%"
                   display={{ base: "none", md: "block" }}
                 >
-                  <Heading
-                    as="h3"
-                    size="lg"
-                    color={titleColor}
-                    mb={3}
-                    fontWeight="600"
-                  >
-                    Service Calendar
-                  </Heading>
 
                 <HStack justify="center" mb={4}>
                   <IconButton
@@ -1836,10 +1827,14 @@ export function Dashboard() {
                                                             key={s.id}
                                                             variant="ghost"
                                                             justifyContent="flex-start"
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                               setSelectedSongByService(prev => ({ ...prev, [svc.id]: s.id }))
-                                                              setSongSearchByService(prev => ({ ...prev, [svc.id]: `${s.title} - ${s.artist}` }))
                                                               setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: false }))
+                                                              await handleAddSongToService(svc.id, s.id)
+                                                              setSongSearchByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setSelectedSongByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setSongNotesByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: false }))
                                                             }}
                                                           >
                                                             {s.title} - {s.artist}
@@ -1929,19 +1924,6 @@ export function Dashboard() {
                                               value={songNotesByService[svc.id] || ''}
                                               onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
                                             />
-                                            <HStack>
-                                              <Button
-                                                size="md"
-                                                colorScheme="blue"
-                                                onClick={() => handleAddSongToService(svc.id)}
-                                                isLoading={!!addingSongByService[svc.id]}
-                                                loadingText="Adding..."
-                                                isDisabled={!selectedSongByService[svc.id]}
-                                              >
-                                                Add Song
-                                              </Button>
-                                              <Button variant="outline" onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: false }))}>Cancel</Button>
-                                            </HStack>
                                           </VStack>
                                         )}
                                       </Box>
@@ -2195,10 +2177,14 @@ export function Dashboard() {
                                                             key={s.id}
                                                             variant="ghost"
                                                             justifyContent="flex-start"
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                               setSelectedSongByService(prev => ({ ...prev, [svc.id]: s.id }))
-                                                              setSongSearchByService(prev => ({ ...prev, [svc.id]: `${s.title} - ${s.artist}` }))
                                                               setShowSongSuggestionsByService(prev => ({ ...prev, [svc.id]: false }))
+                                                              await handleAddSongToService(svc.id, s.id)
+                                                              setSongSearchByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setSelectedSongByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setSongNotesByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: false }))
                                                             }}
                                                           >
                                                             {s.title} - {s.artist}
@@ -2288,19 +2274,6 @@ export function Dashboard() {
                                               value={songNotesByService[svc.id] || ''}
                                               onChange={(e) => setSongNotesByService(prev => ({ ...prev, [svc.id]: e.target.value }))}
                                             />
-                                            <HStack>
-                                              <Button
-                                                size="md"
-                                                colorScheme="blue"
-                                                onClick={() => handleAddSongToService(svc.id)}
-                                                isLoading={!!addingSongByService[svc.id]}
-                                                loadingText="Adding..."
-                                                isDisabled={!selectedSongByService[svc.id]}
-                                              >
-                                                Add Song
-                                              </Button>
-                                              <Button variant="outline" onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: false }))}>Cancel</Button>
-                                            </HStack>
                                           </VStack>
                                         )}
                                       </Box>
