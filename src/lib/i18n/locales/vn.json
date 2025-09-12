@@ -468,13 +468,6 @@
       "onlyAdminsOwnersManage": "Chỉ quản trị viên và chủ sở hữu mới có thể quản lý nhạc cụ."
     }
   },
-  "header": {
-    "appName": "Worship Lead",
-    "dashboard": "Bảng điều khiển",
-    "login": "Đăng nhập",
-    "tryForFree": "Dùng thử miễn phí",
-    "language": "Ngôn ngữ"
-  },
   "homePage": {
     "hero": {
       "title": "Tổ chức Nhóm Thờ cúng của bạn một cách Dễ dàng",
