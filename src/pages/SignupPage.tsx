@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { 
   Box, 
   VStack, 
@@ -21,6 +22,7 @@ import { createUserAccount } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 
 export function SignupPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [formData, setFormData] = useState({
@@ -272,7 +274,7 @@ export function SignupPage() {
               _hover={{ color: 'rgba(255, 255, 255, 0.8)' }}
               transition="color 0.2s ease"
             >
-              Worship Lead
+              {t('header.appName')}
             </Heading>
           </Link>
         </Box>
@@ -298,7 +300,7 @@ export function SignupPage() {
                 color="blue.500"
                 size="xl"
               />
-              <Text color={subtitleColor}>Verifying invitation...</Text>
+              <Text color={subtitleColor}>{t('signupPage.verifyingInvitation')}</Text>
             </VStack>
           </Box>
         </Center>
@@ -354,21 +356,21 @@ export function SignupPage() {
               fontWeight="600"
               color={titleColor}
             >
-              Create your account
+              {t('signupPage.title')}
             </Heading>
             {invitation ? (
               <Text
                 fontSize={{ base: 'md', md: 'lg' }}
                 color={subtitleColor}
               >
-                You've been invited to join <strong>{invitation.organizations?.name}</strong>
+                {t('signupPage.subtitleInvited')} <strong>{invitation.organizations?.name}</strong>
               </Text>
             ) : (
               <Text
                 fontSize={{ base: 'md', md: 'lg' }}
                 color={subtitleColor}
               >
-                Join Worship Lead and start organizing your worship team
+                {t('signupPage.subtitleDefault')}
               </Text>
             )}
           </VStack>
@@ -387,14 +389,14 @@ export function SignupPage() {
               <HStack spacing={4} w="100%" align="start">
                 <FormControl isRequired>
                   <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                    First Name
+                    {t('signupPage.firstName')}
                   </FormLabel>
                   <Input
                     type="text"
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    placeholder="Enter your first name"
+                    placeholder={t('signupPage.placeholders.firstName')}
                     size="lg"
                     _focus={{
                       borderColor: 'blue.500',
@@ -405,14 +407,14 @@ export function SignupPage() {
 
                 <FormControl isRequired>
                   <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                    Last Name
+                    {t('signupPage.lastName')}
                   </FormLabel>
                   <Input
                     type="text"
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    placeholder="Enter your last name"
+                    placeholder={t('signupPage.placeholders.lastName')}
                     size="lg"
                     _focus={{
                       borderColor: 'blue.500',
@@ -425,14 +427,14 @@ export function SignupPage() {
               {/* Email */}
               <FormControl isRequired>
                 <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                  Email
+                  {t('signupPage.email')}
                 </FormLabel>
                 <Input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="Enter your email"
+                  placeholder={t('signupPage.placeholders.email')}
                   size="lg"
                   disabled={!!invitation}
                   bg={invitation ? disabledBg : undefined}
@@ -444,7 +446,7 @@ export function SignupPage() {
                 />
                 {invitation && (
                   <FormHelperText color={subtitleColor} fontSize="xs">
-                    Email is pre-filled from your invitation
+                    {t('signupPage.emailPreFilled')}
                   </FormHelperText>
                 )}
               </FormControl>
@@ -452,14 +454,14 @@ export function SignupPage() {
               {/* Password */}
               <FormControl isRequired>
                 <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                  Password
+                  {t('signupPage.password')}
                 </FormLabel>
                 <Input
                   type="password"
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  placeholder="Create a password"
+                  placeholder={t('signupPage.placeholders.password')}
                   size="lg"
                   _focus={{
                     borderColor: 'blue.500',
@@ -471,14 +473,14 @@ export function SignupPage() {
               {/* Confirm Password */}
               <FormControl isRequired>
                 <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                  Confirm Password
+                  {t('signupPage.confirmPassword')}
                 </FormLabel>
                 <Input
                   type="password"
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  placeholder="Confirm your password"
+                  placeholder={t('signupPage.placeholders.confirmPassword')}
                   size="lg"
                   _focus={{
                     borderColor: 'blue.500',
@@ -494,12 +496,12 @@ export function SignupPage() {
                 size="lg"
                 w="100%"
                 isLoading={isLoading}
-                loadingText="Creating account..."
+                loadingText={t('signupPage.creatingAccount')}
                 fontWeight="500"
                 fontSize="md"
                 py={3}
               >
-                Create account
+                {t('signupPage.createAccount')}
               </Button>
             </VStack>
           </Box>
@@ -512,7 +514,7 @@ export function SignupPage() {
             borderColor={borderColor}
           >
             <Text color={subtitleColor} fontSize="sm">
-              Already have an account?{' '}
+              {t('signupPage.alreadyHaveAccount')}{' '}
               <Box
                 as={Link}
                 to="/login"
@@ -524,7 +526,7 @@ export function SignupPage() {
                 }}
                 transition="color 0.2s ease"
               >
-                Sign in
+                {t('signupPage.signIn')}
               </Box>
             </Text>
           </Box>
@@ -540,7 +542,7 @@ export function SignupPage() {
         textAlign="center"
       >
         <Text color={copyrightColor} fontSize="sm" m={0}>
-          &copy; {new Date().getFullYear()} Worship Lead. All rights reserved.
+          &copy; {new Date().getFullYear()} Worship Lead. {t('signupPage.copyright')}
         </Text>
       </Box>
     </Box>

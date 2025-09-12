@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import { supabase } from '../lib/supabase'
@@ -87,6 +88,7 @@ interface Instrument {
 }
 
 export function TeamManagement() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
@@ -696,7 +698,7 @@ export function TeamManagement() {
         <Center h="100vh">
           <VStack spacing={4}>
             <Spinner size="xl" color="blue.500" />
-            <Text color={textColor}>Loading team management...</Text>
+            <Text color={textColor}>{t('teamManagement.loadingTeamManagement')}</Text>
           </VStack>
         </Center>
       </Box>
@@ -719,10 +721,10 @@ export function TeamManagement() {
           >
             <Box>
               <Heading as="h2" size="lg" color={textColor} mb={2}>
-                Team Management
+                {t('teamManagement.title')}
               </Heading>
               <Text color={textSecondaryColor} fontSize="lg">
-                Invite team members to collaborate on your worship planning
+                {t('teamManagement.description')}
               </Text>
             </Box>
             
@@ -732,7 +734,7 @@ export function TeamManagement() {
               onClick={() => navigate('/dashboard')}
               size="md"
             >
-              Back to Dashboard
+              {t('teamManagement.backToDashboard')}
             </Button>
           </Flex>
 
@@ -747,7 +749,7 @@ export function TeamManagement() {
               mb={6}
             >
               <Text color={useColorModeValue('blue.800', 'blue.200')} fontSize="sm" fontWeight="500">
-              📖 Read-Only Access: You can view team members and instruments, but only admins and owners can invite members, manage roles, or manage instruments.
+              📖 {t('teamManagement.readOnlyAccess')}
               </Text>
             </Box>
           )}
@@ -765,7 +767,7 @@ export function TeamManagement() {
                 p={6}
               >
                 <Heading as="h3" size="md" color={textColor} mb={5}>
-                  Team Members ({members.length})
+                  {t('teamManagement.teamMembers')} ({members.length})
                 </Heading>
                 {roleError && (
                   <Alert status="error" borderRadius="md" mb={4}>

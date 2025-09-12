@@ -12,9 +12,15 @@ import {
   useColorModeValue,
   useToast,
   Alert,
-  AlertIcon
+  AlertIcon,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem
 } from '@chakra-ui/react'
-import { CheckIcon } from '@chakra-ui/icons'
+import { CheckIcon, ChevronDownIcon } from '@chakra-ui/icons'
+import { useTranslation } from 'react-i18next'
+import { useLanguage } from '../hooks/useLanguage'
 import { supabase } from '../lib/supabase'
 import { signInWithGoogleFromVolunteer, ensureUserProfileAndMembership } from '../lib/auth'
 
@@ -62,6 +68,8 @@ export function VolunteerPage() {
   const { publicUrl } = useParams<{ publicUrl: string }>()
   const navigate = useNavigate()
   const toast = useToast()
+  const { t } = useTranslation()
+  const { currentLanguage, changeLanguage, availableLanguages } = useLanguage()
   
   const cacheKey = `volunteer-${publicUrl}`
   const cached = cache.get(cacheKey)
@@ -118,7 +126,7 @@ export function VolunteerPage() {
 
       if (linkError || !volunteerLink) {
         console.error('Error loading volunteer link:', linkError)
-        setError('Invalid volunteer link')
+        setError(t('volunteerPage.errors.invalidLink'))
         setLoading(false)
         return
       }
@@ -135,7 +143,7 @@ export function VolunteerPage() {
         cache.set(cacheKey, { ...current, organization: orgData as OrganizationData, loaded: { ...current.loaded, organization: true } })
       } else {
         console.error('Invalid organization data structure:', orgData)
-        setError('Invalid organization data')
+        setError(t('volunteerPage.errors.invalidData'))
         setLoading(false)
         return
       }
@@ -143,7 +151,7 @@ export function VolunteerPage() {
       setLoading(false)
     } catch (err) {
       console.error('Unexpected error loading organization:', err)
-      setError('Failed to load organization')
+      setError(t('volunteerPage.errors.failedToLoad'))
       setLoading(false)
     }
   }, [publicUrl])
@@ -256,7 +264,7 @@ export function VolunteerPage() {
           console.error('Error removing volunteer assignment:', removeError)
           toast({
             title: 'Error',
-            description: 'Failed to remove volunteer assignment',
+            description: t('volunteerPage.errors.removeFailed'),
             status: 'error',
             duration: 3000,
             isClosable: true
@@ -266,7 +274,7 @@ export function VolunteerPage() {
 
         toast({
           title: 'Success!',
-          description: 'You have been removed from this service',
+          description: t('volunteerPage.success.removed'),
           status: 'success',
           duration: 3000,
           isClosable: true
@@ -284,7 +292,7 @@ export function VolunteerPage() {
           console.error('Error assigning to service:', assignmentError)
           toast({
             title: 'Error',
-            description: 'Failed to assign you to this service',
+            description: t('volunteerPage.errors.assignmentFailed'),
             status: 'error',
             duration: 3000,
             isClosable: true
@@ -294,7 +302,7 @@ export function VolunteerPage() {
 
         toast({
           title: 'Success!',
-          description: 'You have been assigned to this service',
+          description: t('volunteerPage.success.assigned'),
           status: 'success',
           duration: 3000,
           isClosable: true
@@ -316,7 +324,7 @@ export function VolunteerPage() {
       console.error('Unexpected error toggling volunteer status:', err)
       toast({
         title: 'Error',
-        description: 'Failed to update volunteer status',
+        description: t('volunteerPage.errors.updateFailed'),
         status: 'error',
         duration: 3000,
         isClosable: true
@@ -336,7 +344,7 @@ export function VolunteerPage() {
       await signInWithGoogleFromVolunteer()
       // The redirect will happen automatically via Supabase OAuth
     } catch (error: any) {
-      setError(error.message || 'Failed to sign in with Google')
+      setError(error.message || t('loginPage.errors.googleSignInFailed'))
       setGoogleLoading(false)
     }
   }
@@ -363,7 +371,7 @@ export function VolunteerPage() {
           console.error('Error ensuring user profile and membership:', error)
           toast({
             title: 'Warning',
-            description: 'Failed to create user profile. Some features may not work properly.',
+            description: t('volunteerPage.warning.profileFailed'),
             status: 'warning',
             duration: 5000,
             isClosable: true
@@ -422,7 +430,7 @@ export function VolunteerPage() {
         <Center>
           <VStack spacing={4}>
             <Spinner size="xl" color="blue.500" />
-            <Text color={subtitleColor}>Loading volunteer page...</Text>
+            <Text color={subtitleColor}>{t('volunteerPage.loadingPage')}</Text>
           </VStack>
         </Center>
       </Box>
@@ -438,7 +446,7 @@ export function VolunteerPage() {
               <AlertIcon />
               {error}
             </Alert>
-            <Button onClick={() => navigate('/')}>Go Home</Button>
+            <Button onClick={() => navigate('/')}>{t('volunteerPage.goHome')}</Button>
           </VStack>
         </Center>
       </Box>
@@ -450,8 +458,8 @@ export function VolunteerPage() {
       <Box minH="100vh" bg={bgColor} display="flex" alignItems="center" justifyContent="center">
         <Center>
           <VStack spacing={4}>
-            <Text color={subtitleColor}>Organization not found</Text>
-            <Button onClick={() => navigate('/')}>Go Home</Button>
+            <Text color={subtitleColor}>{t('volunteerPage.organizationNotFound')}</Text>
+            <Button onClick={() => navigate('/')}>{t('volunteerPage.goHome')}</Button>
           </VStack>
         </Center>
       </Box>
@@ -465,10 +473,10 @@ export function VolunteerPage() {
         {user && (
           <VStack spacing={4} mb={{ base: 6, md: 8 }} mt={{ base: 4, md: 8 }} textAlign="center">
             <Heading as="h1" size={{ base: "lg", md: "xl" }} color={titleColor} fontWeight="600">
-              Volunteer for {organization.name}
+              {t('volunteerPage.title', { organizationName: organization.name })}
             </Heading>
             <Text color={subtitleColor} fontSize={{ base: "md", md: "lg" }}>
-              Choose a service to volunteer for
+              {t('volunteerPage.subtitle')}
             </Text>
           </VStack>
         )}
@@ -478,16 +486,16 @@ export function VolunteerPage() {
           <Box bg={cardBg} mb={6} p={{ base: 4, md: 6 }} borderRadius="lg">
             <VStack spacing={4}>
               <Heading as="h1" size={{ base: "md", md: "lg" }} color={titleColor} fontWeight="600" textAlign="center">
-                Volunteer for {organization.name}
+                {t('volunteerPage.title', { organizationName: organization.name })}
               </Heading>
               <Text color={textColor} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
-                Please sign in with Google to volunteer for services
+                {t('volunteerPage.signInPrompt')}
               </Text>
               
               <Button
                 onClick={handleGoogleSignIn}
                 isLoading={googleLoading}
-                loadingText="Signing in..."
+                loadingText={t('volunteerPage.signingIn')}
                 size={{ base: "md", md: "lg" }}
                 w="full"
                 colorScheme="blue"
@@ -512,7 +520,7 @@ export function VolunteerPage() {
                   </Box>
                 }
               >
-                Continue with Google
+                {t('volunteerPage.continueWithGoogle')}
               </Button>
             </VStack>
           </Box>
@@ -525,13 +533,13 @@ export function VolunteerPage() {
               <Center py={8}>
                 <VStack spacing={3}>
                   <Spinner size="lg" />
-                  <Text color={subtitleColor}>Loading available services...</Text>
+                  <Text color={subtitleColor}>{t('volunteerPage.loadingServices')}</Text>
                 </VStack>
               </Center>
             ) : availableServices.length === 0 ? (
               <Box bg={cardBg} p={{ base: 4, md: 6 }} borderRadius="lg">
                 <Text color={subtitleColor} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
-                  No services available for volunteering at the moment
+                  {t('volunteerPage.noServicesAvailable')}
                 </Text>
               </Box>
             ) : (
@@ -632,11 +640,36 @@ export function VolunteerPage() {
                 fontSize={{ base: "lg", md: "xl" }}
                 py={{ base: 6, md: 6 }}
               >
-                View {organization.name} Dashboard
+                {t('volunteerPage.viewDashboard', { organizationName: organization.name })}
               </Button>
             </Box>
           </VStack>
         )}
+
+        {/* Language Dropdown - Fixed at Bottom */}
+        <Box
+          position="fixed"
+          bottom={4}
+          right={4}
+          zIndex={20}
+        >
+          <Menu>
+            <MenuButton as={Button} variant="outline" size="sm" rightIcon={<ChevronDownIcon />}>
+              <Text fontSize="sm">{availableLanguages.find(lang => lang.code === currentLanguage)?.name || 'EN'}</Text>
+            </MenuButton>
+            <MenuList>
+              {availableLanguages.map((language) => (
+                <MenuItem
+                  key={language.code}
+                  onClick={() => changeLanguage(language.code)}
+                  bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
+                >
+                  {language.name}
+                </MenuItem>
+              ))}
+            </MenuList>
+          </Menu>
+        </Box>
       </Box>
     </Box>
   )

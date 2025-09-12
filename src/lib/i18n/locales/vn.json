@@ -1,0 +1,573 @@
+{
+  "dashboard": {
+    "title": "Bảng điều khiển",
+    "upcoming": {
+      "title": "Sắp tới",
+      "noVolunteerServices": "Bạn chưa đăng ký tình nguyện cho dịch vụ nào",
+      "noUpcomingServices": "Không có dịch vụ tình nguyện sắp tới",
+      "noSongsAssigned": "Chưa có bài hát nào được phân công"
+    },
+    "calendar": {
+      "previousMonth": "Tháng trước",
+      "nextMonth": "Tháng sau",
+      "months": {
+        "january": "Tháng Một",
+        "february": "Tháng Hai",
+        "march": "Tháng Ba",
+        "april": "Tháng Tư",
+        "may": "Tháng Năm",
+        "june": "Tháng Sáu",
+        "july": "Tháng Bảy",
+        "august": "Tháng Tám",
+        "september": "Tháng Chín",
+        "october": "Tháng Mười",
+        "november": "Tháng Mười Một",
+        "december": "Tháng Mười Hai"
+      },
+      "weekdays": {
+        "sun": "CN",
+        "mon": "T2",
+        "tue": "T3",
+        "wed": "T4",
+        "thu": "T5",
+        "fri": "T6",
+        "sat": "T7"
+      }
+    },
+    "volunteerLink": {
+      "title": "Liên kết Tình nguyện",
+      "description": "Chia sẻ liên kết này với các tình nguyện viên tiềm năng để họ đăng ký tham gia dịch vụ",
+      "copyButton": "Sao chép liên kết tình nguyện",
+      "createButton": "Tạo liên kết tình nguyện",
+      "visitButton": "Truy cập Trang Tình nguyện",
+      "loading": "Đang tải...",
+      "copying": "Đang sao chép..."
+    },
+    "songs": {
+      "title": "Bài hát",
+      "noUsage": "Chưa sử dụng bài hát nào",
+      "addSong": "Thêm bài hát",
+      "manageSongs": "Quản lý bài hát",
+      "usageCount": "{{count}} lần sử dụng",
+      "lastUsed": "Lần cuối: {{date}}"
+    },
+    "services": {
+      "addNewService": "Thêm Dịch vụ Mới",
+      "scheduleNewService": "Lên lịch Dịch vụ Mới",
+      "noServicesScheduled": "Không có dịch vụ nào được lên lịch cho ngày này.",
+      "loadingServices": "Đang tải dịch vụ cho ngày này...",
+      "openFullPage": "Mở Trang Đầy đủ",
+      "allDay": "Cả ngày"
+    },
+    "serviceForm": {
+      "serviceTitle": "Tiêu đề Dịch vụ",
+      "serviceTitlePlaceholder": "ví dụ: Dịch vụ Chủ nhật Sáng",
+      "serviceDate": "Ngày Dịch vụ",
+      "serviceTime": "Thời gian Dịch vụ",
+      "description": "Mô tả",
+      "descriptionPlaceholder": "Mô tả tùy chọn hoặc ghi chú...",
+      "cancel": "Hủy",
+      "scheduleService": "Lên lịch Dịch vụ",
+      "scheduling": "Đang lên lịch...",
+      "addService": "Thêm Dịch vụ",
+      "close": "Đóng"
+    },
+    "songManagement": {
+      "songs": "Bài hát",
+      "noSongsAdded": "Chưa thêm bài hát nào",
+      "addSong": "Thêm bài hát",
+      "searchSongs": "Nhập để tìm kiếm bài hát...",
+      "addNewSong": "Thêm bài hát mới",
+      "notes": "Ghi chú (tùy chọn)",
+      "removeSong": "Xóa bài hát khỏi dịch vụ"
+    },
+    "volunteerManagement": {
+      "volunteers": "Tình nguyện viên",
+      "noVolunteers": "Chưa có tình nguyện viên",
+      "addVolunteer": "Thêm tình nguyện viên",
+      "searchUsers": "Nhập để tìm kiếm người dùng...",
+      "loadingUsers": "Đang tải người dùng...",
+      "noUsersFound": "Không tìm thấy người dùng khả dụng",
+      "removeVolunteer": "Xóa tình nguyện viên khỏi dịch vụ",
+      "assignRole": "Phân công vai trò",
+      "assignInstrument": "Phân công nhạc cụ",
+      "loadingInstruments": "Đang tải nhạc cụ...",
+      "unassignInstrument": "Hủy phân công {{instrument}}"
+    },
+    "status": {
+      "draft": "Bản nháp",
+      "published": "Đã xuất bản",
+      "completed": "Hoàn thành"
+    },
+    "loading": {
+      "authenticating": "Đang xác thực...",
+      "loadingDashboard": "Đang tải bảng điều khiển của bạn..."
+    },
+    "errors": {
+      "loginRequired": "Bạn phải đăng nhập để tạo dịch vụ.",
+      "noPermission": "Bạn không có quyền tạo dịch vụ. Chỉ quản trị viên và chủ sở hữu mới có thể tạo dịch vụ.",
+      "noPermissionSongs": "Bạn không có quyền thêm bài hát. Chỉ quản trị viên và chủ sở hữu mới có thể thêm bài hát vào dịch vụ.",
+      "noPermissionVolunteers": "Bạn không có quyền tạo bài hát. Chỉ quản trị viên và chủ sở hữu mới có thể tạo bài hát.",
+      "fillRequiredFields": "Vui lòng điền tất cả các trường bắt buộc.",
+      "failedToCreate": "Không thể tạo dịch vụ. Vui lòng thử lại.",
+      "failedToCreateLater": "Không thể tạo dịch vụ. Vui lòng thử lại sau.",
+      "failedToAddSong": "Không thể thêm bài hát. Vui lòng thử lại.",
+      "failedToAddSongLater": "Không thể thêm bài hát. Vui lòng thử lại sau.",
+      "failedToCreateSong": "Không thể tạo bài hát. Vui lòng thử lại.",
+      "failedToRemoveVolunteer": "Không thể xóa tình nguyện viên khỏi dịch vụ",
+      "failedToCheckVolunteer": "Không thể kiểm tra xem người dùng đã tình nguyện chưa",
+      "failedToAddVolunteer": "Không thể thêm tình nguyện viên vào dịch vụ",
+      "failedToCreateVolunteerLink": "Không thể tạo liên kết tình nguyện",
+      "failedToLoadVolunteerLink": "Không thể tải liên kết tình nguyện",
+      "failedToCopyLink": "Không thể sao chép liên kết vào clipboard"
+    },
+    "success": {
+      "volunteerRemoved": "Đã xóa tình nguyện viên khỏi dịch vụ",
+      "volunteerAdded": "Đã thêm tình nguyện viên vào dịch vụ",
+      "linkCopied": "Đã sao chép liên kết!",
+      "linkCopiedDescription": "Liên kết tình nguyện đã được sao chép vào clipboard"
+    },
+    "info": {
+      "alreadyVolunteering": "Đã tình nguyện",
+      "userAlreadyVolunteering": "Người dùng này đã tình nguyện cho dịch vụ này"
+    },
+    "warning": {
+      "profileWarning": "Cảnh báo",
+      "profileWarningDescription": "Không thể tạo hồ sơ người dùng. Một số tính năng có thể không hoạt động đúng cách."
+    },
+    "addSongDrawer": {
+      "title": "Thêm Bài hát Mới",
+      "titleField": "Tiêu đề",
+      "titleRequired": "Tiêu đề và Nghệ sĩ là bắt buộc.",
+      "artist": "Nghệ sĩ",
+      "youtubeUrl": "URL YouTube",
+      "youtubePlaceholder": "https://youtube.com/watch?v=...",
+      "spotifyUrl": "URL Spotify",
+      "spotifyPlaceholder": "https://open.spotify.com/track/...",
+      "key": "Khóa",
+      "keyPlaceholder": "C, G, D, v.v.",
+      "bpm": "BPM",
+      "bpmPlaceholder": "120",
+      "ccliNumber": "Số CCLI",
+      "ccliPlaceholder": "CCLI-123456",
+      "tags": "Thẻ",
+      "tagsPlaceholder": "tôn giáo, đương đại, phúc âm (phân cách bằng dấu phẩy)",
+      "lyrics": "Lời bài hát",
+      "lyricsPlaceholder": "Nhập lời bài hát...",
+      "addingSong": "Đang thêm...",
+      "organizationNotFound": "Không tìm thấy tổ chức."
+    }
+  },
+  "header": {
+    "appName": "Worship Lead",
+    "dashboard": "Bảng điều khiển",
+    "songbank": "Kho bài hát",
+    "teamManagement": "Quản lý Nhóm",
+    "scheduleService": "Lên lịch Dịch vụ",
+    "signOut": "Đăng xuất",
+    "language": "Ngôn ngữ",
+    "languages": {
+      "en": "Tiếng Anh",
+      "vn": "Tiếng Việt"
+    }
+  },
+  "songbank": {
+    "title": "Kho bài hát",
+    "backToDashboard": "Quay lại Bảng điều khiển",
+    "addSong": "Thêm Bài hát",
+    "searchSongs": "Tìm kiếm bài hát...",
+    "allKeys": "Tất cả Khóa",
+    "allTags": "Tất cả Thẻ",
+    "cardView": "Xem Thẻ",
+    "tableView": "Xem Bảng",
+    "noSongsFound": "Không tìm thấy bài hát. Thử điều chỉnh tìm kiếm hoặc bộ lọc.",
+    "noSongsYet": "Thêm bài hát đầu tiên để bắt đầu!",
+    "addNewSong": "Thêm Bài hát Mới",
+    "editSong": "Chỉnh sửa Bài hát",
+    "deleteSong": "Xóa Bài hát",
+    "cancel": "Hủy",
+    "updateSong": "Cập nhật Bài hát",
+    "title": "Tiêu đề",
+    "artist": "Nghệ sĩ",
+    "youtubeUrl": "URL YouTube",
+    "spotifyUrl": "URL Spotify",
+    "key": "Khóa",
+    "bpm": "BPM",
+    "ccliNumber": "Số CCLI",
+    "tags": "Thẻ",
+    "lyrics": "Lời bài hát",
+    "actions": "Hành động",
+    "links": "Liên kết",
+    "edit": "Chỉnh sửa",
+    "delete": "Xóa",
+    "errors": {
+      "accessDenied": "Từ chối Truy cập",
+      "noPermissionCreate": "Bạn không có quyền tạo bài hát. Chỉ quản trị viên và chủ sở hữu mới có thể tạo bài hát.",
+      "noPermissionEdit": "Bạn không có quyền chỉnh sửa bài hát. Chỉ quản trị viên và chủ sở hữu mới có thể chỉnh sửa bài hát.",
+      "noPermissionDelete": "Bạn không có quyền xóa bài hát. Chỉ quản trị viên và chủ sở hữu mới có thể xóa bài hát.",
+      "failedToAdd": "Không thể thêm bài hát",
+      "failedToUpdate": "Không thể cập nhật bài hát",
+      "failedToDelete": "Không thể xóa bài hát",
+      "confirmDelete": "Vui lòng nhập chính xác tiêu đề bài hát để xác nhận xóa"
+    },
+    "success": {
+      "songAdded": "Thêm bài hát thành công",
+      "songUpdated": "Cập nhật bài hát thành công",
+      "songDeleted": "Xóa bài hát thành công"
+    },
+    "deleteModal": {
+      "title": "Xóa Bài hát",
+      "confirmText": "Bạn có chắc chắn muốn xóa",
+      "warningInUse": "Bài hát này hiện đang được sử dụng trong các dịch vụ:",
+      "draftServices": "dịch vụ bản nháp",
+      "publishedServices": "dịch vụ đã xuất bản",
+      "typeToConfirm": "Nhập tiêu đề bài hát để xác nhận xóa:"
+    },
+    "placeholders": {
+      "songTitle": "Tiêu đề bài hát",
+      "artistName": "Tên nghệ sĩ",
+      "youtubeUrl": "https://youtube.com/watch?v=...",
+      "spotifyUrl": "https://open.spotify.com/track/...",
+      "keyExample": "C, G, D, v.v.",
+      "bpmExample": "120",
+      "ccliExample": "CCLI-123456",
+      "tagsExample": "tôn giáo, đương đại, phúc âm (phân cách bằng dấu phẩy)",
+      "lyricsPlaceholder": "Nhập lời bài hát..."
+    }
+  },
+  "scheduleService": {
+    "title": "Lên lịch Dịch vụ",
+    "description": "Tạo và quản lý các dịch vụ thờ cúng cho tổ chức của bạn",
+    "createNewService": "Tạo Dịch vụ Mới",
+    "cancel": "Hủy",
+    "backToDashboard": "Quay lại Bảng điều khiển",
+    "worshipServices": "Dịch vụ Thờ cúng",
+    "noServicesFound": "Không tìm thấy dịch vụ nào",
+    "noServicesDescription": "Tạo dịch vụ thờ cúng đầu tiên để bắt đầu.",
+    "noServicesDescriptionMember": "Chưa có dịch vụ nào được tạo.",
+    "viewDetails": "Xem Chi tiết",
+    "edit": "Chỉnh sửa",
+    "delete": "Xóa",
+    "serviceTitle": "Tiêu đề Dịch vụ",
+    "serviceDate": "Ngày Dịch vụ",
+    "serviceTime": "Thời gian Dịch vụ",
+    "description": "Mô tả",
+    "createService": "Tạo Dịch vụ",
+    "scheduling": "Đang lên lịch...",
+    "creatingService": "Đang tạo Dịch vụ...",
+    "loadingServices": "Đang tải dịch vụ...",
+    "placeholders": {
+      "serviceTitle": "ví dụ: Dịch vụ Chủ nhật Sáng",
+      "description": "Mô tả tùy chọn hoặc ghi chú..."
+    },
+    "errors": {
+      "loginRequired": "Bạn phải đăng nhập để tạo dịch vụ.",
+      "noPermission": "Bạn không có quyền tạo dịch vụ. Chỉ quản trị viên và chủ sở hữu mới có thể tạo dịch vụ.",
+      "noPermissionDelete": "Bạn không có quyền xóa dịch vụ. Chỉ quản trị viên và chủ sở hữu mới có thể xóa dịch vụ.",
+      "fillRequired": "Vui lòng điền tất cả các trường bắt buộc.",
+      "failedToCreate": "Không thể tạo dịch vụ. Vui lòng thử lại.",
+      "failedToDelete": "Không thể xóa dịch vụ"
+    },
+    "success": {
+      "serviceCreated": "Tạo dịch vụ thành công!",
+      "serviceDeleted": "đã được xóa thành công"
+    }
+  },
+  "serviceDetail": {
+    "title": "Chi tiết Dịch vụ",
+    "description": "Xem và quản lý dịch vụ thờ cúng của bạn",
+    "editService": "Chỉnh sửa Dịch vụ",
+    "backToServices": "Quay lại Dịch vụ",
+    "serviceDate": "Ngày Dịch vụ",
+    "serviceTime": "Thời gian Dịch vụ",
+    "created": "Đã tạo",
+    "lastUpdated": "Cập nhật Cuối",
+    "serviceSongs": "Bài hát Dịch vụ",
+    "addSongs": "Thêm Bài hát",
+    "volunteers": "Tình nguyện viên",
+    "serviceNotes": "Ghi chú Dịch vụ",
+    "addNotes": "Thêm Ghi chú",
+    "noSongsAdded": "Chưa thêm bài hát nào vào dịch vụ này",
+    "noSongsDescription": "Thêm bài hát từ kho bài hát để tạo danh sách phát",
+    "noSongsDescriptionMember": "Chưa có bài hát nào được thêm vào dịch vụ này.",
+    "dragToReorder": "Kéo để sắp xếp lại bài hát",
+    "noVolunteers": "Chưa có tình nguyện viên",
+    "noVolunteersDescription": "Chia sẻ liên kết tình nguyện để mọi người đăng ký tham gia dịch vụ này",
+    "noNotesAdded": "Chưa thêm ghi chú nào",
+    "noNotesDescription": "Thêm ghi chú cho nhóm thờ cúng, thông báo hoặc hướng dẫn đặc biệt",
+    "noNotesDescriptionMember": "Chưa có ghi chú nào được thêm vào dịch vụ này.",
+    "addSongToService": "Thêm Bài hát vào Dịch vụ",
+    "selectSong": "Chọn Bài hát",
+    "chooseSong": "Chọn một bài hát...",
+    "notes": "Ghi chú (tùy chọn)",
+    "addSong": "Thêm Bài hát",
+    "addingSong": "Đang thêm Bài hát...",
+    "removeSong": "Xóa bài hát khỏi dịch vụ",
+    "assignInstrument": "Phân công nhạc cụ",
+    "loadingInstruments": "Đang tải nhạc cụ...",
+    "unassignInstrument": "Hủy phân công",
+    "joined": "Đã tham gia",
+    "loadingVolunteers": "Đang tải tình nguyện viên...",
+    "loadingServiceDetails": "Đang tải chi tiết dịch vụ...",
+    "serviceNotFound": "Không tìm thấy dịch vụ",
+    "errors": {
+      "serviceNotFound": "Không tìm thấy dịch vụ hoặc bạn không có quyền truy cập.",
+      "failedToLoad": "Không thể tải chi tiết dịch vụ.",
+      "noPermissionSongs": "Bạn không có quyền thêm bài hát vào dịch vụ. Chỉ quản trị viên và chủ sở hữu mới có thể quản lý bài hát dịch vụ.",
+      "noPermissionRemoveSongs": "Bạn không có quyền xóa bài hát khỏi dịch vụ. Chỉ quản trị viên và chủ sở hữu mới có thể quản lý bài hát dịch vụ.",
+      "noPermissionReorder": "Bạn không có quyền sắp xếp lại bài hát. Chỉ quản trị viên và chủ sở hữu mới có thể quản lý bài hát dịch vụ.",
+      "noPermissionInstruments": "Bạn không có quyền phân công nhạc cụ.",
+      "noPermissionRemoveInstruments": "Bạn không có quyền xóa nhạc cụ.",
+      "selectSongFirst": "Vui lòng chọn bài hát để thêm.",
+      "failedToAddSong": "Không thể thêm bài hát vào dịch vụ. Vui lòng thử lại.",
+      "failedToRemoveSong": "Không thể xóa bài hát khỏi dịch vụ. Vui lòng thử lại.",
+      "failedToSaveOrder": "Không thể lưu thứ tự bài hát mới.",
+      "failedToAssignInstrument": "Không thể phân công nhạc cụ",
+      "failedToRemoveInstrument": "Không thể xóa nhạc cụ",
+      "instrumentAlreadyAssigned": "Nhạc cụ đó đã được phân công cho tình nguyện viên khác."
+    },
+    "success": {
+      "songAdded": "Thêm bài hát vào dịch vụ thành công!",
+      "songRemoved": "Xóa bài hát khỏi dịch vụ thành công!",
+      "orderUpdated": "Cập nhật thứ tự bài hát thành công!"
+    },
+    "confirm": {
+      "removeSong": "Bạn có chắc chắn muốn xóa bài hát này khỏi dịch vụ?"
+    },
+    "placeholders": {
+      "songNotes": "ví dụ: số đặc biệt, bài cuối"
+    }
+  },
+  "serviceEdit": {
+    "title": "Chỉnh sửa Dịch vụ",
+    "description": "Cập nhật chi tiết dịch vụ thờ cúng của bạn",
+    "cancel": "Hủy",
+    "saveChanges": "Lưu Thay đổi",
+    "saving": "Đang lưu...",
+    "serviceTitle": "Tiêu đề Dịch vụ",
+    "serviceDate": "Ngày Dịch vụ",
+    "serviceTime": "Thời gian Dịch vụ",
+    "status": "Trạng thái",
+    "description": "Mô tả",
+    "statusOptions": {
+      "draft": "Bản nháp",
+      "published": "Đã xuất bản",
+      "completed": "Hoàn thành"
+    },
+    "loadingServiceDetails": "Đang tải chi tiết dịch vụ...",
+    "serviceNotFound": "Không tìm thấy dịch vụ",
+    "backToService": "Quay lại Dịch vụ",
+    "backToServices": "Quay lại Dịch vụ",
+    "errors": {
+      "accessDenied": "Từ chối Truy cập",
+      "noPermission": "Bạn không có quyền chỉnh sửa dịch vụ. Chỉ quản trị viên và chủ sở hữu mới có thể chỉnh sửa dịch vụ.",
+      "failedToLoad": "Không thể tải chi tiết dịch vụ.",
+      "serviceNotFound": "Không tìm thấy dịch vụ.",
+      "failedToUpdate": "Không thể cập nhật dịch vụ."
+    },
+    "success": {
+      "serviceUpdated": "Cập nhật dịch vụ thành công!"
+    },
+    "placeholders": {
+      "serviceTitle": "ví dụ: Dịch vụ Chủ nhật Sáng",
+      "description": "Thêm bất kỳ chi tiết bổ sung nào về dịch vụ này..."
+    }
+  },
+  "teamManagement": {
+    "title": "Quản lý Nhóm",
+    "description": "Mời thành viên nhóm cộng tác trong việc lập kế hoạch thờ cúng",
+    "backToDashboard": "Quay lại Bảng điều khiển",
+    "readOnlyAccess": "Quyền Chỉ đọc: Bạn có thể xem thành viên nhóm và nhạc cụ, nhưng chỉ quản trị viên và chủ sở hữu mới có thể mời thành viên, quản lý vai trò hoặc quản lý nhạc cụ.",
+    "teamMembers": "Thành viên Nhóm",
+    "roles": "Vai trò",
+    "inviteNewMember": "Mời Thành viên Mới",
+    "inviteDescription": "Gửi lời mời tham gia tổ chức của bạn",
+    "pendingInvitations": "Lời mời Đang chờ",
+    "joinRequests": "Yêu cầu Tham gia",
+    "emailAddress": "Địa chỉ Email",
+    "invite": "Mời",
+    "inviting": "Đang gửi...",
+    "name": "Tên",
+    "description": "Mô tả",
+    "descriptionOptional": "Mô tả (tùy chọn)",
+    "addRole": "Thêm Vai trò",
+    "saveChanges": "Lưu Thay đổi",
+    "adding": "Đang thêm...",
+    "saving": "Đang lưu...",
+    "edit": "Chỉnh sửa",
+    "delete": "Xóa",
+    "cancel": "Hủy",
+    "copyLink": "Sao chép Liên kết",
+    "approve": "Phê duyệt",
+    "noMembers": "Không tìm thấy thành viên",
+    "noRoles": "Chưa thêm vai trò nào",
+    "noPendingInvitations": "Không có lời mời nào đang chờ",
+    "noJoinRequests": "Không có yêu cầu tham gia nào đang chờ",
+    "loadingTeamManagement": "Đang tải quản lý nhóm...",
+    "loadingRoles": "Đang tải vai trò...",
+    "loadingJoinRequests": "Đang tải yêu cầu tham gia...",
+    "joined": "Đã tham gia",
+    "sent": "Đã gửi",
+    "requested": "Đã yêu cầu",
+    "roleOptions": {
+      "owner": "Chủ sở hữu",
+      "admin": "Quản trị viên",
+      "member": "Thành viên"
+    },
+    "statusOptions": {
+      "pending": "đang chờ",
+      "accepted": "đã chấp nhận",
+      "expired": "đã hết hạn"
+    },
+    "errors": {
+      "noPermissionInvite": "Bạn không có quyền mời người dùng. Chỉ quản trị viên và chủ sở hữu mới có thể mời người dùng.",
+      "noPermissionCancel": "Bạn không có quyền hủy lời mời. Chỉ quản trị viên và chủ sở hữu mới có thể hủy lời mời.",
+      "noPermissionManageInstruments": "Bạn không có quyền quản lý nhạc cụ. Chỉ quản trị viên và chủ sở hữu mới có thể quản lý nhạc cụ.",
+      "noPermissionDeleteInstruments": "Bạn không có quyền xóa nhạc cụ. Chỉ quản trị viên và chủ sở hữu mới có thể xóa nhạc cụ.",
+      "inviteAlreadySent": "Lời mời đã được gửi đến địa chỉ email này.",
+      "failedToCreateInvite": "Không thể tạo bản ghi lời mời. Vui lòng thử lại.",
+      "failedToSendInvite": "Không thể gửi lời mời. Vui lòng thử lại.",
+      "failedToCopyLink": "Không thể sao chép liên kết lời mời",
+      "nameRequired": "Tên là bắt buộc",
+      "failedToCreateInstrument": "Không thể tạo nhạc cụ",
+      "failedToUpdateInstrument": "Không thể cập nhật nhạc cụ",
+      "failedToDeleteInstrument": "Không thể xóa nhạc cụ",
+      "failedToLoadInstruments": "Không thể tải nhạc cụ",
+      "failedToLoadJoinRequests": "Không thể tải yêu cầu tham gia",
+      "failedToLoadProfiles": "Không thể tải hồ sơ người dùng",
+      "failedToApproveRequest": "Không thể phê duyệt yêu cầu tham gia",
+      "failedToCreateMembership": "Không thể tạo thành viên",
+      "onlyOwnersCanChangeRoles": "Chỉ chủ sở hữu mới có thể thay đổi vai trò thành viên",
+      "cannotChangeOwnRole": "Bạn không thể thay đổi vai trò của chính mình",
+      "atLeastOneOwner": "Cần ít nhất một chủ sở hữu",
+      "failedToUpdateRole": "Không thể cập nhật vai trò",
+      "failedToChangeRole": "Không thể thay đổi vai trò"
+    },
+    "success": {
+      "inviteCreated": "Tạo lời mời thành công! Sao chép và chia sẻ liên kết này:",
+      "linkCopied": "Liên kết đã được sao chép vào clipboard!",
+      "linkCopiedToClipboard": "Liên kết lời mời đã được sao chép vào clipboard!",
+      "instrumentCreated": "Nhạc cụ đã được tạo",
+      "instrumentUpdated": "Nhạc cụ đã được cập nhật",
+      "instrumentDeleted": "Nhạc cụ đã được xóa",
+      "joinRequestApproved": "Phê duyệt yêu cầu tham gia thành công!",
+      "roleUpdated": "Vai trò đã được cập nhật"
+    },
+    "confirm": {
+      "cancelInvite": "Bạn có chắc chắn muốn hủy lời mời này?",
+      "deleteInstrument": "Xóa nhạc cụ này?",
+      "approveJoinRequest": "Bạn có chắc chắn muốn phê duyệt yêu cầu tham gia này?"
+    },
+    "placeholders": {
+      "emailAddress": "Nhập địa chỉ email",
+      "instrumentName": "ví dụ: Guitar Acoustic",
+      "instrumentDescription": "Chi tiết hoặc ghi chú"
+    },
+    "info": {
+      "onlyAdminsOwners": "Chỉ quản trị viên và chủ sở hữu mới có thể mời thành viên mới vào tổ chức.",
+      "onlyAdminsOwnersManage": "Chỉ quản trị viên và chủ sở hữu mới có thể quản lý nhạc cụ."
+    }
+  },
+  "header": {
+    "appName": "Worship Lead",
+    "dashboard": "Bảng điều khiển",
+    "login": "Đăng nhập",
+    "tryForFree": "Dùng thử miễn phí",
+    "language": "Ngôn ngữ"
+  },
+  "homePage": {
+    "hero": {
+      "title": "Tổ chức Nhóm Thờ cúng của bạn một cách Dễ dàng",
+      "subtitle": "Đơn giản hóa việc lập kế hoạch thờ cúng, điều phối tình nguyện viên và quản lý kho bài hát tất cả trong một nơi.",
+      "getStarted": "Bắt đầu Miễn phí",
+      "learnMore": "Tìm hiểu thêm"
+    },
+    "features": {
+      "title": "Tính năng",
+      "scheduling": {
+        "title": "Lên lịch",
+        "description": "Dễ dàng lên lịch cho các tình nguyện viên nhóm thờ cúng và điều phối các buổi tập với hệ thống lịch trực quan của chúng tôi."
+      },
+      "songBank": {
+        "title": "Kho bài hát",
+        "description": "Xây dựng và quản lý thư viện bài hát của nhà thờ với lời bài hát, hợp âm và ghi chú sắp xếp tất cả trong một nơi."
+      },
+      "teamManagement": {
+        "title": "Quản lý Nhóm",
+        "description": "Theo dõi các thành viên trong nhóm, kỹ năng và sự sẵn có của họ để xây dựng nhóm thờ cúng hoàn hảo."
+      }
+    }
+  },
+  "loginPage": {
+    "title": "Chào mừng trở lại",
+    "subtitle": "Đăng nhập vào tài khoản Worship Lead của bạn",
+    "continueWithGoogle": "Tiếp tục với Google",
+    "or": "hoặc",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "signIn": "Đăng nhập",
+    "signingIn": "Đang đăng nhập...",
+    "noAccount": "Chưa có tài khoản?",
+    "signUp": "Đăng ký",
+    "copyright": "Tất cả quyền được bảo lưu.",
+    "errors": {
+      "googleSignInFailed": "Không thể đăng nhập bằng Google"
+    },
+    "placeholders": {
+      "email": "Nhập email của bạn",
+      "password": "Nhập mật khẩu của bạn"
+    }
+  },
+  "signupPage": {
+    "title": "Tạo tài khoản của bạn",
+    "subtitleDefault": "Tham gia Worship Lead và bắt đầu tổ chức nhóm thờ cúng của bạn",
+    "subtitleInvited": "Bạn đã được mời tham gia",
+    "firstName": "Tên",
+    "lastName": "Họ",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "confirmPassword": "Xác nhận Mật khẩu",
+    "createAccount": "Tạo tài khoản",
+    "creatingAccount": "Đang tạo tài khoản...",
+    "alreadyHaveAccount": "Đã có tài khoản?",
+    "signIn": "Đăng nhập",
+    "copyright": "Tất cả quyền được bảo lưu.",
+    "verifyingInvitation": "Đang xác minh lời mời...",
+    "emailPreFilled": "Email được điền trước từ lời mời của bạn",
+    "placeholders": {
+      "firstName": "Nhập tên của bạn",
+      "lastName": "Nhập họ của bạn",
+      "email": "Nhập email của bạn",
+      "password": "Tạo mật khẩu",
+      "confirmPassword": "Xác nhận mật khẩu của bạn"
+    }
+  },
+  "volunteerPage": {
+    "title": "Tình nguyện cho {{organizationName}}",
+    "subtitle": "Chọn một dịch vụ để tình nguyện",
+    "signInPrompt": "Vui lòng đăng nhập bằng Google để tình nguyện cho các dịch vụ",
+    "continueWithGoogle": "Tiếp tục với Google",
+    "signingIn": "Đang đăng nhập...",
+    "loadingPage": "Đang tải trang tình nguyện...",
+    "loadingServices": "Đang tải các dịch vụ có sẵn...",
+    "organizationNotFound": "Không tìm thấy tổ chức",
+    "goHome": "Về Trang chủ",
+    "noServicesAvailable": "Hiện tại không có dịch vụ nào để tình nguyện",
+    "viewDashboard": "Xem Bảng điều khiển {{organizationName}}",
+    "success": {
+      "assigned": "Bạn đã được phân công cho dịch vụ này",
+      "removed": "Bạn đã được xóa khỏi dịch vụ này"
+    },
+    "errors": {
+      "invalidLink": "Liên kết tình nguyện không hợp lệ",
+      "invalidData": "Dữ liệu tổ chức không hợp lệ",
+      "failedToLoad": "Không thể tải tổ chức",
+      "assignmentFailed": "Không thể phân công bạn cho dịch vụ này",
+      "removeFailed": "Không thể xóa phân công tình nguyện",
+      "updateFailed": "Không thể cập nhật trạng thái tình nguyện"
+    },
+    "warning": {
+      "profileFailed": "Không thể tạo hồ sơ người dùng. Một số tính năng có thể không hoạt động đúng cách."
+    }
+  }
+}

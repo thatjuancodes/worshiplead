@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { signIn, signInWithGoogle, ensureUserProfileAndMembership } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { 
@@ -16,6 +17,7 @@ import {
 } from '@chakra-ui/react'
 
 export function LoginPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
@@ -134,10 +136,10 @@ export function LoginPage() {
           <VStack spacing={6} align="stretch">
             <Box textAlign="center">
               <Heading as="h1" size="xl" color={titleColor} mb={2}>
-                Welcome Back
+                {t('loginPage.title')}
               </Heading>
               <Text color={textColor}>
-                Sign in to your Worship Lead account
+                {t('loginPage.subtitle')}
               </Text>
             </Box>
 
@@ -175,7 +177,7 @@ export function LoginPage() {
                 </Box>
               }
             >
-              Continue with Google
+              {t('loginPage.continueWithGoogle')}
             </Button>
 
             <Box position="relative">
@@ -189,7 +191,7 @@ export function LoginPage() {
                 px={3}
               >
                 <Text fontSize="sm" color={textColor}>
-                  or
+                  {t('loginPage.or')}
                 </Text>
               </Box>
             </Box>
@@ -197,27 +199,27 @@ export function LoginPage() {
             <Box as="form" onSubmit={handleSubmit} mb={6}>
               <VStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel htmlFor="email">Email</FormLabel>
+                  <FormLabel htmlFor="email">{t('loginPage.email')}</FormLabel>
                   <Input
                     type="email"
                     id="email"
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    placeholder="Enter your email"
+                    placeholder={t('loginPage.placeholders.email')}
                     size="lg"
                   />
                 </FormControl>
 
                 <FormControl isRequired>
-                  <FormLabel htmlFor="password">Password</FormLabel>
+                  <FormLabel htmlFor="password">{t('loginPage.password')}</FormLabel>
                   <Input
                     type="password"
                     id="password"
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    placeholder="Enter your password"
+                    placeholder={t('loginPage.placeholders.password')}
                     size="lg"
                   />
                 </FormControl>
@@ -228,16 +230,16 @@ export function LoginPage() {
                   size="lg"
                   w="full"
                   isLoading={loading}
-                  loadingText="Signing in..."
+                  loadingText={t('loginPage.signingIn')}
                 >
-                  Sign In
+                  {t('loginPage.signIn')}
                 </Button>
               </VStack>
             </Box>
 
             <Box textAlign="center">
               <Text color={textColor} fontSize="sm">
-                Don't have an account?{' '}
+                {t('loginPage.noAccount')}{' '}
                 <Box
                   as={Link}
                   to="/signup"
@@ -245,7 +247,7 @@ export function LoginPage() {
                   _hover={{ color: 'blue.600' }}
                   textDecoration="underline"
                 >
-                  Sign up
+                  {t('loginPage.signUp')}
                 </Box>
               </Text>
             </Box>
@@ -262,7 +264,7 @@ export function LoginPage() {
         textAlign="center"
       >
         <Text color={textColor} fontSize="sm">
-          &copy; {new Date().getFullYear()} Worship Lead. All rights reserved.
+          &copy; {new Date().getFullYear()} Worship Lead. {t('loginPage.copyright')}
         </Text>
       </Box>
     </>

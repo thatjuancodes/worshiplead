@@ -7,12 +7,22 @@ import {
   Button, 
   Container,
   Spinner,
-  useColorModeValue
+  useColorModeValue,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Text
 } from '@chakra-ui/react'
+import { ChevronDownIcon } from '@chakra-ui/icons'
+import { useTranslation } from 'react-i18next'
+import { useLanguage } from '../hooks/useLanguage'
 import { getCurrentUser } from '../lib/auth'
 import type { User } from '@supabase/supabase-js'
 
 export function Header() {
+  const { t } = useTranslation()
+  const { currentLanguage, changeLanguage, availableLanguages } = useLanguage()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -78,28 +88,46 @@ export function Header() {
                 display="flex"
                 alignItems="center"
               >
-                Worship Lead
+                {t('header.appName')}
               </Heading>
             </Link>
           </Box>
 
           <Flex gap={3} alignItems="center">
+            {/* Language Selector */}
+            <Menu>
+              <MenuButton as={Button} variant="outline" size="md" rightIcon={<ChevronDownIcon />}>
+                <Text fontSize="sm">{availableLanguages.find(lang => lang.code === currentLanguage)?.name || 'EN'}</Text>
+              </MenuButton>
+              <MenuList>
+                {availableLanguages.map((language) => (
+                  <MenuItem
+                    key={language.code}
+                    onClick={() => changeLanguage(language.code)}
+                    bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
+                  >
+                    {language.name}
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Menu>
+
             {loading ? (
               <Spinner size="sm" color="blue.500" />
             ) : (
               <>
                 {user ? (
                   <Button as={Link} to="/dashboard" colorScheme="blue" size="md">
-                    Dashboard
+                    {t('header.dashboard')}
                   </Button>
                 ) : (
                   <>
                     <Button as={Link} to="/login" variant="outline" size="md">
-                      Login
+                      {t('header.login')}
                     </Button>
 
                     <Button as={Link} to="/signup" colorScheme="blue" size="md">
-                      Try for free
+                      {t('header.tryForFree')}
                     </Button>
                   </>
                 )}

@@ -8,8 +8,10 @@ import {
   VStack,
   useColorModeValue
 } from '@chakra-ui/react'
+import { useTranslation } from 'react-i18next'
 
 export function HeroSection() {
+  const { t } = useTranslation()
   const textColor = useColorModeValue('gray.600', 'gray.300')
   const linkColor = useColorModeValue('blue.500', 'blue.300')
   const linkHoverColor = useColorModeValue('blue.600', 'blue.200')
@@ -31,7 +33,7 @@ export function HeroSection() {
             fontWeight="bold"
             lineHeight="1.2"
           >
-            Plan. Schedule. Worship.
+            {t('homePage.hero.title')}
           </Heading>
 
           <Text
@@ -40,8 +42,7 @@ export function HeroSection() {
             maxW="3xl"
             lineHeight="1.6"
           >
-            Worship Lead helps churches organize worship teams with ease.
-            Schedule volunteers, plan setlists, and manage your song library — all in one simple, powerful tool.
+            {t('homePage.hero.subtitle')}
           </Text>
 
           <Box>
@@ -55,12 +56,12 @@ export function HeroSection() {
               fontSize="lg"
               fontWeight="semibold"
             >
-              Try for free
+              {t('homePage.hero.getStarted')}
             </Button>
           </Box>
 
           <Text color={textColor}>
-            Already have an account?{' '}
+            {t('loginPage.noAccount')}{' '}
             <Box
               as={Link}
               to="/login"
@@ -69,7 +70,7 @@ export function HeroSection() {
               textDecoration="underline"
               transition="color 0.2s ease"
             >
-              Login
+              {t('header.login')}
             </Box>
           </Text>
         </VStack>

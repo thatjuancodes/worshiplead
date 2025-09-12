@@ -7,6 +7,7 @@ import {
   SimpleGrid,
   useColorModeValue
 } from '@chakra-ui/react'
+import { useTranslation } from 'react-i18next'
 
 interface FeatureCardProps {
   title: string
@@ -58,23 +59,24 @@ function FeatureCard({ title, description, icon }: FeatureCardProps) {
 }
 
 export const FeaturesSection = forwardRef<HTMLElement>((_, ref) => {
+  const { t } = useTranslation()
   const sectionBg = useColorModeValue('white', 'gray.800')
   const titleColor = useColorModeValue('gray.800', 'white')
 
   const features = [
     {
-      title: 'Scheduling',
-      description: 'Easily schedule your worship team volunteers and coordinate rehearsals with our intuitive calendar system.',
+      title: t('homePage.features.scheduling.title'),
+      description: t('homePage.features.scheduling.description'),
       icon: '📅'
     },
     {
-      title: 'Song Bank',
-      description: 'Build and manage your church\'s song library with lyrics, chords, and arrangement notes all in one place.',
+      title: t('homePage.features.songBank.title'),
+      description: t('homePage.features.songBank.description'),
       icon: '🎵'
     },
     {
-      title: 'Team Management',
-      description: 'Keep track of your team members, their skills, and availability to build the perfect worship team.',
+      title: t('homePage.features.teamManagement.title'),
+      description: t('homePage.features.teamManagement.description'),
       icon: '👥'
     }
   ]
@@ -96,7 +98,7 @@ export const FeaturesSection = forwardRef<HTMLElement>((_, ref) => {
             fontWeight="bold"
             mb={4}
           >
-            Features
+            {t('homePage.features.title')}
           </Heading>
         </Box>
 

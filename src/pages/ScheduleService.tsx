@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader, DeleteServiceModal } from '../components'
@@ -54,6 +55,7 @@ interface OrganizationData {
 }
 
 export function ScheduleService() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
@@ -317,7 +319,7 @@ export function ScheduleService() {
         <Center h="100vh">
           <VStack spacing={4}>
             <Spinner size="xl" color="blue.500" />
-            <Text color={textColor}>Loading services...</Text>
+            <Text color={textColor}>{t('scheduleService.loadingServices')}</Text>
           </VStack>
         </Center>
       </Box>
@@ -341,10 +343,10 @@ export function ScheduleService() {
           >
             <Box flex="1" minW="300px">
               <Heading as="h2" size="lg" color={textColor} mb={2} mt={8}>
-                Schedule Service
+                {t('scheduleService.title')}
               </Heading>
               <Text color={textSecondaryColor} fontSize="lg">
-                Create and manage worship services for your organization
+                {t('scheduleService.description')}
               </Text>
             </Box>
             
@@ -355,7 +357,7 @@ export function ScheduleService() {
                   onClick={() => setShowCreateForm(!showCreateForm)}
                   size="md"
                 >
-                  {showCreateForm ? 'Cancel' : 'Create New Service'}
+                  {showCreateForm ? t('scheduleService.cancel') : t('scheduleService.createNewService')}
                 </Button>
               )}
               <Button
@@ -364,7 +366,7 @@ export function ScheduleService() {
                 onClick={() => navigate('/dashboard')}
                 size="md"
               >
-                Back to Dashboard
+                {t('scheduleService.backToDashboard')}
               </Button>
             </HStack>
           </Flex>
@@ -396,7 +398,7 @@ export function ScheduleService() {
               mb={6}
             >
               <Heading as="h3" size="md" color={textColor} mb={5}>
-                Create New Service
+                {t('scheduleService.createNewService')}
               </Heading>
               
               <form onSubmit={handleCreateService}>
@@ -404,20 +406,20 @@ export function ScheduleService() {
                   <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={5}>
                     <FormControl isRequired>
                       <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Service Title *
+                        {t('scheduleService.serviceTitle')} *
                       </FormLabel>
                       <Input
                         type="text"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="e.g., Sunday Morning Service"
+                        placeholder={t('scheduleService.placeholders.serviceTitle')}
                         size="md"
                       />
                     </FormControl>
                     
                     <FormControl isRequired>
                       <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Service Date *
+                        {t('scheduleService.serviceDate')} *
                       </FormLabel>
                       <Input
                         type="date"
@@ -431,7 +433,7 @@ export function ScheduleService() {
                   <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={5}>
                     <FormControl>
                       <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Service Time
+                        {t('scheduleService.serviceTime')}
                       </FormLabel>
                       <Input
                         type="time"
@@ -443,12 +445,12 @@ export function ScheduleService() {
                     
                     <FormControl>
                       <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Description
+                        {t('scheduleService.description')}
                       </FormLabel>
                       <Textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Optional description or notes..."
+                        placeholder={t('scheduleService.placeholders.description')}
                         rows={3}
                         resize="vertical"
                         minH="80px"
@@ -461,11 +463,11 @@ export function ScheduleService() {
                       type="submit"
                       colorScheme="blue"
                       isLoading={creating}
-                      loadingText="Creating Service..."
+                      loadingText={t('scheduleService.creatingService')}
                       disabled={!title.trim() || !serviceDate}
                       size="md"
                     >
-                      Create Service
+                      {t('scheduleService.createService')}
                     </Button>
                     <Button
                       type="button"
@@ -474,7 +476,7 @@ export function ScheduleService() {
                       onClick={() => setShowCreateForm(false)}
                       size="md"
                     >
-                      Cancel
+                      {t('scheduleService.cancel')}
                     </Button>
                   </HStack>
                 </VStack>
@@ -492,18 +494,18 @@ export function ScheduleService() {
             p={6}
           >
             <Heading as="h3" size="md" color={textColor} mb={5}>
-              Worship Services ({services.length})
+              {t('scheduleService.worshipServices')} ({services.length})
             </Heading>
             
             {services.length === 0 ? (
               <Box textAlign="center" py={10}>
                 <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
-                  No services found
+                  {t('scheduleService.noServicesFound')}
                 </Text>
                 <Text color={textMutedColor}>
                   {canManagePrimary 
-                    ? 'Create your first worship service to get started.'
-                    : 'No services have been created yet.'
+                    ? t('scheduleService.noServicesDescription')
+                    : t('scheduleService.noServicesDescriptionMember')
                   }
                 </Text>
               </Box>
@@ -574,7 +576,7 @@ export function ScheduleService() {
                             size="sm"
                             onClick={() => navigate(`/service/${service.id}`)}
                           >
-                            View Details
+                            {t('scheduleService.viewDetails')}
                           </Button>
                           {canManagePrimary && (
                             <>
@@ -584,7 +586,7 @@ export function ScheduleService() {
                                 size="sm"
                                 onClick={() => navigate(`/service/${service.id}/edit`)}
                               >
-                                Edit
+                                {t('scheduleService.edit')}
                               </Button>
                               <Button
                                 variant="outline"
@@ -592,7 +594,7 @@ export function ScheduleService() {
                                 size="sm"
                                 onClick={() => handleDeleteService(service)}
                               >
-                                Delete
+                                {t('scheduleService.delete')}
                               </Button>
                             </>
                           )}

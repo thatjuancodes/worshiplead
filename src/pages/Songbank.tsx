@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
 import { getUserPrimaryOrganization } from '../lib/auth'
@@ -75,6 +76,7 @@ interface OrganizationData {
 }
 
 export function Songbank() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const toast = useToast()
   const { canManagePrimary } = useOrganizationAccess()
@@ -485,7 +487,7 @@ export function Songbank() {
               leftIcon={<Text>←</Text>}
               size="sm"
             >
-              Back to Dashboard
+              {t('songbank.backToDashboard')}
             </Button>
           </Box>
 
@@ -708,7 +710,7 @@ export function Songbank() {
             {/* Title - Compact */}
             <Box>
               <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
-                🎵 Songbank
+                🎵 {t('songbank.title')}
               </Heading>
             </Box>
 
@@ -738,7 +740,7 @@ export function Songbank() {
                   },
                 }}
               >
-                + Add Song
+                + {t('songbank.addSong')}
               </Button>
             )}
           </Flex>
@@ -756,7 +758,7 @@ export function Songbank() {
             <DrawerCloseButton />
             <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
               <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
-                Add New Song
+                {t('songbank.addNewSong')}
               </Heading>
             </DrawerHeader>
             
@@ -765,21 +767,21 @@ export function Songbank() {
                 <VStack spacing={6} align="stretch">
                   <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={4}>
                     <FormControl isRequired>
-                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Title</FormLabel>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">{t('songbank.title')}</FormLabel>
                       <Input
                         value={formData.title}
                         onChange={(e) => setFormData({...formData, title: e.target.value})}
-                        placeholder="Song title"
+                        placeholder={t('songbank.placeholders.songTitle')}
                         size="md"
                       />
                     </FormControl>
                     
                     <FormControl isRequired>
-                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">Artist</FormLabel>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">{t('songbank.artist')}</FormLabel>
                       <Input
                         value={formData.artist}
                         onChange={(e) => setFormData({...formData, artist: e.target.value})}
-                        placeholder="Artist name"
+                        placeholder={t('songbank.placeholders.artistName')}
                         size="md"
                       />
                     </FormControl>
@@ -1211,7 +1213,7 @@ export function Songbank() {
             textAlign="center"
           >
             <Text color={mutedTextColor} fontSize="md">
-              No songs found. {songs.length === 0 ? 'Add your first song to get started!' : 'Try adjusting your search or filters.'}
+              {songs.length === 0 ? t('songbank.noSongsYet') : t('songbank.noSongsFound')}
             </Text>
           </Box>
         ) : viewMode === 'cards' ? (

@@ -1,0 +1,573 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "upcoming": {
+      "title": "Upcoming",
+      "noVolunteerServices": "You haven't volunteered for any services yet",
+      "noUpcomingServices": "No upcoming volunteer services",
+      "noSongsAssigned": "No songs assigned yet"
+    },
+    "calendar": {
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "months": {
+        "january": "January",
+        "february": "February",
+        "march": "March",
+        "april": "April",
+        "may": "May",
+        "june": "June",
+        "july": "July",
+        "august": "August",
+        "september": "September",
+        "october": "October",
+        "november": "November",
+        "december": "December"
+      },
+      "weekdays": {
+        "sun": "Sun",
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat"
+      }
+    },
+    "volunteerLink": {
+      "title": "Volunteer Link",
+      "description": "Share this link with potential volunteers to let them sign up for services",
+      "copyButton": "Copy volunteer link",
+      "createButton": "Create volunteer link",
+      "visitButton": "Visit Volunteer Page",
+      "loading": "Loading...",
+      "copying": "Copying..."
+    },
+    "songs": {
+      "title": "Songs",
+      "noUsage": "No song usage yet",
+      "addSong": "Add song",
+      "manageSongs": "Manage songs",
+      "usageCount": "{{count}} uses",
+      "lastUsed": "Last: {{date}}"
+    },
+    "services": {
+      "addNewService": "Add New Service",
+      "scheduleNewService": "Schedule New Service",
+      "noServicesScheduled": "No services scheduled for this date.",
+      "loadingServices": "Loading services for this date...",
+      "openFullPage": "Open Full Page",
+      "allDay": "All day"
+    },
+    "serviceForm": {
+      "serviceTitle": "Service Title",
+      "serviceTitlePlaceholder": "e.g., Sunday Morning Service",
+      "serviceDate": "Service Date",
+      "serviceTime": "Service Time", 
+      "description": "Description",
+      "descriptionPlaceholder": "Optional description or notes...",
+      "cancel": "Cancel",
+      "scheduleService": "Schedule Service",
+      "scheduling": "Scheduling...",
+      "addService": "Add Service",
+      "close": "Close"
+    },
+    "songManagement": {
+      "songs": "Songs",
+      "noSongsAdded": "No songs added yet",
+      "addSong": "Add song",
+      "searchSongs": "Type to search songs...",
+      "addNewSong": "Add new song",
+      "notes": "Notes (optional)",
+      "removeSong": "Remove song from service"
+    },
+    "volunteerManagement": {
+      "volunteers": "Volunteers",
+      "noVolunteers": "No volunteers yet",
+      "addVolunteer": "Add volunteer",
+      "searchUsers": "Type to search users...",
+      "loadingUsers": "Loading users...",
+      "noUsersFound": "No available users found",
+      "removeVolunteer": "Remove volunteer from service",
+      "assignRole": "Assign role",
+      "assignInstrument": "Assign instrument",
+      "loadingInstruments": "Loading instruments...",
+      "unassignInstrument": "Unassign {{instrument}}"
+    },
+    "status": {
+      "draft": "Draft",
+      "published": "Published", 
+      "completed": "Completed"
+    },
+    "loading": {
+      "authenticating": "Authenticating...",
+      "loadingDashboard": "Loading your dashboard..."
+    },
+    "errors": {
+      "loginRequired": "You must be logged in to create a service.",
+      "noPermission": "You do not have permission to create services. Only admins and owners can create services.",
+      "noPermissionSongs": "You do not have permission to add songs. Only admins and owners can add songs to services.",
+      "noPermissionVolunteers": "You do not have permission to create songs. Only admins and owners can create songs.",
+      "fillRequiredFields": "Please fill in all required fields.",
+      "failedToCreate": "Failed to create service. Please try again.",
+      "failedToCreateLater": "Failed to create service. Please try again later.",
+      "failedToAddSong": "Failed to add song. Please try again.",
+      "failedToAddSongLater": "Failed to add song. Please try again later.",
+      "failedToCreateSong": "Failed to create song. Please try again.",
+      "failedToRemoveVolunteer": "Failed to remove volunteer from service",
+      "failedToCheckVolunteer": "Failed to check if user is already volunteering",
+      "failedToAddVolunteer": "Failed to add volunteer to service",
+      "failedToCreateVolunteerLink": "Failed to create volunteer link",
+      "failedToLoadVolunteerLink": "Failed to load volunteer link",
+      "failedToCopyLink": "Failed to copy link to clipboard"
+    },
+    "success": {
+      "volunteerRemoved": "Volunteer removed from service",
+      "volunteerAdded": "Volunteer added to service",
+      "linkCopied": "Link copied!",
+      "linkCopiedDescription": "Volunteer link copied to clipboard"
+    },
+    "info": {
+      "alreadyVolunteering": "Already volunteering",
+      "userAlreadyVolunteering": "This user is already volunteering for this service"
+    },
+    "warning": {
+      "profileWarning": "Warning",
+      "profileWarningDescription": "Failed to create user profile. Some features may not work properly."
+    },
+    "addSongDrawer": {
+      "title": "Add New Song",
+      "titleField": "Title",
+      "titleRequired": "Title and Artist are required.",
+      "artist": "Artist",
+      "youtubeUrl": "YouTube URL",
+      "youtubePlaceholder": "https://youtube.com/watch?v=...",
+      "spotifyUrl": "Spotify URL", 
+      "spotifyPlaceholder": "https://open.spotify.com/track/...",
+      "key": "Key",
+      "keyPlaceholder": "C, G, D, etc.",
+      "bpm": "BPM",
+      "bpmPlaceholder": "120",
+      "ccliNumber": "CCLI Number",
+      "ccliPlaceholder": "CCLI-123456",
+      "tags": "Tags",
+      "tagsPlaceholder": "worship, contemporary, gospel (comma separated)",
+      "lyrics": "Lyrics",
+      "lyricsPlaceholder": "Enter song lyrics...",
+      "addingSong": "Adding...",
+      "organizationNotFound": "Organization not found."
+    }
+  },
+  "header": {
+    "appName": "Worship Lead",
+    "dashboard": "Dashboard",
+    "songbank": "Songbank",
+    "teamManagement": "Team Management",
+    "scheduleService": "Schedule Service",
+    "signOut": "Sign Out",
+    "language": "Language",
+    "languages": {
+      "en": "English",
+      "vn": "Vietnamese"
+    }
+  },
+  "songbank": {
+    "title": "Songbank",
+    "backToDashboard": "Back to Dashboard",
+    "addSong": "Add Song",
+    "searchSongs": "Search songs...",
+    "allKeys": "All Keys",
+    "allTags": "All Tags",
+    "cardView": "Card View",
+    "tableView": "Table View",
+    "noSongsFound": "No songs found. Try adjusting your search or filters.",
+    "noSongsYet": "Add your first song to get started!",
+    "addNewSong": "Add New Song",
+    "editSong": "Edit Song",
+    "deleteSong": "Delete Song",
+    "cancel": "Cancel",
+    "updateSong": "Update Song",
+    "title": "Title",
+    "artist": "Artist",
+    "youtubeUrl": "YouTube URL",
+    "spotifyUrl": "Spotify URL",
+    "key": "Key",
+    "bpm": "BPM",
+    "ccliNumber": "CCLI Number",
+    "tags": "Tags",
+    "lyrics": "Lyrics",
+    "actions": "Actions",
+    "links": "Links",
+    "edit": "Edit",
+    "delete": "Delete",
+    "errors": {
+      "accessDenied": "Access Denied",
+      "noPermissionCreate": "You do not have permission to create songs. Only admins and owners can create songs.",
+      "noPermissionEdit": "You do not have permission to edit songs. Only admins and owners can edit songs.",
+      "noPermissionDelete": "You do not have permission to delete songs. Only admins and owners can delete songs.",
+      "failedToAdd": "Failed to add song",
+      "failedToUpdate": "Failed to update song",
+      "failedToDelete": "Failed to delete song",
+      "confirmDelete": "Please type the exact song title to confirm deletion"
+    },
+    "success": {
+      "songAdded": "Song added successfully",
+      "songUpdated": "Song updated successfully",
+      "songDeleted": "Song deleted successfully"
+    },
+    "deleteModal": {
+      "title": "Delete Song",
+      "confirmText": "Are you sure you want to delete",
+      "warningInUse": "This song is currently being used in services:",
+      "draftServices": "draft service",
+      "publishedServices": "published service",
+      "typeToConfirm": "Type the song title to confirm deletion:"
+    },
+    "placeholders": {
+      "songTitle": "Song title",
+      "artistName": "Artist name",
+      "youtubeUrl": "https://youtube.com/watch?v=...",
+      "spotifyUrl": "https://open.spotify.com/track/...",
+      "keyExample": "C, G, D, etc.",
+      "bpmExample": "120",
+      "ccliExample": "CCLI-123456",
+      "tagsExample": "worship, contemporary, gospel (comma separated)",
+      "lyricsPlaceholder": "Enter song lyrics..."
+    }
+  },
+  "scheduleService": {
+    "title": "Schedule Service",
+    "description": "Create and manage worship services for your organization",
+    "createNewService": "Create New Service",
+    "cancel": "Cancel",
+    "backToDashboard": "Back to Dashboard",
+    "worshipServices": "Worship Services",
+    "noServicesFound": "No services found",
+    "noServicesDescription": "Create your first worship service to get started.",
+    "noServicesDescriptionMember": "No services have been created yet.",
+    "viewDetails": "View Details",
+    "edit": "Edit",
+    "delete": "Delete",
+    "serviceTitle": "Service Title",
+    "serviceDate": "Service Date",
+    "serviceTime": "Service Time",
+    "description": "Description",
+    "createService": "Create Service",
+    "scheduling": "Scheduling...",
+    "creatingService": "Creating Service...",
+    "loadingServices": "Loading services...",
+    "placeholders": {
+      "serviceTitle": "e.g., Sunday Morning Service",
+      "description": "Optional description or notes..."
+    },
+    "errors": {
+      "loginRequired": "You must be logged in to create a service.",
+      "noPermission": "You do not have permission to create services. Only admins and owners can create services.",
+      "noPermissionDelete": "You do not have permission to delete services. Only admins and owners can delete services.",
+      "fillRequired": "Please fill in all required fields.",
+      "failedToCreate": "Failed to create service. Please try again.",
+      "failedToDelete": "Failed to delete service"
+    },
+    "success": {
+      "serviceCreated": "Service created successfully!",
+      "serviceDeleted": "has been deleted successfully"
+    }
+  },
+  "serviceDetail": {
+    "title": "Service Details",
+    "description": "View and manage your worship service",
+    "editService": "Edit Service",
+    "backToServices": "Back to Services",
+    "serviceDate": "Service Date",
+    "serviceTime": "Service Time",
+    "created": "Created",
+    "lastUpdated": "Last Updated",
+    "serviceSongs": "Service Songs",
+    "addSongs": "Add Songs",
+    "volunteers": "Volunteers",
+    "serviceNotes": "Service Notes",
+    "addNotes": "Add Notes",
+    "noSongsAdded": "No songs added to this service yet",
+    "noSongsDescription": "Add songs from your songbank to create a setlist",
+    "noSongsDescriptionMember": "No songs have been added to this service yet.",
+    "dragToReorder": "Drag to reorder songs",
+    "noVolunteers": "No volunteers yet",
+    "noVolunteersDescription": "Share the volunteer link to get people to sign up for this service",
+    "noNotesAdded": "No notes added yet",
+    "noNotesDescription": "Add notes for the worship team, announcements, or special instructions",
+    "noNotesDescriptionMember": "No notes have been added to this service yet.",
+    "addSongToService": "Add Song to Service",
+    "selectSong": "Select Song",
+    "chooseSong": "Choose a song...",
+    "notes": "Notes (optional)",
+    "addSong": "Add Song",
+    "addingSong": "Adding Song...",
+    "removeSong": "Remove song from service",
+    "assignInstrument": "Assign instrument",
+    "loadingInstruments": "Loading instruments...",
+    "unassignInstrument": "Unassign",
+    "joined": "Joined",
+    "loadingVolunteers": "Loading volunteers...",
+    "loadingServiceDetails": "Loading service details...",
+    "serviceNotFound": "Service not found",
+    "errors": {
+      "serviceNotFound": "Service not found or you do not have access to it.",
+      "failedToLoad": "Failed to load service details.",
+      "noPermissionSongs": "You do not have permission to add songs to services. Only admins and owners can manage service songs.",
+      "noPermissionRemoveSongs": "You do not have permission to remove songs from services. Only admins and owners can manage service songs.",
+      "noPermissionReorder": "You do not have permission to reorder songs. Only admins and owners can manage service songs.",
+      "noPermissionInstruments": "You do not have permission to assign instruments.",
+      "noPermissionRemoveInstruments": "You do not have permission to remove instruments.",
+      "selectSongFirst": "Please select a song to add.",
+      "failedToAddSong": "Failed to add song to service. Please try again.",
+      "failedToRemoveSong": "Failed to remove song from service. Please try again.",
+      "failedToSaveOrder": "Failed to save new song order.",
+      "failedToAssignInstrument": "Failed to assign instrument",
+      "failedToRemoveInstrument": "Failed to remove instrument",
+      "instrumentAlreadyAssigned": "That instrument is already assigned to another volunteer."
+    },
+    "success": {
+      "songAdded": "Song added to service successfully!",
+      "songRemoved": "Song removed from service successfully!",
+      "orderUpdated": "Song order updated successfully!"
+    },
+    "confirm": {
+      "removeSong": "Are you sure you want to remove this song from the service?"
+    },
+    "placeholders": {
+      "songNotes": "e.g., special number, ending song"
+    }
+  },
+  "serviceEdit": {
+    "title": "Edit Service",
+    "description": "Update your worship service details",
+    "cancel": "Cancel",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "serviceTitle": "Service Title",
+    "serviceDate": "Service Date",
+    "serviceTime": "Service Time",
+    "status": "Status",
+    "description": "Description",
+    "statusOptions": {
+      "draft": "Draft",
+      "published": "Published",
+      "completed": "Completed"
+    },
+    "loadingServiceDetails": "Loading service details...",
+    "serviceNotFound": "Service not found",
+    "backToService": "Back to Service",
+    "backToServices": "Back to Services",
+    "errors": {
+      "accessDenied": "Access Denied",
+      "noPermission": "You do not have permission to edit services. Only admins and owners can edit services.",
+      "failedToLoad": "Failed to load service details.",
+      "serviceNotFound": "Service not found.",
+      "failedToUpdate": "Failed to update service."
+    },
+    "success": {
+      "serviceUpdated": "Service updated successfully!"
+    },
+    "placeholders": {
+      "serviceTitle": "e.g., Sunday Morning Service",
+      "description": "Add any additional details about this service..."
+    }
+  },
+  "teamManagement": {
+    "title": "Team Management",
+    "description": "Invite team members to collaborate on your worship planning",
+    "backToDashboard": "Back to Dashboard",
+    "readOnlyAccess": "Read-Only Access: You can view team members and instruments, but only admins and owners can invite members, manage roles, or manage instruments.",
+    "teamMembers": "Team Members",
+    "roles": "Roles",
+    "inviteNewMember": "Invite New Member",
+    "inviteDescription": "Send an invitation to join your organization",
+    "pendingInvitations": "Pending Invitations",
+    "joinRequests": "Join Requests",
+    "emailAddress": "Email Address",
+    "invite": "Invite",
+    "inviting": "Sending...",
+    "name": "Name",
+    "description": "Description",
+    "descriptionOptional": "Description (optional)",
+    "addRole": "Add Role",
+    "saveChanges": "Save Changes",
+    "adding": "Adding...",
+    "saving": "Saving...",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "copyLink": "Copy Link",
+    "approve": "Approve",
+    "noMembers": "No members found",
+    "noRoles": "No roles added",
+    "noPendingInvitations": "No pending invitations",
+    "noJoinRequests": "No pending join requests",
+    "loadingTeamManagement": "Loading team management...",
+    "loadingRoles": "Loading roles...",
+    "loadingJoinRequests": "Loading join requests...",
+    "joined": "Joined",
+    "sent": "Sent",
+    "requested": "Requested",
+    "roleOptions": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "statusOptions": {
+      "pending": "pending",
+      "accepted": "accepted",
+      "expired": "expired"
+    },
+    "errors": {
+      "noPermissionInvite": "You do not have permission to invite users. Only admins and owners can invite users.",
+      "noPermissionCancel": "You do not have permission to cancel invitations. Only admins and owners can cancel invitations.",
+      "noPermissionManageInstruments": "You do not have permission to manage instruments. Only admins and owners can manage instruments.",
+      "noPermissionDeleteInstruments": "You do not have permission to delete instruments. Only admins and owners can delete instruments.",
+      "inviteAlreadySent": "An invitation has already been sent to this email address.",
+      "failedToCreateInvite": "Failed to create invitation record. Please try again.",
+      "failedToSendInvite": "Failed to send invitation. Please try again.",
+      "failedToCopyLink": "Failed to copy invitation link",
+      "nameRequired": "Name is required",
+      "failedToCreateInstrument": "Failed to create instrument",
+      "failedToUpdateInstrument": "Failed to update instrument",
+      "failedToDeleteInstrument": "Failed to delete instrument",
+      "failedToLoadInstruments": "Failed to load instruments",
+      "failedToLoadJoinRequests": "Failed to load join requests",
+      "failedToLoadProfiles": "Failed to load user profiles",
+      "failedToApproveRequest": "Failed to approve join request",
+      "failedToCreateMembership": "Failed to create membership",
+      "onlyOwnersCanChangeRoles": "Only owners can change member roles",
+      "cannotChangeOwnRole": "You cannot change your own role",
+      "atLeastOneOwner": "At least one owner is required",
+      "failedToUpdateRole": "Failed to update role",
+      "failedToChangeRole": "Failed to change role"
+    },
+    "success": {
+      "inviteCreated": "Invitation created successfully! Copy and share this link:",
+      "linkCopied": "Link copied to clipboard!",
+      "linkCopiedToClipboard": "Invitation link copied to clipboard!",
+      "instrumentCreated": "Instrument created",
+      "instrumentUpdated": "Instrument updated",
+      "instrumentDeleted": "Instrument deleted",
+      "joinRequestApproved": "Join request approved successfully!",
+      "roleUpdated": "Role updated"
+    },
+    "confirm": {
+      "cancelInvite": "Are you sure you want to cancel this invitation?",
+      "deleteInstrument": "Delete this instrument?",
+      "approveJoinRequest": "Are you sure you want to approve this join request?"
+    },
+    "placeholders": {
+      "emailAddress": "Enter email address",
+      "instrumentName": "e.g. Acoustic Guitar",
+      "instrumentDescription": "Details or notes"
+    },
+    "info": {
+      "onlyAdminsOwners": "Only admins and owners can invite new members to the organization.",
+      "onlyAdminsOwnersManage": "Only admins and owners can manage instruments."
+    }
+  },
+  "header": {
+    "appName": "Worship Lead",
+    "dashboard": "Dashboard",
+    "login": "Login",
+    "tryForFree": "Try for free",
+    "language": "Language"
+  },
+  "homePage": {
+    "hero": {
+      "title": "Organize Your Worship Team with Ease",
+      "subtitle": "Streamline worship planning, coordinate volunteers, and manage your songbank all in one place.",
+      "getStarted": "Get Started for Free",
+      "learnMore": "Learn More"
+    },
+    "features": {
+      "title": "Features",
+      "scheduling": {
+        "title": "Scheduling",
+        "description": "Easily schedule your worship team volunteers and coordinate rehearsals with our intuitive calendar system."
+      },
+      "songBank": {
+        "title": "Song Bank",
+        "description": "Build and manage your church's song library with lyrics, chords, and arrangement notes all in one place."
+      },
+      "teamManagement": {
+        "title": "Team Management",
+        "description": "Keep track of your team members, their skills, and availability to build the perfect worship team."
+      }
+    }
+  },
+  "loginPage": {
+    "title": "Welcome Back",
+    "subtitle": "Sign in to your Worship Lead account",
+    "continueWithGoogle": "Continue with Google",
+    "or": "or",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "noAccount": "Don't have an account?",
+    "signUp": "Sign up",
+    "copyright": "All rights reserved.",
+    "errors": {
+      "googleSignInFailed": "Failed to sign in with Google"
+    },
+    "placeholders": {
+      "email": "Enter your email",
+      "password": "Enter your password"
+    }
+  },
+  "signupPage": {
+    "title": "Create your account",
+    "subtitleDefault": "Join Worship Lead and start organizing your worship team",
+    "subtitleInvited": "You've been invited to join",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "createAccount": "Create account",
+    "creatingAccount": "Creating account...",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign in",
+    "copyright": "All rights reserved.",
+    "verifyingInvitation": "Verifying invitation...",
+    "emailPreFilled": "Email is pre-filled from your invitation",
+    "placeholders": {
+      "firstName": "Enter your first name",
+      "lastName": "Enter your last name",
+      "email": "Enter your email",
+      "password": "Create a password",
+      "confirmPassword": "Confirm your password"
+    }
+  },
+  "volunteerPage": {
+    "title": "Volunteer for {{organizationName}}",
+    "subtitle": "Choose a service to volunteer for",
+    "signInPrompt": "Please sign in with Google to volunteer for services",
+    "continueWithGoogle": "Continue with Google",
+    "signingIn": "Signing in...",
+    "loadingPage": "Loading volunteer page...",
+    "loadingServices": "Loading available services...",
+    "organizationNotFound": "Organization not found",
+    "goHome": "Go Home",
+    "noServicesAvailable": "No services available for volunteering at the moment",
+    "viewDashboard": "View {{organizationName}} Dashboard",
+    "success": {
+      "assigned": "You have been assigned to this service",
+      "removed": "You have been removed from this service"
+    },
+    "errors": {
+      "invalidLink": "Invalid volunteer link",
+      "invalidData": "Invalid organization data",
+      "failedToLoad": "Failed to load organization",
+      "assignmentFailed": "Failed to assign you to this service",
+      "removeFailed": "Failed to remove volunteer assignment",
+      "updateFailed": "Failed to update volunteer status"
+    },
+    "warning": {
+      "profileFailed": "Failed to create user profile. Some features may not work properly."
+    }
+  }
+}

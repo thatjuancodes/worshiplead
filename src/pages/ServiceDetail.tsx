@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
@@ -128,6 +129,7 @@ function SortableSongItem({
   isRemoving: boolean
   canManage: boolean
 }) {
+  const { t } = useTranslation()
   const {
     attributes,
     listeners,
@@ -233,9 +235,9 @@ function SortableSongItem({
       {/* Actions */}
       <Box flexShrink={0}>
         {canManage && (
-          <Tooltip label="Remove song from service">
+          <Tooltip label={t('serviceDetail.removeSong')}>
             <IconButton
-              aria-label="Remove song from service"
+              aria-label={t('serviceDetail.removeSong')}
               icon={isRemoving ? <Spinner size="sm" /> : <CloseIcon />}
               colorScheme="red"
               size="sm"
@@ -256,6 +258,7 @@ function SortableSongItem({
 }
 
 export function ServiceDetail() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { canManagePrimary } = useOrganizationAccess()
@@ -786,7 +789,7 @@ export function ServiceDetail() {
         <Center h="100vh">
           <VStack spacing={4}>
             <Spinner size="xl" color="blue.500" />
-            <Text color={textColor}>Loading service details...</Text>
+            <Text color={textColor}>{t('serviceDetail.loadingServiceDetails')}</Text>
           </VStack>
         </Center>
       </Box>
@@ -856,10 +859,10 @@ export function ServiceDetail() {
           >
             <Box flex="1">
               <Heading as="h2" size="xl" color={textColor} mb={2}>
-                Service Details
+                {t('serviceDetail.title')}
               </Heading>
               <Text color={textSecondaryColor} fontSize="lg">
-                View and manage your worship service
+                {t('serviceDetail.description')}
               </Text>
             </Box>
             

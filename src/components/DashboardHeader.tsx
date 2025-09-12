@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { signOut } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useLanguage } from '../hooks/useLanguage'
 import { 
   Box, 
   Flex, 
@@ -67,6 +69,8 @@ const getOrganizationName = (organization: OrganizationData | null): string => {
 }
 
 export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
+  const { t } = useTranslation()
+  const { currentLanguage, changeLanguage, availableLanguages } = useLanguage()
   const navigate = useNavigate()
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
@@ -159,7 +163,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                   _hover={{ color: 'blue.500' }}
                   transition="color 0.2s ease"
                 >
-                  Worship Lead
+                  {t('header.appName')}
                 </Heading>
               </Link>
             </Box>
@@ -238,20 +242,20 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                       onClick={() => navigate('/dashboard')}
                       _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
                     >
-                      Dashboard
+                      {t('header.dashboard')}
                     </MenuItem>
                     <MenuItem
                       onClick={() => navigate('/songbank')}
                       _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
                     >
-                      Songbank
+                      {t('header.songbank')}
                     </MenuItem>
                     {canManagePrimary && (
                       <MenuItem
                         onClick={() => navigate('/team')}
                         _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
                       >
-                        Team Management
+                        {t('header.teamManagement')}
                       </MenuItem>
                     )}
                     {canManagePrimary && (
@@ -259,16 +263,41 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                         onClick={() => navigate('/schedule')}
                         _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
                       >
-                        Schedule Service
+                        {t('header.scheduleService')}
                       </MenuItem>
                     )}
+                    <MenuDivider />
+                    
+                    {/* Language Selector - Simple MenuItems */}
+                    {availableLanguages.map((language) => (
+                      <MenuItem
+                        key={language.code}
+                        onClick={() => changeLanguage(language.code)}
+                        _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                        bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
+                        color={currentLanguage === language.code ? 'blue.600' : 'inherit'}
+                        fontWeight={currentLanguage === language.code ? '600' : 'normal'}
+                      >
+                        <Flex justify="space-between" align="center" w="100%">
+                          <Text>
+                            {language.name}
+                          </Text>
+                          {currentLanguage === language.code && (
+                            <Text fontSize="xs" color="blue.500">
+                              ✓
+                            </Text>
+                          )}
+                        </Flex>
+                      </MenuItem>
+                    ))}
+                    
                     <MenuDivider />
                     <MenuItem
                       onClick={handleSignOut}
                       _hover={{ bg: useColorModeValue('red.50', 'red.900') }}
                       color="red.500"
                     >
-                      Sign Out
+                      {t('header.signOut')}
                     </MenuItem>
                   </MenuList>
                 </Menu>
@@ -331,7 +360,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                 _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
               >
                 <Text fontSize="lg" fontWeight="500">
-                  Dashboard
+                  {t('header.dashboard')}
                 </Text>
               </Button>
               
@@ -346,7 +375,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                 _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
               >
                 <Text fontSize="lg" fontWeight="500">
-                  Songbank
+                  {t('header.songbank')}
                 </Text>
               </Button>
               
@@ -362,7 +391,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                   _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
                 >
                   <Text fontSize="lg" fontWeight="500">
-                    Team Management
+                    {t('header.teamManagement')}
                   </Text>
                 </Button>
               )}
@@ -379,10 +408,33 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                   _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
                 >
                   <Text fontSize="lg" fontWeight="500">
-                    Schedule Service
+                    {t('header.scheduleService')}
                   </Text>
                 </Button>
               )}
+              
+              <Divider my={4} />
+              
+              {/* Language Selector for Mobile */}
+              <Box px={6} py={3}>
+                <Text fontSize="sm" fontWeight="600" color="gray.500" mb={2}>
+                  {t('header.language')}
+                </Text>
+                <Flex gap={2}>
+                  {availableLanguages.map((language) => (
+                    <Button
+                      key={language.code}
+                      size="sm"
+                      variant={currentLanguage === language.code ? 'solid' : 'outline'}
+                      colorScheme={currentLanguage === language.code ? 'blue' : 'gray'}
+                      onClick={() => changeLanguage(language.code)}
+                      flex="1"
+                    >
+                      {language.name}
+                    </Button>
+                  ))}
+                </Flex>
+              </Box>
               
               <Divider my={4} />
               
@@ -398,7 +450,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                 _active={{ bg: useColorModeValue('red.100', 'red.800') }}
               >
                 <Text fontSize="lg" fontWeight="500">
-                  Sign Out
+                  {t('header.signOut')}
                 </Text>
               </Button>
             </VStack>

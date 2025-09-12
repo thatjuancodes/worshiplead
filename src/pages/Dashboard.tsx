@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { 
   Box, 
   VStack, 
@@ -131,6 +132,7 @@ interface Instrument {
 }
 
 export function Dashboard() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { canManagePrimary } = useOrganizationAccess()
   const { user, isLoading: authLoading, error: authError } = useAuth()
@@ -240,8 +242,18 @@ export function Dashboard() {
   const toast = useToast()
 
   const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    t('dashboard.calendar.months.january'),
+    t('dashboard.calendar.months.february'),
+    t('dashboard.calendar.months.march'),
+    t('dashboard.calendar.months.april'),
+    t('dashboard.calendar.months.may'),
+    t('dashboard.calendar.months.june'),
+    t('dashboard.calendar.months.july'),
+    t('dashboard.calendar.months.august'),
+    t('dashboard.calendar.months.september'),
+    t('dashboard.calendar.months.october'),
+    t('dashboard.calendar.months.november'),
+    t('dashboard.calendar.months.december')
   ]
 
   function handlePrevMonth() {
@@ -1405,7 +1417,7 @@ export function Dashboard() {
               size="xl"
             />
             <Text color={subtitleColor} fontSize="md" m={0}>
-              {authLoading ? 'Authenticating...' : 'Loading your dashboard...'}
+              {authLoading ? t('dashboard.loading.authenticating') : t('dashboard.loading.loadingDashboard')}
             </Text>
           </VStack>
         </Center>
@@ -1440,7 +1452,7 @@ export function Dashboard() {
                     mb={4}
                     fontWeight="600"
                   >
-                    Upcoming
+                    {t('dashboard.upcoming.title')}
                   </Heading>
                   
                   {(() => {
@@ -1455,8 +1467,8 @@ export function Dashboard() {
                     return upcomingVolunteerDates.length === 0 ? (
                       <Text color={mutedTextColor} textAlign="center" py={4}>
                         {userVolunteerDates.length === 0 
-                          ? "You haven't volunteered for any services yet"
-                          : "No upcoming volunteer services"
+                          ? t('dashboard.upcoming.noVolunteerServices')
+                          : t('dashboard.upcoming.noUpcomingServices')
                         }
                       </Text>
                     ) : (
@@ -1552,7 +1564,7 @@ export function Dashboard() {
                                             borderRadius="md"
                                           >
                                             <WarningTwoIcon boxSize="3" />
-                                            No songs assigned yet
+                                            {t('dashboard.upcoming.noSongsAssigned')}
                                           </Badge>
                                         )}
                                       </HStack>
@@ -1590,7 +1602,7 @@ export function Dashboard() {
 
                 <HStack justify="center" mb={4}>
                   <IconButton
-                    aria-label="Previous month"
+                    aria-label={t('dashboard.calendar.previousMonth')}
                     icon={<ChevronLeftIcon />}
                     size="sm"
                     variant="outline"
@@ -1616,7 +1628,7 @@ export function Dashboard() {
                   </Text>
 
                   <IconButton
-                    aria-label="Next month"
+                    aria-label={t('dashboard.calendar.nextMonth')}
                     icon={<ChevronRightIcon />}
                     size="sm"
                     variant="outline"
@@ -1659,7 +1671,7 @@ export function Dashboard() {
                       createDrawer.onOpen()
                     }}
                   >
-                    Add New Service
+                    {t('dashboard.services.addNewService')}
                   </Button>
                 )}
               </Box>
@@ -1691,11 +1703,11 @@ export function Dashboard() {
                   mb={4}
                   fontWeight="600"
                 >
-                  Volunteer Link
+                  {t('dashboard.volunteerLink.title')}
                 </Heading>
                 
                 <Text color={subtitleColor} fontSize="sm" mb={4} display={{ base: 'none', md: 'block' }}>
-                  Share this link with potential volunteers to let them sign up for services
+                  {t('dashboard.volunteerLink.description')}
                 </Text>
 
                 <VStack spacing={3} align="stretch">
@@ -1705,15 +1717,15 @@ export function Dashboard() {
                     variant="outline"
                     onClick={copyVolunteerLink}
                     isLoading={loadingVolunteerLink || copyingLink}
-                    loadingText={loadingVolunteerLink ? "Loading..." : "Copying..."}
+                    loadingText={loadingVolunteerLink ? t('dashboard.volunteerLink.loading') : t('dashboard.volunteerLink.copying')}
                     isDisabled={loadingVolunteerLink}
                     w="100%"
                   >
                     {loadingVolunteerLink 
-                      ? "Loading..." 
+                      ? t('dashboard.volunteerLink.loading')
                       : volunteerLink 
-                        ? "Copy volunteer link" 
-                        : "Create volunteer link"
+                        ? t('dashboard.volunteerLink.copyButton')
+                        : t('dashboard.volunteerLink.createButton')
                     }
                   </Button>
 
@@ -1725,7 +1737,7 @@ export function Dashboard() {
                       onClick={() => navigate(`/volunteer/${volunteerLink}`)}
                       w="100%"
                     >
-                      Visit Volunteer Page
+                      {t('dashboard.volunteerLink.visitButton')}
                     </Button>
                   )}
                 </VStack>
@@ -1747,7 +1759,7 @@ export function Dashboard() {
                     mb={5}
                     fontWeight="600"
                   >
-                    Songs
+                    {t('dashboard.songs.title')}
                   </Heading>
 
                   {recentSongsError && (
@@ -1763,7 +1775,7 @@ export function Dashboard() {
                   </Center>
                 ) : recentSongs.length === 0 ? (
                   <Box textAlign="center" py={6}>
-                    <Text color={mutedTextColor}>No song usage yet</Text>
+                    <Text color={mutedTextColor}>{t('dashboard.songs.noUsage')}</Text>
                   </Box>
                 ) : (
                   <VStack spacing={3} align="stretch">
@@ -1841,12 +1853,12 @@ export function Dashboard() {
                     }}
                     onClick={addSongDrawer.onOpen}
                   >
-                    Add song
+                    {t('dashboard.songs.addSong')}
                   </Button>
                 )}
 
                 <Button mt={3} w="100%" variant="outline" colorScheme="blue" onClick={() => navigate('/songbank')}>
-                  Manage songs
+                  {t('dashboard.songs.manageSongs')}
                 </Button>
               </Box>
             </VStack>
@@ -3044,6 +3056,7 @@ interface CalendarProps {
 }
 
 function CalendarGrid({ year, month, scheduledDates, userVolunteerDates, onDateClick }: CalendarProps) {
+  const { t } = useTranslation()
 
   const firstOfMonth = new Date(year, month, 1)
   const startWeekday = firstOfMonth.getDay()
@@ -3054,7 +3067,15 @@ function CalendarGrid({ year, month, scheduledDates, userVolunteerDates, onDateC
   const cellBorderColor = useColorModeValue('gray.200', 'gray.600')
   const eventBg = useColorModeValue('blue.50', 'rgba(66, 153, 225, 0.16)')
 
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayNames = [
+    t('dashboard.calendar.weekdays.sun'),
+    t('dashboard.calendar.weekdays.mon'),
+    t('dashboard.calendar.weekdays.tue'),
+    t('dashboard.calendar.weekdays.wed'),
+    t('dashboard.calendar.weekdays.thu'),
+    t('dashboard.calendar.weekdays.fri'),
+    t('dashboard.calendar.weekdays.sat')
+  ]
 
   const prefixEmptyCells: (number | null)[] = Array.from({ length: startWeekday }, () => null)
   const monthDays: (number | null)[] = Array.from({ length: daysInMonth }, (_, i) => i + 1)

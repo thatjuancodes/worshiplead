@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
@@ -52,6 +53,7 @@ interface WorshipService {
 }
 
 export function ServiceEdit() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { canManagePrimary } = useOrganizationAccess()
@@ -209,7 +211,7 @@ export function ServiceEdit() {
         <Center h="100vh">
           <VStack spacing={4}>
             <Spinner size="xl" color="blue.500" />
-            <Text color={textColor}>Loading service details...</Text>
+            <Text color={textColor}>{t('serviceEdit.loadingServiceDetails')}</Text>
           </VStack>
         </Center>
       </Box>
@@ -308,10 +310,10 @@ export function ServiceEdit() {
           >
             <Box flex="1">
               <Heading as="h2" size="lg" color={textColor} mb={2} mt={8}>
-                Edit Service
+                {t('serviceEdit.title')}
               </Heading>
               <Text color={textSecondaryColor} fontSize="lg">
-                Update your worship service details
+                {t('serviceEdit.description')}
               </Text>
             </Box>
             
