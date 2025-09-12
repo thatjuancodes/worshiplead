@@ -12,13 +12,16 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
-  Text
+  Text,
+  Image,
+  HStack
 } from '@chakra-ui/react'
 import { ChevronDownIcon } from '@chakra-ui/icons'
 import { useTranslation } from 'react-i18next'
 import { useLanguage } from '../hooks/useLanguage'
 import { getCurrentUser } from '../lib/auth'
 import type { User } from '@supabase/supabase-js'
+import logoImage from '../assets/images/logo.png'
 
 export function Header() {
   const { t } = useTranslation()
@@ -76,20 +79,29 @@ export function Header() {
         <Flex justify="space-between" align="center" minH="3.5rem">
           <Box display="flex" alignItems="center" minH="2.25rem">
             <Link to={user ? "/dashboard" : "/"} style={{ textDecoration: 'none' }}>
-              <Heading
-                as="h1"
-                size="lg"
-                color={logoColor}
-                _hover={{ color: logoHoverColor }}
-                transition="color 0.2s ease"
-                m={0}
-                p={0}
-                lineHeight={1}
-                display="flex"
-                alignItems="center"
-              >
-                {t('header.appName')}
-              </Heading>
+              <HStack spacing={3} align="center">
+                <Image
+                  src={logoImage}
+                  alt="Worship Lead Logo"
+                  h="32px"
+                  w="auto"
+                  objectFit="contain"
+                />
+                <Heading
+                  as="h1"
+                  size="lg"
+                  color={logoColor}
+                  _hover={{ color: logoHoverColor }}
+                  transition="color 0.2s ease"
+                  m={0}
+                  p={0}
+                  lineHeight={1}
+                  display="flex"
+                  alignItems="center"
+                >
+                  {t('header.appName')}
+                </Heading>
+              </HStack>
             </Link>
           </Box>
 

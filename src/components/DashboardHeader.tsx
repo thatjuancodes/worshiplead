@@ -26,12 +26,15 @@ import {
   DrawerCloseButton,
   VStack,
   Divider,
-  useDisclosure
+  useDisclosure,
+  Image,
+  HStack
 } from '@chakra-ui/react'
 import { ChevronDownIcon, HamburgerIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
+import logoImage from '../assets/images/logo.png'
 
 interface OrganizationData {
   organization_id: string
@@ -154,17 +157,26 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
             {/* Logo */}
             <Box>
               <Link to="/dashboard" style={{ textDecoration: 'none' }}>
-                <Heading
-                  as="h1"
-                  size="lg"
-                  color={logoColor}
-                  fontWeight="700"
-                  m={0}
-                  _hover={{ color: 'blue.500' }}
-                  transition="color 0.2s ease"
-                >
-                  {t('header.appName')}
-                </Heading>
+                <HStack spacing={3} align="center">
+                  <Image
+                    src={logoImage}
+                    alt="Worship Lead Logo"
+                    h="32px"
+                    w="auto"
+                    objectFit="contain"
+                  />
+                  <Heading
+                    as="h1"
+                    size="lg"
+                    color={logoColor}
+                    fontWeight="700"
+                    m={0}
+                    _hover={{ color: 'blue.500' }}
+                    transition="color 0.2s ease"
+                  >
+                    {t('header.appName')}
+                  </Heading>
+                </HStack>
               </Link>
             </Box>
             
