@@ -217,6 +217,7 @@ export function Dashboard() {
   const [volunteerToInstrumentIds, setVolunteerToInstrumentIds] = useState<Record<string, string[]>>({})
   const [selectedInstrumentByVolunteer, setSelectedInstrumentByVolunteer] = useState<Record<string, string>>({})
   const [savingAssignmentByVolunteer, setSavingAssignmentByVolunteer] = useState<Record<string, boolean>>({})
+  const [removingVolunteerById, setRemovingVolunteerById] = useState<Record<string, boolean>>({})
 
   // Volunteer link state
   const [volunteerLink, setVolunteerLink] = useState<string>('')
@@ -716,6 +717,52 @@ export function Dashboard() {
       setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
     }
   }, [])
+
+  const handleRemoveVolunteer = useCallback(async (volunteerId: string, serviceId: string) => {
+    try {
+      setRemovingVolunteerById(prev => ({ ...prev, [volunteerId]: true }))
+      
+      // Remove the volunteer from the service
+      const { error } = await supabase
+        .from('worship_service_volunteers')
+        .delete()
+        .eq('id', volunteerId)
+
+      if (error) {
+        console.error('Error removing volunteer:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to remove volunteer from service',
+          status: 'error',
+          duration: 3000,
+          isClosable: true
+        })
+        return
+      }
+
+      // Refresh volunteers for the affected service
+      await loadVolunteersForServices([serviceId])
+      
+      toast({
+        title: 'Success',
+        description: 'Volunteer removed from service',
+        status: 'success',
+        duration: 3000,
+        isClosable: true
+      })
+    } catch (err) {
+      console.error('Unexpected error removing volunteer:', err)
+      toast({
+        title: 'Error', 
+        description: 'Failed to remove volunteer from service',
+        status: 'error',
+        duration: 3000,
+        isClosable: true
+      })
+    } finally {
+      setRemovingVolunteerById(prev => ({ ...prev, [volunteerId]: false }))
+    }
+  }, [loadVolunteersForServices, toast])
 
   useEffect(() => {
     if (createDrawer.isOpen) loadAvailableSongs()
@@ -1957,50 +2004,70 @@ export function Dashboard() {
                                             h="100%"
                                           >
                                             <VStack align="stretch" spacing={1} h="100%">
-                                              <HStack spacing={2} align="center">
-                                                <Text fontWeight="600" fontSize="sm" m={0}>
-                                                  {volunteer.profiles.first_name} {volunteer.profiles.last_name}
-                                                </Text>
-                                                {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
-                                                  const inst = instruments.find(i => i.id === instId)
-                                                  if (!inst) return null
-                                                  return (
-                                                    <Box key={instId} as="span">
-                                                      <Badge
-                                                        colorScheme="blue"
-                                                        variant="solid"
-                                                        borderRadius="md"
-                                                        fontSize="0.7rem"
-                                                        display="inline-flex"
-                                                        alignItems="center"
-                                                        pl={2}
-                                                        pr={2}
-                                                        py={0.5}
-                                                        gap={0}
-                                                        role="group"
-                                                      >
-                                                        {inst.name}
-                                                        <Box
-                                                          h="14px"
-                                                          ml={0}
-                                                          display="none"
-                                                          alignItems="center"
-                                                          justifyContent="center"
-                                                          _groupHover={{ display: 'inline-flex', ml: 1 }}
-                                                        >
-                                                          <CloseButton
-                                                            size="xs"
-                                                            aria-label={`Unassign ${inst.name}`}
-                                                            onClick={() => handleRemoveInstrument(volunteer.id, instId)}
-                                                            variant="ghost"
-                                                            color="whiteAlpha.800"
-                                                            _hover={{ color: 'white' }}
-                                                          />
+                                              <HStack spacing={2} align="center" justify="space-between">
+                                                <HStack spacing={2} align="center" flex="1">
+                                                  <Text fontWeight="600" fontSize="sm" m={0}>
+                                                    {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                                                  </Text>
+                                                  <HStack spacing={1} flexWrap="wrap">
+                                                    {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
+                                                      const inst = instruments.find(i => i.id === instId)
+                                                      if (!inst) return null
+                                                      return (
+                                                        <Box key={instId} as="span">
+                                                          <Badge
+                                                            colorScheme="blue"
+                                                            variant="solid"
+                                                            borderRadius="md"
+                                                            fontSize="0.7rem"
+                                                            display="inline-flex"
+                                                            alignItems="center"
+                                                            pl={2}
+                                                            pr={2}
+                                                            py={0.5}
+                                                            gap={0}
+                                                            role="group"
+                                                          >
+                                                            {inst.name}
+                                                            <Box
+                                                              h="14px"
+                                                              ml={0}
+                                                              display="none"
+                                                              alignItems="center"
+                                                              justifyContent="center"
+                                                              _groupHover={{ display: 'inline-flex', ml: 1 }}
+                                                            >
+                                                              <CloseButton
+                                                                size="xs"
+                                                                aria-label={`Unassign ${inst.name}`}
+                                                                onClick={() => handleRemoveInstrument(volunteer.id, instId)}
+                                                                variant="ghost"
+                                                                color="whiteAlpha.800"
+                                                                _hover={{ color: 'white' }}
+                                                              />
+                                                            </Box>
+                                                          </Badge>
                                                         </Box>
-                                                      </Badge>
-                                                    </Box>
-                                                  )
-                                                }).filter(Boolean)}
+                                                      )
+                                                    }).filter(Boolean)}
+                                                  </HStack>
+                                                </HStack>
+                                                
+                                                {canManagePrimary && (
+                                                  <Tooltip label="Remove volunteer from service">
+                                                    <IconButton
+                                                      aria-label="Remove volunteer from service"
+                                                      icon={removingVolunteerById[volunteer.id] ? <Spinner size="xs" /> : <CloseIcon boxSize="3" />}
+                                                      variant="ghost"
+                                                      colorScheme="red"
+                                                      size="sm"
+                                                      opacity={0.6}
+                                                      _hover={{ opacity: 1, bg: useColorModeValue('red.100', 'red.800') }}
+                                                      onClick={() => handleRemoveVolunteer(volunteer.id, svc.id)}
+                                                      isDisabled={!!removingVolunteerById[volunteer.id]}
+                                                    />
+                                                  </Tooltip>
+                                                )}
                                               </HStack>
                                               <HStack spacing={2} align="center" mt={2}>
                                                 <Select
@@ -2307,50 +2374,70 @@ export function Dashboard() {
                                             h="100%"
                                           >
                                             <VStack align="stretch" spacing={1} h="100%">
-                                              <HStack spacing={2} align="center">
-                                                <Text fontWeight="600" fontSize="sm" m={0}>
-                                                  {volunteer.profiles.first_name} {volunteer.profiles.last_name}
-                                                </Text>
-                                                {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
-                                                  const inst = instruments.find(i => i.id === instId)
-                                                  if (!inst) return null
-                                                  return (
-                                                    <Box key={instId} as="span">
-                                                      <Badge
-                                                        colorScheme="blue"
-                                                        variant="solid"
-                                                        borderRadius="md"
-                                                        fontSize="0.7rem"
-                                                        display="inline-flex"
-                                                        alignItems="center"
-                                                        pl={2}
-                                                        pr={2}
-                                                        py={0.5}
-                                                        gap={0}
-                                                        role="group"
-                                                      >
-                                                        {inst.name}
-                                                        <Box
-                                                          h="14px"
-                                                          ml={0}
-                                                          display="none"
-                                                          alignItems="center"
-                                                          justifyContent="center"
-                                                          _groupHover={{ display: 'inline-flex', ml: 1 }}
-                                                        >
-                                                          <CloseButton
-                                                            size="xs"
-                                                            aria-label={`Unassign ${inst.name}`}
-                                                            onClick={() => handleRemoveInstrument(volunteer.id, instId)}
-                                                            variant="ghost"
-                                                            color="whiteAlpha.800"
-                                                            _hover={{ color: 'white' }}
-                                                          />
+                                              <HStack spacing={2} align="center" justify="space-between">
+                                                <HStack spacing={2} align="center" flex="1">
+                                                  <Text fontWeight="600" fontSize="sm" m={0}>
+                                                    {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                                                  </Text>
+                                                  <HStack spacing={1} flexWrap="wrap">
+                                                    {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
+                                                      const inst = instruments.find(i => i.id === instId)
+                                                      if (!inst) return null
+                                                      return (
+                                                        <Box key={instId} as="span">
+                                                          <Badge
+                                                            colorScheme="blue"
+                                                            variant="solid"
+                                                            borderRadius="md"
+                                                            fontSize="0.7rem"
+                                                            display="inline-flex"
+                                                            alignItems="center"
+                                                            pl={2}
+                                                            pr={2}
+                                                            py={0.5}
+                                                            gap={0}
+                                                            role="group"
+                                                          >
+                                                            {inst.name}
+                                                            <Box
+                                                              h="14px"
+                                                              ml={0}
+                                                              display="none"
+                                                              alignItems="center"
+                                                              justifyContent="center"
+                                                              _groupHover={{ display: 'inline-flex', ml: 1 }}
+                                                            >
+                                                              <CloseButton
+                                                                size="xs"
+                                                                aria-label={`Unassign ${inst.name}`}
+                                                                onClick={() => handleRemoveInstrument(volunteer.id, instId)}
+                                                                variant="ghost"
+                                                                color="whiteAlpha.800"
+                                                                _hover={{ color: 'white' }}
+                                                              />
+                                                            </Box>
+                                                          </Badge>
                                                         </Box>
-                                                      </Badge>
-                                                    </Box>
-                                                  )
-                                                }).filter(Boolean)}
+                                                      )
+                                                    }).filter(Boolean)}
+                                                  </HStack>
+                                                </HStack>
+                                                
+                                                {canManagePrimary && (
+                                                  <Tooltip label="Remove volunteer from service">
+                                                    <IconButton
+                                                      aria-label="Remove volunteer from service"
+                                                      icon={removingVolunteerById[volunteer.id] ? <Spinner size="xs" /> : <CloseIcon boxSize="3" />}
+                                                      variant="ghost"
+                                                      colorScheme="red"
+                                                      size="sm"
+                                                      opacity={0.6}
+                                                      _hover={{ opacity: 1, bg: useColorModeValue('red.100', 'red.800') }}
+                                                      onClick={() => handleRemoveVolunteer(volunteer.id, svc.id)}
+                                                      isDisabled={!!removingVolunteerById[volunteer.id]}
+                                                    />
+                                                  </Tooltip>
+                                                )}
                                               </HStack>
                                               <HStack spacing={2} align="center" mt={2}>
                                                 <Select
