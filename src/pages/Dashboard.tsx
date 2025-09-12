@@ -219,6 +219,15 @@ export function Dashboard() {
   const [savingAssignmentByVolunteer, setSavingAssignmentByVolunteer] = useState<Record<string, boolean>>({})
   const [removingVolunteerById, setRemovingVolunteerById] = useState<Record<string, boolean>>({})
 
+  // Add volunteer state
+  const [showAddVolunteerByService, setShowAddVolunteerByService] = useState<Record<string, boolean>>({})
+  const [volunteerSearchByService, setVolunteerSearchByService] = useState<Record<string, string>>({})
+  const [volunteerSuggestionsVisible, setVolunteerSuggestionsVisible] = useState<Record<string, boolean>>({})
+  const [addingVolunteerByService, setAddingVolunteerByService] = useState<Record<string, boolean>>({})
+  const [availableUsers, setAvailableUsers] = useState<Array<{id: string, first_name: string, last_name: string, email: string}>>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [usersLoaded, setUsersLoaded] = useState(false)
+
   // Volunteer link state
   const [volunteerLink, setVolunteerLink] = useState<string>('')
   const [loadingVolunteerLink, setLoadingVolunteerLink] = useState(false)
@@ -764,9 +773,146 @@ export function Dashboard() {
     }
   }, [loadVolunteersForServices, toast])
 
+  const loadAvailableUsers = useCallback(async () => {
+    if (!organization || usersLoaded || loadingUsers) return
+    
+    try {
+      setLoadingUsers(true)
+      
+      // Get all users who are members of this organization
+      const { data: orgMembers, error: membersError } = await supabase
+        .from('organization_memberships')
+        .select('user_id')
+        .eq('organization_id', organization.organization_id)
+
+      if (membersError) {
+        console.error('Error loading organization members:', membersError)
+        setLoadingUsers(false)
+        return
+      }
+
+      if (!orgMembers || orgMembers.length === 0) {
+        setAvailableUsers([])
+        setLoadingUsers(false)
+        setUsersLoaded(true)
+        return
+      }
+
+      // Get profiles for these users
+      const userIds = orgMembers.map(m => m.user_id)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+        .order('first_name', { ascending: true })
+
+      if (profilesError) {
+        console.error('Error loading user profiles:', profilesError)
+        setLoadingUsers(false)
+        return
+      }
+
+      setAvailableUsers(profiles || [])
+      setUsersLoaded(true)
+    } catch (err) {
+      console.error('Unexpected error loading users:', err)
+    } finally {
+      setLoadingUsers(false)
+    }
+  }, [organization, usersLoaded])
+
+  const handleAddVolunteer = useCallback(async (serviceId: string, userId: string) => {
+    if (!serviceId || !userId) return
+    
+    try {
+      setAddingVolunteerByService(prev => ({ ...prev, [serviceId]: true }))
+      
+      // Check if user is already volunteering for this service
+      const { data: existing, error: checkError } = await supabase
+        .from('worship_service_volunteers')
+        .select('id')
+        .eq('worship_service_id', serviceId)
+        .eq('user_id', userId)
+        .single()
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing volunteer:', checkError)
+        toast({
+          title: 'Error',
+          description: 'Failed to check if user is already volunteering',
+          status: 'error',
+          duration: 3000,
+          isClosable: true
+        })
+        return
+      }
+
+      if (existing) {
+        toast({
+          title: 'Already volunteering',
+          description: 'This user is already volunteering for this service',
+          status: 'info',
+          duration: 3000,
+          isClosable: true
+        })
+        return
+      }
+
+      // Add the volunteer
+      const { error: insertError } = await supabase
+        .from('worship_service_volunteers')
+        .insert({
+          worship_service_id: serviceId,
+          user_id: userId
+        })
+
+      if (insertError) {
+        console.error('Error adding volunteer:', insertError)
+        toast({
+          title: 'Error',
+          description: 'Failed to add volunteer to service',
+          status: 'error',
+          duration: 3000,
+          isClosable: true
+        })
+        return
+      }
+
+      // Refresh volunteers for this service
+      await loadVolunteersForServices([serviceId])
+      
+      // Reset form
+      setVolunteerSearchByService(prev => ({ ...prev, [serviceId]: '' }))
+      setVolunteerSuggestionsVisible(prev => ({ ...prev, [serviceId]: false }))
+      setShowAddVolunteerByService(prev => ({ ...prev, [serviceId]: false }))
+      
+      toast({
+        title: 'Success',
+        description: 'Volunteer added to service',
+        status: 'success',
+        duration: 3000,
+        isClosable: true
+      })
+    } catch (err) {
+      console.error('Unexpected error adding volunteer:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to add volunteer to service',
+        status: 'error',
+        duration: 3000,
+        isClosable: true
+      })
+    } finally {
+      setAddingVolunteerByService(prev => ({ ...prev, [serviceId]: false }))
+    }
+  }, [loadVolunteersForServices, toast])
+
   useEffect(() => {
-    if (createDrawer.isOpen) loadAvailableSongs()
-  }, [createDrawer.isOpen, loadAvailableSongs])
+    if (createDrawer.isOpen) {
+      loadAvailableSongs()
+      loadAvailableUsers()
+    }
+  }, [createDrawer.isOpen, loadAvailableSongs, loadAvailableUsers])
 
   const loadRecentSongs = useCallback(async () => {
     if (!organization) return
@@ -2098,7 +2244,97 @@ export function Dashboard() {
                                         ))}
                                       </SimpleGrid>
                                     )}
-                                    <Button size="md" w="100%" colorScheme="gray" onClick={() => navigate(`/service/${svc.id}`)}>
+                                    
+                                    {canManagePrimary && (
+                                      <Box mt={3} mb={3}>
+                                        {!showAddVolunteerByService[svc.id] && (
+                                          <Button
+                                            variant="outline"
+                                            colorScheme="blue"
+                                            w="100%"
+                                            borderWidth="1px"
+                                            onClick={() => setShowAddVolunteerByService(prev => ({ ...prev, [svc.id]: true }))}
+                                            animation={`${addSongPulse} 2.5s ease-out infinite`}
+                                          >
+                                            Add volunteer
+                                          </Button>
+                                        )}
+                                        {showAddVolunteerByService[svc.id] && (
+                                          <VStack spacing={3} align="stretch">
+                                            <Box>
+                                              <Input
+                                                type="text"
+                                                placeholder="Type to search users..."
+                                                size="md"
+                                                value={volunteerSearchByService[svc.id] || ''}
+                                                onChange={(e) => {
+                                                  const value = e.target.value
+                                                  setVolunteerSearchByService(prev => ({ ...prev, [svc.id]: value }))
+                                                  setVolunteerSuggestionsVisible(prev => ({ ...prev, [svc.id]: value.trim().length > 0 }))
+                                                }}
+                                              />
+                                              {volunteerSuggestionsVisible[svc.id] && (
+                                                <Box mt={2} border="1px" borderColor={cardBorderColor} borderRadius="md" overflow="hidden">
+                                                  {(() => {
+                                                    const searchQuery = (volunteerSearchByService[svc.id] || '').trim().toLowerCase()
+                                                    const currentVolunteerUserIds = new Set((serviceIdToVolunteers[svc.id] || []).map(v => v.user_id))
+                                                    const filteredUsers = availableUsers
+                                                      .filter(user => !currentVolunteerUserIds.has(user.id))
+                                                      .filter(user => {
+                                                        if (!searchQuery) return true
+                                                        const fullName = `${user.first_name} ${user.last_name}`.toLowerCase()
+                                                        const email = user.email.toLowerCase()
+                                                        return fullName.includes(searchQuery) || email.includes(searchQuery)
+                                                      })
+                                                      .slice(0, 6)
+                                                    
+                                                    if (loadingUsers) {
+                                                      return (
+                                                        <Button variant="ghost" w="100%" justifyContent="center" isLoading>
+                                                          Loading users...
+                                                        </Button>
+                                                      )
+                                                    }
+                                                    
+                                                    if (!filteredUsers.length) {
+                                                      return (
+                                                        <Button variant="ghost" w="100%" justifyContent="flex-start" isDisabled>
+                                                          No available users found
+                                                        </Button>
+                                                      )
+                                                    }
+                                                    
+                                                    return (
+                                                      <VStack align="stretch" spacing={0}>
+                                                        {filteredUsers.map(user => (
+                                                          <Button
+                                                            key={user.id}
+                                                            variant="ghost"
+                                                            justifyContent="flex-start"
+                                                            onClick={async () => {
+                                                              await handleAddVolunteer(svc.id, user.id)
+                                                              setVolunteerSearchByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setVolunteerSuggestionsVisible(prev => ({ ...prev, [svc.id]: false }))
+                                                              setShowAddVolunteerByService(prev => ({ ...prev, [svc.id]: false }))
+                                                            }}
+                                                            isLoading={addingVolunteerByService[svc.id]}
+                                                            isDisabled={addingVolunteerByService[svc.id]}
+                                                          >
+                                                            {user.first_name} {user.last_name} ({user.email})
+                                                          </Button>
+                                                        ))}
+                                                      </VStack>
+                                                    )
+                                                  })()}
+                                                </Box>
+                                              )}
+                                            </Box>
+                                          </VStack>
+                                        )}
+                                      </Box>
+                                    )}
+                                    
+                                    <Button mt={6} size="md" w="100%" colorScheme="gray" onClick={() => navigate(`/service/${svc.id}`)}>
                                       Open Full Page
                                     </Button>
                                   </Box>
@@ -2465,7 +2701,97 @@ export function Dashboard() {
                                         ))}
                                       </SimpleGrid>
                                     )}
-                                    <Button size="md" w="100%" colorScheme="gray" onClick={() => navigate(`/service/${svc.id}`)}>
+                                    
+                                    {canManagePrimary && (
+                                      <Box mt={3} mb={3}>
+                                        {!showAddVolunteerByService[svc.id] && (
+                                          <Button
+                                            variant="outline"
+                                            colorScheme="blue"
+                                            w="100%"
+                                            borderWidth="1px"
+                                            onClick={() => setShowAddVolunteerByService(prev => ({ ...prev, [svc.id]: true }))}
+                                            animation={`${addSongPulse} 2.5s ease-out infinite`}
+                                          >
+                                            Add volunteer
+                                          </Button>
+                                        )}
+                                        {showAddVolunteerByService[svc.id] && (
+                                          <VStack spacing={3} align="stretch">
+                                            <Box>
+                                              <Input
+                                                type="text"
+                                                placeholder="Type to search users..."
+                                                size="md"
+                                                value={volunteerSearchByService[svc.id] || ''}
+                                                onChange={(e) => {
+                                                  const value = e.target.value
+                                                  setVolunteerSearchByService(prev => ({ ...prev, [svc.id]: value }))
+                                                  setVolunteerSuggestionsVisible(prev => ({ ...prev, [svc.id]: value.trim().length > 0 }))
+                                                }}
+                                              />
+                                              {volunteerSuggestionsVisible[svc.id] && (
+                                                <Box mt={2} border="1px" borderColor={cardBorderColor} borderRadius="md" overflow="hidden">
+                                                  {(() => {
+                                                    const searchQuery = (volunteerSearchByService[svc.id] || '').trim().toLowerCase()
+                                                    const currentVolunteerUserIds = new Set((serviceIdToVolunteers[svc.id] || []).map(v => v.user_id))
+                                                    const filteredUsers = availableUsers
+                                                      .filter(user => !currentVolunteerUserIds.has(user.id))
+                                                      .filter(user => {
+                                                        if (!searchQuery) return true
+                                                        const fullName = `${user.first_name} ${user.last_name}`.toLowerCase()
+                                                        const email = user.email.toLowerCase()
+                                                        return fullName.includes(searchQuery) || email.includes(searchQuery)
+                                                      })
+                                                      .slice(0, 6)
+                                                    
+                                                    if (loadingUsers) {
+                                                      return (
+                                                        <Button variant="ghost" w="100%" justifyContent="center" isLoading>
+                                                          Loading users...
+                                                        </Button>
+                                                      )
+                                                    }
+                                                    
+                                                    if (!filteredUsers.length) {
+                                                      return (
+                                                        <Button variant="ghost" w="100%" justifyContent="flex-start" isDisabled>
+                                                          No available users found
+                                                        </Button>
+                                                      )
+                                                    }
+                                                    
+                                                    return (
+                                                      <VStack align="stretch" spacing={0}>
+                                                        {filteredUsers.map(user => (
+                                                          <Button
+                                                            key={user.id}
+                                                            variant="ghost"
+                                                            justifyContent="flex-start"
+                                                            onClick={async () => {
+                                                              await handleAddVolunteer(svc.id, user.id)
+                                                              setVolunteerSearchByService(prev => ({ ...prev, [svc.id]: '' }))
+                                                              setVolunteerSuggestionsVisible(prev => ({ ...prev, [svc.id]: false }))
+                                                              setShowAddVolunteerByService(prev => ({ ...prev, [svc.id]: false }))
+                                                            }}
+                                                            isLoading={addingVolunteerByService[svc.id]}
+                                                            isDisabled={addingVolunteerByService[svc.id]}
+                                                          >
+                                                            {user.first_name} {user.last_name} ({user.email})
+                                                          </Button>
+                                                        ))}
+                                                      </VStack>
+                                                    )
+                                                  })()}
+                                                </Box>
+                                              )}
+                                            </Box>
+                                          </VStack>
+                                        )}
+                                      </Box>
+                                    )}
+                                    
+                                    <Button mt={6} size="md" w="100%" colorScheme="gray" onClick={() => navigate(`/service/${svc.id}`)}>
                                       Open Full Page
                                     </Button>
                                   </Box>
