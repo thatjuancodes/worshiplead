@@ -165,6 +165,8 @@
     "teamManagement": "Team Management",
     "scheduleService": "Schedule Service",
     "signOut": "Sign Out",
+    "login": "Login",
+    "tryForFree": "Try for Free",
     "language": "Language",
     "languages": {
       "en": "English",

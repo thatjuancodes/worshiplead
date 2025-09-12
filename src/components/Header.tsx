@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { 
   Box, 
   Flex, 
@@ -28,6 +28,20 @@ export function Header() {
   const { currentLanguage, changeLanguage, availableLanguages } = useLanguage()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Create translation helper function that provides fallbacks
+  const translate = useCallback((key: string, fallback: string) => {
+    const translation = t(key)
+    // Debug logging for troubleshooting
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Translation for ${key}:`, translation, `(current language: ${currentLanguage})`)
+    }
+    // Check if translation exists and is not just the key returned
+    if (translation && translation !== key && translation.trim() !== '') {
+      return translation
+    }
+    return fallback
+  }, [t, currentLanguage])
 
   const headerBg = useColorModeValue('white', 'gray.800')
   const borderColor = useColorModeValue('gray.200', 'gray.700')
@@ -99,7 +113,7 @@ export function Header() {
                   display="flex"
                   alignItems="center"
                 >
-                  {t('header.appName')}
+                  {translate('header.appName', 'Worship Lead')}
                 </Heading>
               </HStack>
             </Link>
@@ -130,16 +144,16 @@ export function Header() {
               <>
                 {user ? (
                   <Button as={Link} to="/dashboard" colorScheme="blue" size="md">
-                    {t('header.dashboard')}
+                    {translate('header.dashboard', 'Dashboard')}
                   </Button>
                 ) : (
                   <>
                     <Button as={Link} to="/login" variant="outline" size="md">
-                      {t('header.login')}
+                      {translate('header.login', 'Login')}
                     </Button>
 
                     <Button as={Link} to="/signup" colorScheme="blue" size="md">
-                      {t('header.tryForFree')}
+                      {translate('header.tryForFree', 'Try for Free')}
                     </Button>
                   </>
                 )}
