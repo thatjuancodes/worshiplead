@@ -84,28 +84,11 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
     console.log('Current language:', currentLanguage)
     console.log('i18n language:', i18n.language)
     console.log('Available resources:', Object.keys(i18n.store?.data || {}))
-    console.log('VN header resources:', i18n.store?.data?.vn?.translation?.header)
+    console.log('VN header resources:', (i18n.store?.data as any)?.vn?.translation?.header)
   }
 
   // Create translation helper function that provides fallbacks
   const translate = useCallback((key: string, fallback: string) => {
-    // Force language-specific translations as a temporary fix
-    const hardcodedTranslations: Record<string, Record<string, string>> = {
-      'vn': {
-        'header.songbank': 'Kho bài hát',
-        'header.teamManagement': 'Quản lý Nhóm', 
-        'header.scheduleService': 'Lên lịch Dịch vụ',
-        'header.dashboard': 'Bảng điều khiển',
-        'header.signOut': 'Đăng xuất',
-        'header.language': 'Ngôn ngữ'
-      }
-    }
-
-    // Try hardcoded translation first if Vietnamese
-    if (currentLanguage === 'vn' && hardcodedTranslations[currentLanguage]?.[key]) {
-      return hardcodedTranslations[currentLanguage][key]
-    }
-
     const translation = t(key)
     // Debug logging for troubleshooting
     if (process.env.NODE_ENV === 'development') {

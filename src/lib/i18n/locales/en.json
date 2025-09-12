@@ -468,13 +468,6 @@
       "onlyAdminsOwnersManage": "Only admins and owners can manage instruments."
     }
   },
-  "header": {
-    "appName": "Worship Lead",
-    "dashboard": "Dashboard",
-    "login": "Login",
-    "tryForFree": "Try for free",
-    "language": "Language"
-  },
   "homePage": {
     "hero": {
       "title": "Organize Your Worship Team with Ease",
