@@ -1250,19 +1250,29 @@ export function Dashboard() {
                     Upcoming
                   </Heading>
                   
-                  {userVolunteerDates.length === 0 ? (
-                    <Text color={mutedTextColor} textAlign="center" py={4}>
-                      You haven't volunteered for any services yet
-                    </Text>
-                  ) : (
-                    <VStack spacing={3} align="stretch">
-                      {userVolunteerDates
-                        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-                        .slice(0, 5) // Show only next 5 volunteer services
-                        .map((date) => {
-                          // Find the service for this date
-                          const service = services.find(s => s.service_date === date)
-                          if (!service) return null
+                  {(() => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0) // Set to start of today for accurate comparison
+                    
+                    const upcomingVolunteerDates = userVolunteerDates
+                      .filter(date => new Date(date) >= today) // Only show today and future dates
+                      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+                      .slice(0, 5) // Show only next 5 volunteer services
+                    
+                    return upcomingVolunteerDates.length === 0 ? (
+                      <Text color={mutedTextColor} textAlign="center" py={4}>
+                        {userVolunteerDates.length === 0 
+                          ? "You haven't volunteered for any services yet"
+                          : "No upcoming volunteer services"
+                        }
+                      </Text>
+                    ) : (
+                      <VStack spacing={3} align="stretch">
+                        {upcomingVolunteerDates
+                          .map((date) => {
+                            // Find the service for this date
+                            const service = services.find(s => s.service_date === date)
+                            if (!service) return null
                           
                           return (
                             <Box
@@ -1367,11 +1377,12 @@ export function Dashboard() {
                               </HStack>
                             </Box>
                           )
-                        })
-                        .filter(Boolean) // Remove any null entries
-                    }
-                    </VStack>
-                  )}
+                          })
+                          .filter(Boolean) // Remove any null entries
+                      }
+                      </VStack>
+                    )
+                  })()}
                 </Box>
 
                 {/* Service Calendar Section */}
