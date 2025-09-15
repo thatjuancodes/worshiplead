@@ -163,13 +163,18 @@ export function VolunteerPage() {
     try {
       setLoadingServices(true)
       
-      // Get published services that are not completed
+      // Get today's date in YYYY-MM-DD format for filtering
+      const today = new Date().toISOString().split('T')[0]
+      
+      // Get published services that are upcoming (not past) and limit to 16
       const { data: services, error: servicesError } = await supabase
         .from('worship_services')
         .select('*')
         .eq('organization_id', organization.id)
         .eq('status', 'published')
+        .gte('service_date', today)
         .order('service_date', { ascending: true })
+        .limit(16)
 
       if (servicesError) {
         console.error('Error loading services:', servicesError)
