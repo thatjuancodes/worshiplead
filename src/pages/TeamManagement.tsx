@@ -12,21 +12,35 @@ import {
   Heading, 
   Text, 
   Button, 
-  Spinner, 
-  SimpleGrid, 
   useColorModeValue,
-  Container,
+  Skeleton,
+  SkeletonText,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  useDisclosure,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  useToast,
   FormControl,
   FormLabel,
   Input,
   Textarea,
-  Alert,
-  AlertIcon,
   Badge,
   Flex,
-  Center,
   Select,
-  Grid,
 } from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
 
@@ -90,6 +104,7 @@ interface Instrument {
 export function TeamManagement() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const toast = useToast()
   const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
@@ -98,38 +113,32 @@ export function TeamManagement() {
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
 
   // Instruments state
   const [instruments, setInstruments] = useState<Instrument[]>([])
   const [instrumentForm, setInstrumentForm] = useState({ name: '', description: '' })
   const [editingInstrumentId, setEditingInstrumentId] = useState<string | null>(null)
   const [isSavingInstrument, setIsSavingInstrument] = useState(false)
-  const [isLoadingInstruments, setIsLoadingInstruments] = useState(false)
-  const [instrumentError, setInstrumentError] = useState('')
-  const [instrumentSuccess, setInstrumentSuccess] = useState('')
 
   // Join requests state
   const [joinRequests, setJoinRequests] = useState<OrganizationJoinRequest[]>([])
-  const [isLoadingJoinRequests, setIsLoadingJoinRequests] = useState(false)
-  const [joinRequestError, setJoinRequestError] = useState('')
-  const [joinRequestSuccess, setJoinRequestSuccess] = useState('')
 
   // Role management state
-  const [roleError, setRoleError] = useState('')
-  const [roleSuccess, setRoleSuccess] = useState('')
   const [roleChangingMemberId, setRoleChangingMemberId] = useState<string | null>(null)
+
+  // Drawer states
+  const { isOpen: isInviteDrawerOpen, onOpen: onInviteDrawerOpen, onClose: onInviteDrawerClose } = useDisclosure()
+  const { isOpen: isRoleDrawerOpen, onOpen: onRoleDrawerOpen, onClose: onRoleDrawerClose } = useDisclosure()
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
   const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
-  const textColor = useColorModeValue('gray.800', 'white')
-  const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
-  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
   const titleColor = useColorModeValue('gray.800', 'white')
-  const subtitleColor = useColorModeValue('gray.600', 'gray.300')
+  const textColor = useColorModeValue('gray.700', 'gray.200')
+  const mutedTextColor = useColorModeValue('gray.500', 'gray.400')
+  const tableHeaderBg = useColorModeValue('gray.50', 'gray.700')
+  const tableHoverBg = useColorModeValue('gray.50', 'gray.700')
   const isOwner = organization?.role === 'owner'
 
   const checkUserAndOrganization = useCallback(async () => {
@@ -149,6 +158,12 @@ export function TeamManagement() {
         return
       }
       setOrganization(userOrg)
+      await Promise.all([
+        loadInvites(userOrg.organization_id),
+        loadMembers(userOrg.organization_id),
+        loadJoinRequests(userOrg.organization_id),
+        loadInstruments(userOrg.organization_id)
+      ])
       setLoading(false)
     } catch (error) {
       console.error('Error checking user and organization:', error)
@@ -156,14 +171,15 @@ export function TeamManagement() {
     }
   }, [navigate])
 
-  const loadInvites = useCallback(async () => {
-    if (!organization) return
+  const loadInvites = useCallback(async (organizationId?: string) => {
+    const orgId = organizationId || organization?.organization_id
+    if (!orgId) return
 
     try {
       const { data, error } = await supabase
         .from('organization_invites')
         .select('*')
-        .eq('organization_id', organization.organization_id)
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -177,11 +193,12 @@ export function TeamManagement() {
     }
   }, [organization])
 
-  const loadMembers = useCallback(async () => {
-    if (!organization) return
+  const loadMembers = useCallback(async (organizationId?: string) => {
+    const orgId = organizationId || organization?.organization_id
+    if (!orgId) return
 
     try {
-      console.log('Loading members for organization:', organization.organization_id)
+      console.log('Loading members for organization:', orgId)
       
       // First, get the memberships
       const { data: memberships, error: membershipsError } = await supabase
@@ -193,7 +210,7 @@ export function TeamManagement() {
           status,
           joined_at
         `)
-        .eq('organization_id', organization.organization_id)
+        .eq('organization_id', orgId)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
 
@@ -239,12 +256,11 @@ export function TeamManagement() {
     }
   }, [organization])
 
-  const loadJoinRequests = useCallback(async () => {
-    if (!organization) return
+  const loadJoinRequests = useCallback(async (organizationId?: string) => {
+    const orgId = organizationId || organization?.organization_id
+    if (!orgId) return
 
     try {
-      setIsLoadingJoinRequests(true)
-      setJoinRequestError('')
 
       // Get join requests for this organization that are not approved
       const { data: requests, error: requestsError } = await supabase
@@ -256,13 +272,12 @@ export function TeamManagement() {
           approved,
           created_at
         `)
-        .eq('organization_id', organization.organization_id)
+        .eq('organization_id', orgId)
         .eq('approved', false)
         .order('created_at', { ascending: true })
 
       if (requestsError) {
         console.error('Error loading join requests:', requestsError)
-        setJoinRequestError('Failed to load join requests')
         return
       }
 
@@ -280,7 +295,6 @@ export function TeamManagement() {
 
       if (profilesError) {
         console.error('Error loading profiles for join requests:', profilesError)
-        setJoinRequestError('Failed to load user profiles')
         return
       }
 
@@ -296,9 +310,6 @@ export function TeamManagement() {
       setJoinRequests(requestsWithProfiles)
     } catch (error) {
       console.error('Error loading join requests:', error)
-      setJoinRequestError('Failed to load join requests')
-    } finally {
-      setIsLoadingJoinRequests(false)
     }
   }, [organization])
 
@@ -306,52 +317,50 @@ export function TeamManagement() {
     checkUserAndOrganization()
   }, [checkUserAndOrganization])
 
-  useEffect(() => {
-    if (organization) {
-      loadInvites()
-      loadMembers()
-      loadJoinRequests()
-    }
-  }, [organization, loadInvites, loadMembers, loadJoinRequests])
-
-  const loadInstruments = useCallback(async () => {
-    if (!organization) return
+  const loadInstruments = useCallback(async (organizationId?: string) => {
+    const orgId = organizationId || organization?.organization_id
+    if (!orgId) return
 
     try {
-      setIsLoadingInstruments(true)
       const { data, error } = await supabase
         .from('instruments')
         .select('*')
-        .eq('organization_id', organization.organization_id)
+        .eq('organization_id', orgId)
         .order('name', { ascending: true })
 
       if (error) {
         console.error('Error loading instruments:', error)
-        setInstrumentError('Failed to load instruments')
         return
       }
 
       setInstruments(data || [])
     } catch (error) {
       console.error('Error loading instruments:', error)
-      setInstrumentError('Failed to load instruments')
-    } finally {
-      setIsLoadingInstruments(false)
     }
   }, [organization])
 
   async function handleChangeMemberRole(member: OrganizationMember, newRole: 'owner' | 'admin' | 'member') {
     if (!organization || !user) return
-    setRoleError('')
-    setRoleSuccess('')
 
     if (!isOwner) {
-      setRoleError('Only owners can change member roles')
+      toast({
+        title: 'Access Denied',
+        description: 'Only owners can change member roles',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
       return
     }
 
     if (user.id === member.user_id) {
-      setRoleError('You cannot change your own role')
+      toast({
+        title: 'Error',
+        description: 'You cannot change your own role',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
       return
     }
 
@@ -360,7 +369,13 @@ export function TeamManagement() {
     if (member.role === 'owner' && newRole !== 'owner') {
       const ownerCount = members.filter(m => m.role === 'owner').length
       if (ownerCount <= 1) {
-        setRoleError('At least one owner is required')
+        toast({
+          title: 'Error',
+          description: 'At least one owner is required',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
     }
@@ -375,16 +390,33 @@ export function TeamManagement() {
 
       if (error) {
         console.error('Error updating member role:', error)
-        setRoleError('Failed to update role')
+        toast({
+          title: 'Error',
+          description: 'Failed to update role',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
 
-      setRoleSuccess('Role updated')
+      toast({
+        title: 'Success',
+        description: 'Role updated successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
       await loadMembers()
-      setTimeout(() => setRoleSuccess(''), 2000)
     } catch (e) {
       console.error('Error changing role:', e)
-      setRoleError('Failed to change role')
+      toast({
+        title: 'Error',
+        description: 'Failed to change role',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     } finally {
       setRoleChangingMemberId(null)
     }
@@ -395,9 +427,6 @@ export function TeamManagement() {
     if (!confirm('Are you sure you want to approve this join request?')) return
 
     try {
-      setJoinRequestError('')
-      setJoinRequestSuccess('')
-
       // Start a transaction by updating the join request first
       const { error: updateError } = await supabase
         .from('organization_join_requests')
@@ -409,7 +438,13 @@ export function TeamManagement() {
 
       if (updateError) {
         console.error('Error updating join request:', updateError)
-        setJoinRequestError('Failed to approve join request')
+        toast({
+          title: 'Error',
+          description: 'Failed to approve join request',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
 
@@ -426,23 +461,38 @@ export function TeamManagement() {
 
       if (membershipError) {
         console.error('Error creating membership:', membershipError)
-        setJoinRequestError('Failed to create membership')
+        toast({
+          title: 'Error',
+          description: 'Failed to create membership',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
 
-      setJoinRequestSuccess('Join request approved successfully!')
+      toast({
+        title: 'Success',
+        description: 'Join request approved successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
       
       // Reload data
       await Promise.all([
         loadJoinRequests(),
         loadMembers()
       ])
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setJoinRequestSuccess(''), 3000)
     } catch (error) {
       console.error('Error approving join request:', error)
-      setJoinRequestError('Failed to approve join request')
+      toast({
+        title: 'Error',
+        description: 'Failed to approve join request',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     }
   }
 
@@ -455,18 +505,28 @@ export function TeamManagement() {
     if (!organization) return
     
     if (!canManagePrimary) {
-      setInstrumentError('You do not have permission to manage instruments. Only admins and owners can manage instruments.')
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to manage roles. Only admins and owners can manage roles.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
       return
     }
     
     if (!instrumentForm.name.trim()) {
-      setInstrumentError('Name is required')
+      toast({
+        title: 'Error',
+        description: 'Role name is required',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
       return
     }
 
     setIsSavingInstrument(true)
-    setInstrumentError('')
-    setInstrumentSuccess('')
 
     try {
       if (editingInstrumentId) {
@@ -481,11 +541,23 @@ export function TeamManagement() {
 
         if (error) {
           console.error('Error updating instrument:', error)
-          setInstrumentError('Failed to update instrument')
+          toast({
+            title: 'Error',
+            description: 'Failed to update role',
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          })
           return
         }
 
-        setInstrumentSuccess('Instrument updated')
+        toast({
+          title: 'Success',
+          description: 'Role updated successfully',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
       } else {
         const { error } = await supabase
           .from('instruments')
@@ -497,45 +569,61 @@ export function TeamManagement() {
 
         if (error) {
           console.error('Error creating instrument:', error)
-          setInstrumentError('Failed to create instrument')
+          toast({
+            title: 'Error',
+            description: 'Failed to create role',
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          })
           return
         }
 
-        setInstrumentSuccess('Instrument created')
+        toast({
+          title: 'Success',
+          description: 'Role created successfully',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
       }
 
       setInstrumentForm({ name: '', description: '' })
       setEditingInstrumentId(null)
+      onRoleDrawerClose()
       await loadInstruments()
     } catch (error) {
       console.error('Error saving instrument:', error)
-      setInstrumentError('Failed to save instrument')
+      toast({
+        title: 'Error',
+        description: 'Failed to save role',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     } finally {
       setIsSavingInstrument(false)
-      setTimeout(() => setInstrumentSuccess(''), 2000)
     }
   }
 
   async function handleEditInstrument(instrument: Instrument) {
     setEditingInstrumentId(instrument.id)
     setInstrumentForm({ name: instrument.name, description: instrument.description || '' })
-    setInstrumentError('')
-    setInstrumentSuccess('')
-  }
-
-  async function handleCancelEditInstrument() {
-    setEditingInstrumentId(null)
-    setInstrumentForm({ name: '', description: '' })
-    setInstrumentError('')
-    setInstrumentSuccess('')
+    onRoleDrawerOpen()
   }
 
   async function handleDeleteInstrument(instrumentId: string) {
     if (!organization) return
-    if (!confirm('Delete this instrument?')) return
+    if (!confirm('Delete this role?')) return
 
     if (!canManagePrimary) {
-      setInstrumentError('You do not have permission to delete instruments. Only admins and owners can delete instruments.')
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to delete roles. Only admins and owners can delete roles.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
       return
     }
 
@@ -548,17 +636,33 @@ export function TeamManagement() {
 
       if (error) {
         console.error('Error deleting instrument:', error)
-        setInstrumentError('Failed to delete instrument')
+        toast({
+          title: 'Error',
+          description: 'Failed to delete role',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
 
-      setInstrumentSuccess('Instrument deleted')
+      toast({
+        title: 'Success',
+        description: 'Role deleted successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
       await loadInstruments()
     } catch (error) {
       console.error('Error deleting instrument:', error)
-      setInstrumentError('Failed to delete instrument')
-    } finally {
-      setTimeout(() => setInstrumentSuccess(''), 2000)
+      toast({
+        title: 'Error',
+        description: 'Failed to delete role',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     }
   }
 
@@ -567,13 +671,17 @@ export function TeamManagement() {
     if (!organization || !inviteEmail.trim()) return
 
     if (!canManagePrimary) {
-      setError('You do not have permission to invite users. Only admins and owners can invite users.')
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to invite users. Only admins and owners can invite users.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
       return
     }
 
     setInviting(true)
-    setError('')
-    setSuccess('')
 
     try {
       // Check if invitation already exists for this email
@@ -587,7 +695,13 @@ export function TeamManagement() {
       if (inviteError) {
         console.error('Error checking existing invites:', inviteError)
       } else if (existingInvites && existingInvites.length > 0) {
-        setError('An invitation has already been sent to this email address.')
+        toast({
+          title: 'Error',
+          description: 'An invitation has already been sent to this email address.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         setInviting(false)
         return
       }
@@ -610,7 +724,13 @@ export function TeamManagement() {
 
       if (dbError) {
         console.error('Error creating invite record:', dbError)
-        setError('Failed to create invitation record. Please try again.')
+        toast({
+          title: 'Error',
+          description: 'Failed to create invitation record. Please try again.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
 
@@ -639,12 +759,25 @@ export function TeamManagement() {
       }
 
       setInviteEmail('')
-      setSuccess(`Invitation created successfully! Copy and share this link: ${inviteUrl}`)
+      toast({
+        title: 'Success',
+        description: `Invitation created successfully! Copy and share this link: ${inviteUrl}`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      })
+      onInviteDrawerClose()
       await loadInvites()
       await loadMembers()
     } catch (error) {
       console.error('Error inviting user:', error)
-      setError('Failed to send invitation. Please try again.')
+      toast({
+        title: 'Error',
+        description: 'Failed to send invitation. Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     } finally {
       setInviting(false)
     }
@@ -654,7 +787,13 @@ export function TeamManagement() {
     if (!confirm('Are you sure you want to cancel this invitation?')) return
 
     if (!canManagePrimary) {
-      setError('You do not have permission to cancel invitations. Only admins and owners can cancel invitations.')
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to cancel invitations. Only admins and owners can cancel invitations.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
       return
     }
 
@@ -679,583 +818,759 @@ export function TeamManagement() {
     try {
       const inviteUrl = `${window.location.origin}/signup?invite=${inviteId}`
       await navigator.clipboard.writeText(inviteUrl)
-      setSuccess('Invitation link copied to clipboard!')
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000)
+      toast({
+        title: 'Success',
+        description: 'Invitation link copied to clipboard!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
     } catch (error) {
       console.error('Error copying invite link:', error)
-      setError('Failed to copy invitation link')
-      
-      // Clear error message after 3 seconds
-      setTimeout(() => setError(''), 3000)
+      toast({
+        title: 'Error',
+        description: 'Failed to copy invitation link',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     }
   }
 
-  if (loading) {
-    return (
-      <Box minH="100vh" bg={bgColor}>
-        <Center h="100vh">
-          <VStack spacing={4}>
-            <Spinner size="xl" color="blue.500" />
-            <Text color={textColor}>{t('teamManagement.loadingTeamManagement')}</Text>
-          </VStack>
-        </Center>
-      </Box>
-    )
-  }
 
   return (
     <Box minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" py={8}>
-        <Container maxW="1200px" px={6}>
-          {/* Header Section */}
-          <Flex 
-            justify="space-between" 
-            align="flex-start" 
-            mb={8}
+      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+        {/* Back Button */}
+        <Box mb={4}>
+          <Button
+            variant="ghost"
+            colorScheme="gray"
+            onClick={() => navigate('/dashboard')}
+            leftIcon={<Text>←</Text>}
+            size="sm"
+          >
+            Back to Dashboard
+          </Button>
+        </Box>
+
+        {/* Header Section */}
+        <Box
+          bg={cardBg}
+          p={4}
+          borderRadius="lg"
+          boxShadow="sm"
+          border="1px"
+          borderColor={cardBorderColor}
+          mb={3}
+        >
+          <Flex
             direction={{ base: 'column', md: 'row' }}
-            gap={{ base: 4, md: 0 }}
+            justify="space-between"
+            align={{ base: 'stretch', md: 'center' }}
+            gap={4}
           >
             <Box>
-              <Heading as="h2" size="lg" color={textColor} mb={2}>
-                {t('teamManagement.title')}
+              <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
+                👥 {t('teamManagement.title')}
               </Heading>
-              <Text color={textSecondaryColor} fontSize="lg">
-                {t('teamManagement.description')}
-              </Text>
             </Box>
-            
-            <Button
-              variant="outline"
-              colorScheme="gray"
-              onClick={() => navigate('/dashboard')}
-              size="md"
-            >
-              {t('teamManagement.backToDashboard')}
-            </Button>
+
+            {canManagePrimary && (
+              <Button
+                colorScheme="blue"
+                onClick={onInviteDrawerOpen}
+                size="md"
+                isDisabled={loading}
+              >
+                + Invite Member
+              </Button>
+            )}
           </Flex>
+        </Box>
 
-          {/* Permission Info Alert */}
-          {!canManagePrimary && (
-            <Box
-              bg={useColorModeValue('blue.50', 'blue.900')}
-              p={4}
-              borderRadius="lg"
-              border="1px"
-              borderColor={useColorModeValue('blue.200', 'blue.700')}
-              mb={6}
-            >
-              <Text color={useColorModeValue('blue.800', 'blue.200')} fontSize="sm" fontWeight="500">
+        {/* Permission Info Alert */}
+        {!canManagePrimary && (
+          <Box
+            bg={useColorModeValue('blue.50', 'blue.900')}
+            p={4}
+            borderRadius="lg"
+            border="1px"
+            borderColor={useColorModeValue('blue.200', 'blue.700')}
+            mb={4}
+          >
+            <Text color={useColorModeValue('blue.800', 'blue.200')} fontSize="sm" fontWeight="500">
               📖 {t('teamManagement.readOnlyAccess')}
-              </Text>
-            </Box>
-          )}
+            </Text>
+          </Box>
+        )}
 
-          {/* Content Grid */}
-          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8} alignItems="start">
-            <VStack spacing={8} align="stretch">
-              {/* Team Members Section */}
-              <Box
-                bg={cardBg}
-                borderRadius="lg"
-                boxShadow="sm"
-                border="1px"
-                borderColor={cardBorderColor}
-                p={6}
-              >
-                <Heading as="h3" size="md" color={textColor} mb={5}>
-                  {t('teamManagement.teamMembers')} ({members.length})
-                </Heading>
-                {roleError && (
-                  <Alert status="error" borderRadius="md" mb={4}>
-                    <AlertIcon />
-                    {roleError}
-                  </Alert>
-                )}
-                {roleSuccess && (
-                  <Alert status="success" borderRadius="md" mb={4}>
-                    <AlertIcon />
-                    {roleSuccess}
-                  </Alert>
-                )}
-                
-                {members.length === 0 ? (
-                  <Box textAlign="center" py={8}>
-                    <Text color={textMutedColor}>No members found</Text>
-                    <Text fontSize="xs" color={textMutedColor} mt={2}>
-                      Debug: Members data: {JSON.stringify(members, null, 2)}
-                    </Text>
+        {/* Tabs */}
+        <Tabs>
+          <TabList>
+            <Tab>Team Members ({members.length})</Tab>
+            <Tab>Roles ({instruments.length})</Tab>
+            <Tab>Invitations ({invites.length + joinRequests.length})</Tab>
+          </TabList>
+
+          <TabPanels>
+            {/* Team Members Tab */}
+            <TabPanel px={0}>
+              {loading ? (
+                <Box
+                  bg={cardBg}
+                  borderRadius="lg"
+                  boxShadow="sm"
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  overflow="hidden"
+                >
+                  <Box overflowX="auto">
+                    <Table variant="simple" minW="600px">
+                      <Thead>
+                        <Tr>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Role</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Joined</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {[...Array(5)].map((_, index) => (
+                          <Tr key={index}>
+                            <Td minW="200px">
+                              <Skeleton height="20px" />
+                            </Td>
+                            <Td minW="200px">
+                              <Skeleton height="20px" />
+                            </Td>
+                            <Td minW="100px">
+                              <Skeleton height="20px" borderRadius="md" />
+                            </Td>
+                            <Td minW="120px">
+                              <Skeleton height="20px" />
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
                   </Box>
-                ) : (
-                  <VStack spacing={3} align="stretch">
-                    {members.map(member => (
-                      <Box
-                        key={member.id}
-                        bg={useColorModeValue('gray.50', 'gray.700')}
-                        borderRadius="md"
-                        border="1px"
-                        borderColor={cardBorderColor}
-                        p={4}
-                      >
-                        <Flex justify="space-between" align="center">
-                          <Box flex="1">
-                            <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                              {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
-                            </Text>
-                            <VStack spacing={0} align="start" fontSize="sm">
-                              <Text color={textMutedColor}>
-                                {member.profiles?.email || 'No email'}
-                              </Text>
-                              <Text color={textMutedColor}>
-                                Joined {new Date(member.joined_at).toLocaleDateString()}
-                              </Text>
-                            </VStack>
-                          </Box>
-                          
-                          {isOwner && user && user.id !== member.user_id ? (
-                            <HStack spacing={2} align="center">
-                              <Select
-                                size="sm"
-                                value={member.role}
-                                onChange={e => handleChangeMemberRole(member, e.target.value as 'owner' | 'admin' | 'member')}
-                                isDisabled={roleChangingMemberId === member.id}
-                                minW="150px"
-                              >
-                                <option value="owner">Owner</option>
-                                <option value="admin">Admin</option>
-                                <option value="member">Member</option>
-                              </Select>
-                              {roleChangingMemberId === member.id && <Spinner size="sm" />}
-                            </HStack>
-                          ) : (
-                            <Badge
-                              colorScheme={
-                                member.role === 'owner' ? 'yellow' : 
-                                member.role === 'admin' ? 'blue' : 'gray'
-                              }
-                              variant="subtle"
-                              textTransform="capitalize"
-                              fontSize="xs"
-                              px={3}
-                              py={1}
-                            >
-                              {member.role}
-                            </Badge>
-                          )}
-                        </Flex>
-                      </Box>
-                    ))}
-                  </VStack>
-                )}
-              </Box>
-
-              {/* Instruments Section */}
-              <Box
-                bg={cardBg}
-                borderRadius="lg"
-                boxShadow="sm"
-                border="1px"
-                borderColor={cardBorderColor}
-                p={6}
-              >
-                <Heading as="h3" size="md" color={textColor} mb={5}>
-                  Roles ({instruments.length})
-                </Heading>
-
-                {canManagePrimary ? (
-                  <form onSubmit={handleSaveInstrument}>
-                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
-                      <FormControl>
-                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                          Name
-                        </FormLabel>
-                        <Input
-                          type="text"
-                          value={instrumentForm.name}
-                          onChange={e => setInstrumentForm(v => ({ ...v, name: e.target.value }))}
-                          placeholder="e.g. Acoustic Guitar"
-                          required
-                          size="md"
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                          Description (optional)
-                        </FormLabel>
-                        <Textarea
-                          value={instrumentForm.description}
-                          onChange={e => setInstrumentForm(v => ({ ...v, description: e.target.value }))}
-                          placeholder="Details or notes"
-                          size="md"
-                          rows={1}
-                        />
-                      </FormControl>
-                    </SimpleGrid>
-
-                    <HStack spacing={3} mb={4}>
-                      <Button
-                        type="submit"
-                        colorScheme="blue"
-                        isLoading={isSavingInstrument}
-                        loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
-                        disabled={!instrumentForm.name.trim()}
-                        size="md"
-                      >
-                        {editingInstrumentId ? 'Save Changes' : 'Add Role'}
-                      </Button>
-
-                      {editingInstrumentId && (
-                        <Button
-                          variant="outline"
-                          colorScheme="gray"
-                          onClick={handleCancelEditInstrument}
-                          size="md"
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </HStack>
-                  </form>
-                ) : (
-                  <Text color={subtitleColor} fontSize="sm" mb={4}>
-                    Only admins and owners can manage instruments.
-                  </Text>
-                )}
-
-                {instrumentError && (
-                  <Alert status="error" borderRadius="md" mt={2}>
-                    <AlertIcon />
-                    {instrumentError}
-                  </Alert>
-                )}
-
-                {instrumentSuccess && (
-                  <Alert status="success" borderRadius="md" mt={2}>
-                    <AlertIcon />
-                    {instrumentSuccess}
-                  </Alert>
-                )}
-
-                <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
-                  {isLoadingInstruments ? (
-                    <HStack>
-                      <Spinner size="sm" />
-                      <Text color={textMutedColor}>Loading roles...</Text>
-                    </HStack>
-                  ) : instruments.length === 0 ? (
-                    <Box textAlign="center" py={4}>
-                      <Text color={textMutedColor}>No roles added</Text>
-                    </Box>
-                  ) : (
-                    <VStack spacing={3} align="stretch">
-                      {instruments.map(instrument => (
-                        <Box
-                          key={instrument.id}
-                          bg={useColorModeValue('gray.50', 'gray.700')}
-                          borderRadius="md"
-                          border="1px"
-                          borderColor={cardBorderColor}
-                          p={4}
-                        >
-                          <Flex justify="space-between" align="center">
-                            <Box flex="1">
-                              <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                                {instrument.name}
-                              </Text>
-
-                              {instrument.description && (
-                                <Text color={textMutedColor} fontSize="sm">
-                                  {instrument.description}
-                                </Text>
-                              )}
-                            </Box>
-
-                            <HStack spacing={2}>
-                              {canManagePrimary && (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    colorScheme="gray"
-                                    size="sm"
-                                    onClick={() => handleEditInstrument(instrument)}
-                                  >
-                                    Edit
-                                  </Button>
-
-                                  <Button
-                                    variant="outline"
-                                    colorScheme="red"
-                                    size="sm"
-                                    onClick={() => handleDeleteInstrument(instrument.id)}
-                                  >
-                                    Delete
-                                  </Button>
-                                </>
-                              )}
-                            </HStack>
-                          </Flex>
-                        </Box>
-                      ))}
-                    </VStack>
-                  )}
                 </Box>
-              </Box>
-            </VStack>
-
-            <VStack spacing={8} align="stretch">
-              {/* Invite New Member Section */}
-              <Box
-                bg={cardBg}
-                borderRadius="lg"
-                boxShadow="sm"
-                border="1px"
-                borderColor={cardBorderColor}
-                p={6}
-                alignSelf="start"
-              >
-                <VStack align="start" spacing={4}>
-                {canManagePrimary ? (
-                  <>
-                    <Heading as="h3" size="md" color={titleColor}>
-                      Invite New Member
-                    </Heading>
-                    <Text color={subtitleColor} fontSize="sm">
-                      Send an invitation to join your organization
-                    </Text>
-                    
-                    <form onSubmit={handleInviteUser}>
-                      <Grid templateColumns={{ base: '1fr', md: 'minmax(420px, 1fr) auto' }} gap={4} alignItems="end" mb={4}>
-                        <FormControl>
-                          <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                            Email Address
-                          </FormLabel>
-                          <Input
-                            type="email"
-                            value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            placeholder="Enter email address"
-                            required
-                            size="md"
-                            h="40px"
-                          />
-                        </FormControl>
-
-                        <Button
-                          type="submit"
-                          colorScheme="blue"
-                          isLoading={inviting}
-                          loadingText="Sending..."
-                          disabled={!inviteEmail.trim()}
-                          size="md"
-                          h="40px"
-                          alignSelf={{ base: 'stretch', md: 'end' }}
-                        >
-                          Invite
-                        </Button>
-                      </Grid>
-                    </form>
-                  </>
-                ) : (
-                  <Box>
-                    <Heading as="h3" size="md" color={titleColor}>
-                      Invite New Member
-                    </Heading>
-                    <Text color={subtitleColor} fontSize="sm">
-                      Only admins and owners can invite new members to the organization.
-                    </Text>
-                  </Box>
-                )}
-
-                {error && (
-                  <Alert status="error" borderRadius="md" mt={4}>
-                    <AlertIcon />
-                    {error}
-                  </Alert>
-                )}
-
-                {success && (
-                  <Alert status="success" borderRadius="md" mt={4}>
-                    <AlertIcon />
-                    <Box flex="1">
-                      <Text>{success}</Text>
-                      {success.includes('Copy and share this link:') && (
-                        <Button
-                          variant="outline"
-                          colorScheme="gray"
-                          size="sm"
-                          onClick={() => {
-                            const url = success.split('Copy and share this link: ')[1]
-                            navigator.clipboard.writeText(url)
-                            setSuccess('Link copied to clipboard!')
-                          }}
-                          ml={3}
-                          mt={2}
-                        >
-                          Copy Link
-                        </Button>
-                      )}
-                    </Box>
-                  </Alert>
-                )}
-
-                {/* Pending Invitations */}
-                <Box mt={6} pt={6} borderTop="1px" borderColor={cardBorderColor}>
-                  <Heading as="h4" size="sm" color={textColor} mb={4}>
-                    Pending Invitations
-                  </Heading>
-                  
-                  {invites.length === 0 ? (
-                    <Box textAlign="center" py={8}>
-                      <Text color={textMutedColor}>No pending invitations</Text>
-                    </Box>
-                  ) : (
-                    <VStack spacing={3} align="stretch">
-                      {invites.map(invite => (
-                        <Box
-                          key={invite.id}
-                          bg={useColorModeValue('gray.50', 'gray.700')}
-                          borderRadius="md"
-                          border="1px"
-                          borderColor={cardBorderColor}
-                          p={4}
-                        >
-                          <Flex justify="space-between" align="center">
-                            <Box flex="1">
-                              <Text fontWeight="500" color={textColor} fontSize="md" mb={1}>
-                                {invite.email}
-                              </Text>
-                              <HStack spacing={3} fontSize="sm">
-                                <Text color={textMutedColor}>
-                                  Sent {new Date(invite.created_at).toLocaleDateString()}
-                                </Text>
+              ) : members.length === 0 ? (
+                <Box
+                  bg={cardBg}
+                  p={12}
+                  borderRadius="lg"
+                  boxShadow="sm"
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  textAlign="center"
+                >
+                  <Text color={mutedTextColor} fontSize="md">
+                    No team members found
+                  </Text>
+                </Box>
+              ) : (
+                <Box
+                  bg={cardBg}
+                  borderRadius="lg"
+                  boxShadow="sm"
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  overflow="hidden"
+                >
+                  <Box overflowX="auto">
+                    <Table variant="simple" minW="600px">
+                      <Thead>
+                        <Tr>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Role</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Joined</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {members.map(member => (
+                          <Tr key={member.id} _hover={{ bg: tableHoverBg }}>
+                            <Td fontWeight="500" color={titleColor} minW="200px">
+                              {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
+                            </Td>
+                            <Td minW="200px">
+                              {member.profiles?.email || 'No email'}
+                            </Td>
+                            <Td minW="100px">
+                              {isOwner && user && user.id !== member.user_id ? (
+                                <HStack spacing={2}>
+                                  <Select
+                                    size="sm"
+                                    value={member.role}
+                                    onChange={e => handleChangeMemberRole(member, e.target.value as 'owner' | 'admin' | 'member')}
+                                    isDisabled={roleChangingMemberId === member.id}
+                                    minW="120px"
+                                  >
+                                    <option value="owner">Owner</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="member">Member</option>
+                                  </Select>
+                                  {roleChangingMemberId === member.id && <Skeleton height="20px" width="20px" />}
+                                </HStack>
+                              ) : (
                                 <Badge
                                   colorScheme={
-                                    invite.status === 'pending' ? 'yellow' : 
-                                    invite.status === 'accepted' ? 'green' : 'red'
+                                    member.role === 'owner' ? 'yellow' : 
+                                    member.role === 'admin' ? 'blue' : 'gray'
                                   }
                                   variant="subtle"
                                   textTransform="capitalize"
                                   fontSize="xs"
-                                  px={2}
+                                  px={3}
                                   py={1}
                                 >
-                                  {invite.status}
+                                  {member.role}
                                 </Badge>
-                              </HStack>
-                            </Box>
-                            
-                            <HStack spacing={2}>
-                              <Button
-                                variant="outline"
-                                colorScheme="gray"
-                                size="sm"
-                                onClick={() => handleCopyInviteLink(invite.id)}
-                              >
-                                Copy Link
-                              </Button>
-                              {canManagePrimary && (
-                                <Button
-                                  variant="outline"
-                                  colorScheme="red"
-                                  size="sm"
-                                  onClick={() => handleCancelInvite(invite.id)}
-                                >
-                                  Cancel
-                                </Button>
                               )}
-                            </HStack>
-                          </Flex>
-                        </Box>
-                      ))}
-                    </VStack>
-                  )}
+                            </Td>
+                            <Td minW="120px">
+                              {new Date(member.joined_at).toLocaleDateString()}
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
                 </Box>
-                </VStack>
-              </Box>
+              )}
+            </TabPanel>
 
-              {/* Join Requests Section */}
+            {/* Roles Tab */}
+            <TabPanel px={0}>
               <Box
                 bg={cardBg}
+                p={4}
                 borderRadius="lg"
                 boxShadow="sm"
                 border="1px"
                 borderColor={cardBorderColor}
-                p={6}
+                mb={4}
               >
-                <Heading as="h3" size="md" color={textColor} mb={5}>
-                  Join Requests ({joinRequests.length})
-                </Heading>
+                <Flex
+                  direction={{ base: 'column', md: 'row' }}
+                  justify="space-between"
+                  align={{ base: 'stretch', md: 'center' }}
+                  gap={4}
+                >
+                  <Heading as="h3" size="md" color={titleColor} m={0}>
+                    Manage Roles
+                  </Heading>
 
-                {joinRequestError && (
-                  <Alert status="error" borderRadius="md" mb={4}>
-                    <AlertIcon />
-                    {joinRequestError}
-                  </Alert>
-                )}
-
-                {joinRequestSuccess && (
-                  <Alert status="success" borderRadius="md" mb={4}>
-                    <AlertIcon />
-                    {joinRequestSuccess}
-                  </Alert>
-                )}
-
-                {isLoadingJoinRequests ? (
-                  <HStack>
-                    <Spinner size="sm" />
-                    <Text color={textMutedColor}>Loading join requests...</Text>
-                  </HStack>
-                ) : joinRequests.length === 0 ? (
-                  <Box textAlign="center" py={8}>
-                    <Text color={textMutedColor}>No pending join requests</Text>
-                  </Box>
-                ) : (
-                  <VStack spacing={3} align="stretch">
-                    {joinRequests.map(request => (
-                      <Box
-                        key={request.id}
-                        bg={useColorModeValue('gray.50', 'gray.700')}
-                        borderRadius="md"
-                        border="1px"
-                        borderColor={cardBorderColor}
-                        p={4}
-                      >
-                        <Flex justify="space-between" align="center">
-                          <Box flex="1">
-                            <Text fontWeight="600" color={textColor} fontSize="md" mb={1}>
-                              {request.profiles?.first_name || 'Unknown'} {request.profiles?.last_name || 'User'}
-                            </Text>
-                            <HStack spacing={4} fontSize="sm">
-                              <Text color={textMutedColor}>
-                                {request.profiles?.email || 'No email'}
-                              </Text>
-                              <Text color={textMutedColor}>
-                                Requested {new Date(request.created_at).toLocaleDateString()}
-                              </Text>
-                            </HStack>
-                          </Box>
-                          
-                          <Button
-                            colorScheme="green"
-                            size="sm"
-                            onClick={() => handleApproveJoinRequest(request.id, request.user_id)}
-                          >
-                            Approve
-                          </Button>
-                        </Flex>
-                      </Box>
-                    ))}
-                  </VStack>
-                )}
+                  {canManagePrimary && (
+                    <Button
+                      colorScheme="green"
+                      onClick={onRoleDrawerOpen}
+                      size="md"
+                    >
+                      + Add Role
+                    </Button>
+                  )}
+                </Flex>
               </Box>
-            </VStack>
-          </SimpleGrid>
-        </Container>
+
+              {loading ? (
+                <Box
+                  bg={cardBg}
+                  borderRadius="lg"
+                  boxShadow="sm"
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  overflow="hidden"
+                >
+                  <Box overflowX="auto">
+                    <Table variant="simple" minW="500px">
+                      <Thead>
+                        <Tr>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Name</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Description</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {[...Array(3)].map((_, index) => (
+                          <Tr key={index}>
+                            <Td minW="150px">
+                              <Skeleton height="20px" />
+                            </Td>
+                            <Td minW="200px">
+                              <SkeletonText noOfLines={1} />
+                            </Td>
+                            <Td minW="100px">
+                              <HStack spacing={2}>
+                                <Skeleton height="24px" width="40px" borderRadius="md" />
+                                <Skeleton height="24px" width="50px" borderRadius="md" />
+                              </HStack>
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                </Box>
+              ) : instruments.length === 0 ? (
+                <Box
+                  bg={cardBg}
+                  p={12}
+                  borderRadius="lg"
+                  boxShadow="sm"
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  textAlign="center"
+                >
+                  <Text color={mutedTextColor} fontSize="md">
+                    No roles added yet
+                  </Text>
+                </Box>
+              ) : (
+                <Box
+                  bg={cardBg}
+                  borderRadius="lg"
+                  boxShadow="sm"
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  overflow="hidden"
+                >
+                  <Box overflowX="auto">
+                    <Table variant="simple" minW="500px">
+                      <Thead>
+                        <Tr>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Name</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Description</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {instruments.map(instrument => (
+                          <Tr key={instrument.id} _hover={{ bg: tableHoverBg }}>
+                            <Td fontWeight="500" color={titleColor} minW="150px">
+                              {instrument.name}
+                            </Td>
+                            <Td minW="200px">
+                              <Text noOfLines={2} fontSize="sm">
+                                {instrument.description || '-'}
+                              </Text>
+                            </Td>
+                            <Td minW="100px">
+                              <HStack spacing={2}>
+                                {canManagePrimary && (
+                                  <>
+                                    <Button
+                                      size="xs"
+                                      variant="outline"
+                                      colorScheme="gray"
+                                      onClick={() => handleEditInstrument(instrument)}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      colorScheme="red"
+                                      onClick={() => handleDeleteInstrument(instrument.id)}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </>
+                                )}
+                              </HStack>
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                </Box>
+              )}
+            </TabPanel>
+
+            {/* Invitations Tab */}
+            <TabPanel px={0}>
+              <VStack spacing={6} align="stretch">
+                {/* Pending Invitations */}
+                <Box>
+                  <Heading as="h3" size="md" color={titleColor} mb={4}>
+                    Pending Invitations ({invites.length})
+                  </Heading>
+                  
+                  {loading ? (
+                    <Box
+                      bg={cardBg}
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      overflow="hidden"
+                    >
+                      <Box overflowX="auto">
+                        <Table variant="simple" minW="600px">
+                          <Thead>
+                            <Tr>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Status</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Sent</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Actions</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {[...Array(3)].map((_, index) => (
+                              <Tr key={index}>
+                                <Td minW="200px">
+                                  <Skeleton height="20px" />
+                                </Td>
+                                <Td minW="100px">
+                                  <Skeleton height="20px" borderRadius="md" />
+                                </Td>
+                                <Td minW="120px">
+                                  <Skeleton height="20px" />
+                                </Td>
+                                <Td minW="150px">
+                                  <HStack spacing={2}>
+                                    <Skeleton height="24px" width="70px" borderRadius="md" />
+                                    <Skeleton height="24px" width="50px" borderRadius="md" />
+                                  </HStack>
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </Box>
+                    </Box>
+                  ) : invites.length === 0 ? (
+                    <Box
+                      bg={cardBg}
+                      p={8}
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      textAlign="center"
+                    >
+                      <Text color={mutedTextColor} fontSize="md">
+                        No pending invitations
+                      </Text>
+                    </Box>
+                  ) : (
+                    <Box
+                      bg={cardBg}
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      overflow="hidden"
+                    >
+                      <Box overflowX="auto">
+                        <Table variant="simple" minW="600px">
+                          <Thead>
+                            <Tr>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Status</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Sent</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Actions</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {invites.map(invite => (
+                              <Tr key={invite.id} _hover={{ bg: tableHoverBg }}>
+                                <Td fontWeight="500" color={titleColor} minW="200px">
+                                  {invite.email}
+                                </Td>
+                                <Td minW="100px">
+                                  <Badge
+                                    colorScheme={
+                                      invite.status === 'pending' ? 'yellow' : 
+                                      invite.status === 'accepted' ? 'green' : 'red'
+                                    }
+                                    variant="subtle"
+                                    textTransform="capitalize"
+                                    fontSize="xs"
+                                    px={2}
+                                    py={1}
+                                  >
+                                    {invite.status}
+                                  </Badge>
+                                </Td>
+                                <Td minW="120px">
+                                  {new Date(invite.created_at).toLocaleDateString()}
+                                </Td>
+                                <Td minW="150px">
+                                  <HStack spacing={2}>
+                                    <Button
+                                      size="xs"
+                                      variant="outline"
+                                      colorScheme="gray"
+                                      onClick={() => handleCopyInviteLink(invite.id)}
+                                    >
+                                      Copy Link
+                                    </Button>
+                                    {canManagePrimary && (
+                                      <Button
+                                        size="xs"
+                                        colorScheme="red"
+                                        onClick={() => handleCancelInvite(invite.id)}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    )}
+                                  </HStack>
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Join Requests */}
+                <Box>
+                  <Heading as="h3" size="md" color={titleColor} mb={4}>
+                    Join Requests ({joinRequests.length})
+                  </Heading>
+                  
+                  {loading ? (
+                    <Box
+                      bg={cardBg}
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      overflow="hidden"
+                    >
+                      <Box overflowX="auto">
+                        <Table variant="simple" minW="600px">
+                          <Thead>
+                            <Tr>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Requested</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {[...Array(2)].map((_, index) => (
+                              <Tr key={index}>
+                                <Td minW="200px">
+                                  <Skeleton height="20px" />
+                                </Td>
+                                <Td minW="200px">
+                                  <Skeleton height="20px" />
+                                </Td>
+                                <Td minW="120px">
+                                  <Skeleton height="20px" />
+                                </Td>
+                                <Td minW="100px">
+                                  <Skeleton height="24px" width="60px" borderRadius="md" />
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </Box>
+                    </Box>
+                  ) : joinRequests.length === 0 ? (
+                    <Box
+                      bg={cardBg}
+                      p={8}
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      textAlign="center"
+                    >
+                      <Text color={mutedTextColor} fontSize="md">
+                        No pending join requests
+                      </Text>
+                    </Box>
+                  ) : (
+                    <Box
+                      bg={cardBg}
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor={cardBorderColor}
+                      overflow="hidden"
+                    >
+                      <Box overflowX="auto">
+                        <Table variant="simple" minW="600px">
+                          <Thead>
+                            <Tr>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Requested</Th>
+                              <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {joinRequests.map(request => (
+                              <Tr key={request.id} _hover={{ bg: tableHoverBg }}>
+                                <Td fontWeight="500" color={titleColor} minW="200px">
+                                  {request.profiles?.first_name || 'Unknown'} {request.profiles?.last_name || 'User'}
+                                </Td>
+                                <Td minW="200px">
+                                  {request.profiles?.email || 'No email'}
+                                </Td>
+                                <Td minW="120px">
+                                  {new Date(request.created_at).toLocaleDateString()}
+                                </Td>
+                                <Td minW="100px">
+                                  <Button
+                                    size="xs"
+                                    colorScheme="green"
+                                    onClick={() => handleApproveJoinRequest(request.id, request.user_id)}
+                                  >
+                                    Approve
+                                  </Button>
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              </VStack>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
       </Box>
+
+      {/* Invite Member Drawer */}
+      <Drawer
+        isOpen={isInviteDrawerOpen}
+        placement="right"
+        onClose={onInviteDrawerClose}
+        size={{ base: 'full', md: 'md' }}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+            <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
+              Invite New Member
+            </Heading>
+          </DrawerHeader>
+          
+          <DrawerBody bg={bgColor} p={6}>
+            <Box as="form" onSubmit={handleInviteUser}>
+              <VStack spacing={6} align="stretch">
+                <Text color={textColor} fontSize="sm">
+                  Send an invitation to join your organization
+                </Text>
+                
+                <FormControl isRequired>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Email Address</FormLabel>
+                  <Input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    size="md"
+                  />
+                </FormControl>
+
+                <Flex gap={4} justify="flex-end" pt={4}>
+                  <Button
+                    variant="outline"
+                    onClick={onInviteDrawerClose}
+                    size="md"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    colorScheme="blue"
+                    size="md"
+                    isLoading={inviting}
+                    loadingText="Sending..."
+                    isDisabled={!inviteEmail.trim()}
+                  >
+                    Send Invitation
+                  </Button>
+                </Flex>
+              </VStack>
+            </Box>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Add Role Drawer */}
+      <Drawer
+        isOpen={isRoleDrawerOpen}
+        placement="right"
+        onClose={onRoleDrawerClose}
+        size={{ base: 'full', md: 'md' }}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+            <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
+              {editingInstrumentId ? 'Edit Role' : 'Add New Role'}
+            </Heading>
+          </DrawerHeader>
+          
+          <DrawerBody bg={bgColor} p={6}>
+            <Box as="form" onSubmit={handleSaveInstrument}>
+              <VStack spacing={6} align="stretch">
+                <FormControl isRequired>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Role Name</FormLabel>
+                  <Input
+                    value={instrumentForm.name}
+                    onChange={(e) => setInstrumentForm(v => ({ ...v, name: e.target.value }))}
+                    placeholder="e.g. Acoustic Guitar, Piano, Vocals"
+                    size="md"
+                  />
+                </FormControl>
+                
+                <FormControl>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Description (optional)</FormLabel>
+                  <Textarea
+                    value={instrumentForm.description}
+                    onChange={(e) => setInstrumentForm(v => ({ ...v, description: e.target.value }))}
+                    placeholder="Add any details or notes about this role..."
+                    size="md"
+                    rows={4}
+                  />
+                </FormControl>
+
+                <Flex gap={4} justify="flex-end" pt={4}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onRoleDrawerClose()
+                      setEditingInstrumentId(null)
+                      setInstrumentForm({ name: '', description: '' })
+                    }}
+                    size="md"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    colorScheme="green"
+                    size="md"
+                    isLoading={isSavingInstrument}
+                    loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
+                    isDisabled={!instrumentForm.name.trim()}
+                  >
+                    {editingInstrumentId ? 'Save Changes' : 'Add Role'}
+                  </Button>
+                </Flex>
+              </VStack>
+            </Box>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
     </Box>
   )
 } 
