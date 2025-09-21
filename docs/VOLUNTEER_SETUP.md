@@ -131,7 +131,7 @@ WHERE wsv.user_id = 'your-user-id';
 Potential improvements to consider:
 
 1. **Email notifications** when users volunteer for services
-2. **Volunteer roles** (e.g., "worship leader", "musician", "sound tech")
+2. **Volunteer roles** (e.g., "spirit leader", "musician", "sound tech")
 3. **Service requirements** (e.g., minimum volunteers needed)
 4. **Volunteer availability** scheduling
 5. **Service reminders** for assigned volunteers

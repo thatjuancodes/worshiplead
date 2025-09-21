@@ -23,7 +23,7 @@ export function Footer() {
           color={textColor}
           fontSize="sm"
         >
-          &copy; {currentYear} Worship Lead. All rights reserved.
+          &copy; {currentYear} Spirit Lead. All rights reserved.
         </Text>
       </Container>
     </Box>

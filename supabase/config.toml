@@ -76,7 +76,7 @@ enable_confirmations = false
 
 # Custom email template for organization invitations
 [auth.email.template.invite]
-subject = "You've been invited to join {{ .OrganizationName }} on Worship Lead"
+subject = "You've been invited to join {{ .OrganizationName }} on Spirit Lead"
 content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize email template

@@ -159,7 +159,7 @@
     }
   },
   "header": {
-    "appName": "Worship Lead",
+    "appName": "Spirit Lead",
     "dashboard": "Dashboard",
     "songbank": "Songbank",
     "teamManagement": "Team Management",
@@ -495,7 +495,7 @@
   },
   "loginPage": {
     "title": "Welcome Back",
-    "subtitle": "Sign in to your Worship Lead account",
+    "subtitle": "Sign in to your Spirit Lead account",
     "continueWithGoogle": "Continue with Google",
     "or": "or",
     "email": "Email",
@@ -515,7 +515,7 @@
   },
   "signupPage": {
     "title": "Create your account",
-    "subtitleDefault": "Join Worship Lead and start organizing your worship team",
+    "subtitleDefault": "Join Spirit Lead and start organizing your worship team",
     "subtitleInvited": "You've been invited to join",
     "firstName": "First Name",
     "lastName": "Last Name",

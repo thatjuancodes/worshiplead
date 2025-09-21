@@ -1,7 +1,7 @@
 {
-  "name": "WorshipLead - Church Worship Team Management",
-  "short_name": "WorshipLead",
-  "description": "Streamline your church worship team management with WorshipLead. Schedule services, manage song libraries, coordinate team members, and plan worship sets with ease.",
+  "name": "SpiritLead - Church Worship Team Management",
+  "short_name": "SpiritLead",
+  "description": "Streamline your church worship team management with SpiritLead. Schedule services, manage song libraries, coordinate team members, and plan worship sets with ease.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",

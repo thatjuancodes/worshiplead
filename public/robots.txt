@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 
 # Sitemap location (add when you have a sitemap)
-# Sitemap: https://worshiplead.com/sitemap.xml
+# Sitemap: https://spiritlead.com/sitemap.xml
 
 # Disallow admin and private areas
 Disallow: /admin/

@@ -1,4 +1,4 @@
-# WorshipLead
+# SpiritLead
 
 A vanilla React TypeScript project built with Vite, following modern development practices and user-defined coding standards.
 

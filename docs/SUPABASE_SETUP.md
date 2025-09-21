@@ -6,7 +6,7 @@
 2. Click "Start your project" or "New Project"
 3. Choose your organization
 4. Fill in project details:
-   - **Name**: `worshiplead` (or your preferred name)
+   - **Name**: `spiritlead` (or your preferred name)
    - **Database Password**: Create a strong password (save this!)
    - **Region**: Choose closest to your users
 5. Click "Create new project"

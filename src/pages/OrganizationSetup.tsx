@@ -258,13 +258,13 @@ export function OrganizationSetup() {
           {/* Header */}
           <Box textAlign="center">
             <Heading as="h1" size="xl" color="blue.600" mb={2}>
-              Worship Lead
+              Spirit Lead
             </Heading>
             <Heading as="h2" size="lg" mb={2}>
               Set Up Your Organization
             </Heading>
             <Text color="gray.600" fontSize="lg">
-              Choose how you'd like to get started with Worship Lead
+              Choose how you'd like to get started with Spirit Lead
             </Text>
           </Box>
 
@@ -362,7 +362,7 @@ export function OrganizationSetup() {
                       <FormLabel htmlFor="orgSlug">Organization URL</FormLabel>
                       <HStack>
                         <Text color="gray.500" fontSize="lg">
-                          worshiplead.com/
+                          spiritlead.com/
                         </Text>
                         <Input
                           id="orgSlug"
@@ -419,7 +419,7 @@ export function OrganizationSetup() {
                       <FormLabel htmlFor="joinSlug">Organization Slug</FormLabel>
                       <HStack>
                         <Text color="gray.500" fontSize="lg">
-                          worshiplead.com/
+                          spiritlead.com/
                         </Text>
                         <Input
                           id="joinSlug"

@@ -125,7 +125,7 @@ serve(async (req) => {
     
     const emailData = {
       to: email,
-      subject: `You've been invited to join ${organizationName} on Worship Lead`,
+      subject: `You've been invited to join ${organizationName} on Spirit Lead`,
       template: 'invitation',
       templateData: {
         InvitedBy: invitedBy,

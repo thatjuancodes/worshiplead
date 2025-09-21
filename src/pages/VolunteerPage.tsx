@@ -976,17 +976,17 @@ export function VolunteerPage() {
                               // Check if this is the current user
                               const isCurrentUser = user && volunteer.user_id === user.id
                               
-                              // Check if volunteer has Mic 1 or Worship Leader role
-                              const hasMic1OrWorshipLeader = instruments.some(instrument => {
+                              // Check if volunteer has Mic 1 or Spirit Leader role
+                              const hasMic1OrSpiritLeader = instruments.some(instrument => {
                                 const lowerInstrument = instrument.toLowerCase()
                                 return lowerInstrument.includes('mic 1') || 
                                        lowerInstrument === 'mic1' ||
-                                       lowerInstrument.includes('worship leader') ||
-                                       lowerInstrument === 'worship leader'
+                                       lowerInstrument.includes('spirit leader') ||
+                                       lowerInstrument === 'spirit leader'
                               })
                               
-                              // Use darker blue for current user or Mic 1/Worship Leader, lighter blue for others
-                              const shouldUseDarkBlue = isCurrentUser || hasMic1OrWorshipLeader
+                              // Use darker blue for current user or Mic 1/Spirit Leader, lighter blue for others
+                              const shouldUseDarkBlue = isCurrentUser || hasMic1OrSpiritLeader
                               
                               return (
                                 <Box

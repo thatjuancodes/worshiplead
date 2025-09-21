@@ -96,7 +96,7 @@ export function Header() {
               <HStack spacing={3} align="center">
                 <Image
                   src={logoImage}
-                  alt="Worship Lead Logo"
+                  alt="Spirit Lead Logo"
                   h="32px"
                   w="auto"
                   objectFit="contain"
@@ -113,7 +113,7 @@ export function Header() {
                   display="flex"
                   alignItems="center"
                 >
-                  {translate('header.appName', 'Worship Lead')}
+                  {translate('header.appName', 'Spirit Lead')}
                 </Heading>
               </HStack>
             </Link>

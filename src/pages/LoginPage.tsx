@@ -264,7 +264,7 @@ export function LoginPage() {
         textAlign="center"
       >
         <Text color={textColor} fontSize="sm">
-          &copy; {new Date().getFullYear()} Worship Lead. {t('loginPage.copyright')}
+          &copy; {new Date().getFullYear()} Spirit Lead. {t('loginPage.copyright')}
         </Text>
       </Box>
     </>

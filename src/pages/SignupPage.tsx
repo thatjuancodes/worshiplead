@@ -332,7 +332,7 @@ export function SignupPage() {
             _hover={{ color: 'rgba(255, 255, 255, 0.8)' }}
             transition="color 0.2s ease"
           >
-            Worship Lead
+            Spirit Lead
           </Heading>
         </Link>
       </Box>
@@ -542,7 +542,7 @@ export function SignupPage() {
         textAlign="center"
       >
         <Text color={copyrightColor} fontSize="sm" m={0}>
-          &copy; {new Date().getFullYear()} Worship Lead. {t('signupPage.copyright')}
+          &copy; {new Date().getFullYear()} Spirit Lead. {t('signupPage.copyright')}
         </Text>
       </Box>
     </Box>

@@ -159,7 +159,7 @@
     }
   },
   "header": {
-    "appName": "Worship Lead",
+    "appName": "Spirit Lead",
     "dashboard": "Bảng điều khiển",
     "songbank": "Kho bài hát",
     "teamManagement": "Quản lý Nhóm",
@@ -495,7 +495,7 @@
   },
   "loginPage": {
     "title": "Chào mừng trở lại",
-    "subtitle": "Đăng nhập vào tài khoản Worship Lead của bạn",
+    "subtitle": "Đăng nhập vào tài khoản Spirit Lead của bạn",
     "continueWithGoogle": "Tiếp tục với Google",
     "or": "hoặc",
     "email": "Email",
@@ -515,7 +515,7 @@
   },
   "signupPage": {
     "title": "Tạo tài khoản của bạn",
-    "subtitleDefault": "Tham gia Worship Lead và bắt đầu tổ chức nhóm thờ cúng của bạn",
+    "subtitleDefault": "Tham gia Spirit Lead và bắt đầu tổ chức nhóm thờ cúng của bạn",
     "subtitleInvited": "Bạn đã được mời tham gia",
     "firstName": "Tên",
     "lastName": "Họ",

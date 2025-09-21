@@ -183,7 +183,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                 <HStack spacing={3} align="center">
                   <Image
                     src={logoImage}
-                    alt="Worship Lead Logo"
+                    alt="Spirit Lead Logo"
                     h="32px"
                     w="auto"
                     objectFit="contain"
