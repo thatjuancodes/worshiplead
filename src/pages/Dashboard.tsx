@@ -1407,13 +1407,12 @@ export function Dashboard() {
     if (!organization || services.length === 0) return
     
     // Get upcoming services (same logic as in the render)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const now = new Date() // Use current time, not just date
     
     const upcomingServices = services
       .filter(service => {
-        const serviceDate = new Date(service.service_time)
-        return serviceDate >= today
+        const serviceDateTime = new Date(service.service_time)
+        return serviceDateTime > now // Use current time for comparison
       })
       .slice(0, 8) // Show next 8 upcoming services
     
@@ -1515,21 +1514,26 @@ export function Dashboard() {
                   </Heading>
                   
                   {(() => {
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0) // Set to start of today for accurate comparison
+                    const now = new Date() // Use current time, not just date
                     
-                    // Get all services from today forward, ordered chronologically
+                    // Get all services from now forward, ordered chronologically
                     const upcomingServices = services
                       .filter(service => {
-                        const serviceDate = new Date(service.service_time)
-                        return serviceDate >= today
+                        const serviceDateTime = new Date(service.service_time)
+                        return serviceDateTime > now // Use current time for comparison
                       })
                       .sort((a, b) => new Date(a.service_time).getTime() - new Date(b.service_time).getTime())
                       .slice(0, 8) // Show next 8 upcoming services
                     
+                    console.log('Debug - Current time:', now.toISOString())
                     console.log('Debug - All services:', services.length)
                     console.log('Debug - Upcoming services:', upcomingServices.length)
-                    console.log('Debug - Services statuses:', services.map(s => ({ id: s.id, status: s.status, date: getServiceDateISO(s.service_time) })))
+                    console.log('Debug - All services with times:', services.map(s => ({ 
+                      id: s.id, 
+                      status: s.status, 
+                      service_time: s.service_time,
+                      isPast: new Date(s.service_time) <= now 
+                    })))
                     
                     return upcomingServices.length === 0 ? (
                       <Text color={mutedTextColor} textAlign="center" py={4}>
@@ -1594,8 +1598,21 @@ export function Dashboard() {
                                 
                                 return (
                                   <>
-                                    {/* Desktop: Single row layout */}
-                                    <HStack justify="space-between" align="center" w="100%" display={{ base: "none", md: "flex" }}>
+                                    {/* Large screens: Single row layout */}
+                                    <HStack 
+                                      justify="space-between" 
+                                      align="center" 
+                                      w="100%" 
+                                      display={{ base: "none", lg: "flex" }}
+                                      sx={{
+                                        '@media (max-width: 1055px)': {
+                                          display: 'none'
+                                        },
+                                        '@media (min-width: 1056px)': {
+                                          display: 'flex'
+                                        }
+                                      }}
+                                    >
                                       {/* Date | Ordinal SUN | Time */}
                                       <HStack spacing={3} align="center" flex="1">
                                         <Box minW="90px">
@@ -1685,8 +1702,127 @@ export function Dashboard() {
                                       </HStack>
                                     </HStack>
 
+                                    {/* Medium screens (tablet): Two row layout */}
+                                    <VStack 
+                                      spacing={2} 
+                                      align="stretch" 
+                                      w="100%" 
+                                      display={{ base: "none", md: "flex", lg: "none" }}
+                                      sx={{
+                                        '@media (max-width: 767px)': {
+                                          display: 'none'
+                                        },
+                                        '@media (min-width: 768px) and (max-width: 1055px)': {
+                                          display: 'flex'
+                                        },
+                                        '@media (min-width: 1056px)': {
+                                          display: 'none'
+                                        }
+                                      }}
+                                    >
+                                      {/* Medium: Service details row */}
+                                      <HStack spacing={3} align="center" w="100%">
+                                        <Box minW="90px">
+                                          <Text fontWeight="600" color={textColor} fontSize="sm" textAlign="left">
+                                            {dateStr}
+                                          </Text>
+                                        </Box>
+                                        <Text color={mutedTextColor} fontSize="sm">
+                                          |
+                                        </Text>
+                                        <Box minW="65px">
+                                          <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
+                                            {ordinal} SUN
+                                          </Text>
+                                        </Box>
+                                        <Text color={mutedTextColor} fontSize="sm">
+                                          |
+                                        </Text>
+                                        <Box minW="45px">
+                                          <Text fontWeight="500" color={textColor} fontSize="sm" textAlign="left">
+                                            {timePart}
+                                          </Text>
+                                        </Box>
+                                        {isNextService && (
+                                          <Badge
+                                            colorScheme="orange"
+                                            variant="solid"
+                                            fontSize="xs"
+                                            px={2}
+                                            py={1}
+                                            borderRadius="md"
+                                            ml={2}
+                                          >
+                                            Next Service
+                                          </Badge>
+                                        )}
+                                      </HStack>
+                                      
+                                      {/* Medium: Volunteer circles on separate row */}
+                                      {volunteers.length > 0 && (
+                                        <HStack spacing={1} align="center" justify="flex-start" flexWrap="wrap">
+                                          {(() => {
+                                            // Sort volunteers to put current user first
+                                            const sortedVolunteers = [...volunteers].sort((a, b) => {
+                                              if (user && a.user_id === user.id) return -1
+                                              if (user && b.user_id === user.id) return 1
+                                              return 0
+                                            })
+                                            
+                                            return sortedVolunteers.map((volunteer) => {
+                                              const firstName = volunteer.profiles.first_name || 'U'
+                                              const lastName = volunteer.profiles.last_name || 'U'
+                                              const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+                                              const isCurrentUser = user && volunteer.user_id === user.id
+                                              
+                                              return (
+                                                <Tooltip 
+                                                  key={volunteer.id}
+                                                  label={`${firstName} ${lastName}`}
+                                                  placement="top"
+                                                  hasArrow
+                                                >
+                                                  <Box
+                                                    bg={isCurrentUser 
+                                                      ? useColorModeValue('#2196f3', '#1976d2') 
+                                                      : useColorModeValue('#eee', 'gray.600')
+                                                    }
+                                                    borderRadius="50%"
+                                                    w="30px"
+                                                    h="30px"
+                                                    display="flex"
+                                                    alignItems="center"
+                                                    justifyContent="center"
+                                                    fontSize="14px"
+                                                    fontWeight="600"
+                                                    color={isCurrentUser ? 'white' : textColor}
+                                                    cursor="pointer"
+                                                  >
+                                                    {initials}
+                                                  </Box>
+                                                </Tooltip>
+                                              )
+                                            })
+                                          })()}
+                                        </HStack>
+                                      )}
+                                    </VStack>
+
                                     {/* Mobile: Two row layout */}
-                                    <VStack spacing={2} align="stretch" w="100%" display={{ base: "flex", md: "none" }}>
+                                    <VStack 
+                                      spacing={2} 
+                                      align="stretch" 
+                                      w="100%" 
+                                      display={{ base: "flex", md: "none" }}
+                                      sx={{
+                                        '@media (max-width: 767px)': {
+                                          display: 'flex'
+                                        },
+                                        '@media (min-width: 768px)': {
+                                          display: 'none'
+                                        }
+                                      }}
+                                    >
                                       {/* Mobile: Service details row */}
                                       <HStack spacing={2} align="center" w="100%">
                                         <Box minW="115px">
