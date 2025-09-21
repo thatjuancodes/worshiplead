@@ -34,6 +34,7 @@ import { useTranslation } from 'react-i18next'
 import { useLanguage } from '../hooks/useLanguage'
 import { supabase } from '../lib/supabase'
 import { signInWithGoogleFromVolunteer, ensureUserProfileAndMembership } from '../lib/auth'
+import { formatServiceDate, getServiceTimeDisplay } from '../utils/dateTime'
 
 // Module-level cache to persist across component remounts
 const cache = new Map<string, {
@@ -62,8 +63,7 @@ interface OrganizationData {
 interface WorshipService {
   id: string
   title: string
-  service_date: string
-  service_time?: string
+  service_time: string // TIMESTAMPTZ - contains both date and time
   description?: string
   status: 'draft' | 'published' | 'completed'
 }
@@ -195,8 +195,8 @@ export function VolunteerPage() {
     try {
       setLoadingServices(true)
       
-      // Get today's date in YYYY-MM-DD format for filtering
-      const today = new Date().toISOString().split('T')[0]
+      // Get current timestamp for filtering upcoming services
+      const now = new Date().toISOString()
       
       // Get published services that are upcoming (not past) and limit to 16
       const { data: services, error: servicesError } = await supabase
@@ -204,8 +204,8 @@ export function VolunteerPage() {
         .select('*')
         .eq('organization_id', organization.id)
         .eq('status', 'published')
-        .gte('service_date', today)
-        .order('service_date', { ascending: true })
+        .gte('service_time', now)
+        .order('service_time', { ascending: true })
         .limit(16)
 
       if (servicesError) {
@@ -898,18 +898,7 @@ export function VolunteerPage() {
                     <VStack spacing={3} align="stretch" w="100%">
                       <HStack justify="space-between" align="center" w="100%">
                         <Text color={titleColor} fontWeight="700" fontSize={{ base: "lg", md: "xl" }} flex={1}>
-                          {new Date(service.service_date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                          {service.service_time && (
-                            ` ${new Date(`2000-01-01T${service.service_time}`).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
-                            })}`
-                          )} - {service.title}
+                          {formatServiceDate(service.service_time)} {getServiceTimeDisplay(service.service_time)} - {service.title}
                         </Text>
                         
                         {/* Check Circle */}

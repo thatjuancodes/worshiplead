@@ -199,7 +199,7 @@ export interface Database {
           organization_id: string
           title: string
           service_date: string
-          service_time: string | null
+          service_time: string | null // TIMESTAMPTZ in UTC - full ISO timestamp string
           description: string | null
           status: 'draft' | 'published' | 'completed'
           created_by: string | null
@@ -211,7 +211,7 @@ export interface Database {
           organization_id: string
           title: string
           service_date: string
-          service_time?: string | null
+          service_time?: string | null // TIMESTAMPTZ in UTC - full ISO timestamp string
           description?: string | null
           status?: 'draft' | 'published' | 'completed'
           created_by?: string | null
@@ -223,7 +223,7 @@ export interface Database {
           organization_id?: string
           title?: string
           service_date?: string
-          service_time?: string | null
+          service_time?: string | null // TIMESTAMPTZ in UTC - full ISO timestamp string
           description?: string | null
           status?: 'draft' | 'published' | 'completed'
           created_by?: string | null

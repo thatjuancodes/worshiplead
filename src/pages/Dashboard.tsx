@@ -64,6 +64,7 @@ import { getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../l
 import { DashboardHeader } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { useAuth } from '../contexts'
+import { formatServiceDate, getServiceTimeDisplay, getServiceDateISO, createServiceTime, formatForDateTimeInput } from '../utils/dateTime'
 
 interface OrganizationData {
   organization_id: string
@@ -81,8 +82,7 @@ interface WorshipService {
   id: string
   organization_id: string
   title: string
-  service_date: string
-  service_time?: string
+  service_time: string // TIMESTAMPTZ - contains both date and time
   description?: string
   status: 'draft' | 'published' | 'completed'
   created_at: string
@@ -145,8 +145,7 @@ export function Dashboard() {
   // Create service form state
   const [creating, setCreating] = useState(false)
   const [formTitle, setFormTitle] = useState('')
-  const [formDate, setFormDate] = useState('')
-  const [formTime, setFormTime] = useState('')
+  const [formDateTime, setFormDateTime] = useState('')
   const [formDescription, setFormDescription] = useState('')
   const [formError, setFormError] = useState('')
 
@@ -416,7 +415,7 @@ export function Dashboard() {
       return
     }
 
-    if (!formTitle.trim() || !formDate) {
+    if (!formTitle.trim() || !formDateTime) {
       setFormError('Please fill in all required fields.')
       return
     }
@@ -430,8 +429,7 @@ export function Dashboard() {
         .insert({
           organization_id: organization.organization_id,
           title: formTitle.trim(),
-          service_date: formDate,
-          service_time: formTime || null,
+          service_time: new Date(formDateTime).toISOString(),
           description: formDescription.trim() || null,
           status: 'draft',
           created_by: user.id
@@ -445,7 +443,7 @@ export function Dashboard() {
       }
 
       setFormTitle('')
-      setFormTime('')
+      setFormDateTime('')
       setFormDescription('')
 
       if (selectedDate) {
@@ -453,7 +451,7 @@ export function Dashboard() {
         await loadServices()
         await loadServicesForDate(selectedDate)
       } else {
-        setFormDate('')
+        setFormDateTime('')
         await loadServices()
         createDrawer.onClose()
       }
@@ -470,9 +468,10 @@ export function Dashboard() {
       setLoadingDayServices(true)
       const { data, error } = await supabase
         .from('worship_services')
-        .select('id, title, service_date, service_time, description, status, created_at, updated_at')
+        .select('id, title, service_time, description, status, created_at, updated_at')
         .eq('organization_id', organization.organization_id)
-        .eq('service_date', isoDate)
+        .gte('service_time', `${isoDate}T00:00:00.000Z`)
+        .lte('service_time', `${isoDate}T23:59:59.999Z`)
 
       if (error) {
         console.error('Error loading day services:', error)
@@ -481,9 +480,7 @@ export function Dashboard() {
       }
 
       const sorted = (data || []).sort((a: any, b: any) => {
-        const ta = a.service_time ? a.service_time : '99:99'
-        const tb = b.service_time ? b.service_time : '99:99'
-        return ta.localeCompare(tb)
+        return new Date(a.service_time).getTime() - new Date(b.service_time).getTime()
       }) as WorshipService[]
 
       setDayServices(sorted)
@@ -970,10 +967,10 @@ export function Dashboard() {
       setLoadingRecentSongs(true)
       setRecentSongsError('')
 
-      // 1) Fetch all services for org (id -> service_date)
+      // 1) Fetch all services for org (id -> service_time)
       const { data: servicesData, error: servicesErr } = await supabase
         .from('worship_services')
-        .select('id, service_date')
+        .select('id, service_time')
         .eq('organization_id', organization.organization_id)
 
       if (servicesErr) {
@@ -985,7 +982,7 @@ export function Dashboard() {
       const serviceIdToDate = new Map<string, string>()
       const serviceIds: string[] = []
       ;(servicesData || []).forEach((s: any) => {
-        serviceIdToDate.set(s.id as string, s.service_date as string)
+        serviceIdToDate.set(s.id as string, getServiceDateISO(s.service_time as string))
         serviceIds.push(s.id as string)
       })
 
@@ -1151,7 +1148,7 @@ export function Dashboard() {
       const serviceIds = volunteerRecords.map(record => record.worship_service_id)
       const { data: services, error: servicesError } = await supabase
         .from('worship_services')
-        .select('id, service_date')
+        .select('id, service_time')
         .in('id', serviceIds)
         .eq('organization_id', organization.organization_id)
 
@@ -1161,9 +1158,9 @@ export function Dashboard() {
         return
       }
 
-      // Extract the service dates
+      // Extract the service dates from service_time timestamps
       const dates = (services || [])
-        .map(service => service.service_date)
+        .map(service => getServiceDateISO(service.service_time))
         .filter(date => date) as string[]
 
       setUserVolunteerDates(dates)
@@ -1380,7 +1377,7 @@ export function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('worship_services')
-        .select('id, service_date, service_time, title, status')
+        .select('id, service_time, title, status')
         .eq('organization_id', organization.organization_id)
 
       if (error) {
@@ -1415,7 +1412,7 @@ export function Dashboard() {
     
     const upcomingServices = services
       .filter(service => {
-        const serviceDate = new Date(service.service_date)
+        const serviceDate = new Date(service.service_time)
         return serviceDate >= today
       })
       .slice(0, 8) // Show next 8 upcoming services
@@ -1524,15 +1521,15 @@ export function Dashboard() {
                     // Get all services from today forward, ordered chronologically
                     const upcomingServices = services
                       .filter(service => {
-                        const serviceDate = new Date(service.service_date)
+                        const serviceDate = new Date(service.service_time)
                         return serviceDate >= today
                       })
-                      .sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
+                      .sort((a, b) => new Date(a.service_time).getTime() - new Date(b.service_time).getTime())
                       .slice(0, 8) // Show next 8 upcoming services
                     
                     console.log('Debug - All services:', services.length)
                     console.log('Debug - Upcoming services:', upcomingServices.length)
-                    console.log('Debug - Services statuses:', services.map(s => ({ id: s.id, status: s.status, date: s.service_date })))
+                    console.log('Debug - Services statuses:', services.map(s => ({ id: s.id, status: s.status, date: getServiceDateISO(s.service_time) })))
                     
                     return upcomingServices.length === 0 ? (
                       <Text color={mutedTextColor} textAlign="center" py={4}>
@@ -1562,9 +1559,10 @@ export function Dashboard() {
                               }}
                               transition="all 0.2s"
                               onClick={() => {
-                                setFormDate(service.service_date)
-                                setSelectedDate(service.service_date)
-                                loadServicesForDate(service.service_date)
+                                const serviceDate = getServiceDateISO(service.service_time)
+                                setFormDateTime(formatForDateTimeInput(service.service_time))
+                                setSelectedDate(serviceDate)
+                                loadServicesForDate(serviceDate)
                                 setIsAddingServiceMode(false)
                                 createDrawer.onOpen()
                               }}
@@ -1576,10 +1574,8 @@ export function Dashboard() {
                               } : {})}
                             >
                               {(() => {
-                                const serviceDate = new Date(service.service_date)
-                                const dateStr = serviceDate.toLocaleDateString('en-US', {
-                                  month: 'short', day: 'numeric', year: 'numeric'
-                                })
+                                const serviceDate = new Date(service.service_time)
+                                const dateStr = formatServiceDate(service.service_time)
                                 
                                 // Get ordinal for the Sunday of the month
                                 const firstDayOfMonth = new Date(serviceDate.getFullYear(), serviceDate.getMonth(), 1)
@@ -1592,15 +1588,7 @@ export function Dashboard() {
                                 const ordinals = ['', '1st', '2nd', '3rd', '4th', '5th']
                                 const ordinal = ordinals[weekNumber] || `${weekNumber}th`
                                 
-                                const timePart = service.service_time ? (() => {
-                                  const [hStr, mStr] = service.service_time.split(':')
-                                  const hours = parseInt(hStr || '', 10)
-                                  const minutes = parseInt(mStr || '', 10)
-                                  if (Number.isNaN(hours) || Number.isNaN(minutes)) return 'All day'
-                                  const d = new Date()
-                                  d.setHours(hours, minutes, 0, 0)
-                                  return d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }).replace(' ', '').toLowerCase()
-                                })() : 'All day'
+                                const timePart = getServiceTimeDisplay(service.service_time).toLowerCase().replace(' ', '')
                                 
                                 
                                 return (
@@ -1830,10 +1818,11 @@ export function Dashboard() {
                   <CalendarGrid
                     year={displayYear}
                     month={displayMonth}
-                    scheduledDates={[...new Set(services.map(s => s.service_date))]}
+                    scheduledDates={[...new Set(services.map(s => getServiceDateISO(s.service_time)))]}
                     userVolunteerDates={userVolunteerDates}
                     onDateClick={(iso) => {
-                      setFormDate(iso)
+                      const defaultDateTime = `${iso}T10:00`
+                      setFormDateTime(defaultDateTime)
                       setSelectedDate(iso)
                       loadServicesForDate(iso)
                       setIsAddingServiceMode(false)
@@ -1860,7 +1849,7 @@ export function Dashboard() {
                     onClick={() => {
                       setSelectedDate('')
                       setDayServices([])
-                      setFormDate('')
+                      setFormDateTime('')
                       setIsAddingServiceMode(true)
                       createDrawer.onOpen()
                     }}
@@ -2140,24 +2129,9 @@ export function Dashboard() {
                                 <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor} px={4} py={3}>
                                   <Box as="span" flex='1' textAlign='left'>
                                     {(() => {
-                                      const timePart = svc.service_time ? (() => {
-                                        const [hStr, mStr] = svc.service_time.split(':')
-                                        const hours = parseInt(hStr || '', 10)
-                                        const minutes = parseInt(mStr || '', 10)
-                                        if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
-                                        const d = new Date()
-                                        d.setHours(hours, minutes, 0, 0)
-                                        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase()
-                                      })() : 'All day'
+                                      const timePart = getServiceTimeDisplay(svc.service_time).toLowerCase().replace(' ', '')
                                       
-                                      const formattedDate = (() => {
-                                        try {
-                                          const serviceDate = new Date(selectedDate)
-                                          return serviceDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                        } catch {
-                                          return ''
-                                        }
-                                      })()
+                                      const formattedDate = selectedDate ? formatServiceDate(svc.service_time) : ''
                                       
                                       const volunteerInitials = (() => {
                                         const volunteers = serviceIdToVolunteers[svc.id] || []
@@ -2632,24 +2606,9 @@ export function Dashboard() {
                                 <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor} px={4} py={3}>
                                   <Box as="span" flex='1' textAlign='left'>
                                     {(() => {
-                                      const timePart = svc.service_time ? (() => {
-                                        const [hStr, mStr] = svc.service_time.split(':')
-                                        const hours = parseInt(hStr || '', 10)
-                                        const minutes = parseInt(mStr || '', 10)
-                                        if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
-                                        const d = new Date()
-                                        d.setHours(hours, minutes, 0, 0)
-                                        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase()
-                                      })() : 'All day'
+                                      const timePart = getServiceTimeDisplay(svc.service_time).toLowerCase().replace(' ', '')
                                       
-                                      const formattedDate = (() => {
-                                        try {
-                                          const serviceDate = new Date(selectedDate)
-                                          return serviceDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                        } catch {
-                                          return ''
-                                        }
-                                      })()
+                                      const formattedDate = selectedDate ? formatServiceDate(svc.service_time) : ''
                                       
                                       const volunteerInitials = (() => {
                                         const volunteers = serviceIdToVolunteers[svc.id] || []
@@ -3128,21 +3087,11 @@ export function Dashboard() {
                       </FormControl>
 
                       <FormControl isRequired>
-                        <FormLabel fontSize="sm">Service Date *</FormLabel>
+                        <FormLabel fontSize="sm">Service Date & Time *</FormLabel>
                         <Input
-                          type="date"
-                          value={formDate}
-                          onChange={(e) => setFormDate(e.target.value)}
-                          size="md"
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel fontSize="sm">Service Time</FormLabel>
-                        <Input
-                          type="time"
-                          value={formTime}
-                          onChange={(e) => setFormTime(e.target.value)}
+                          type="datetime-local"
+                          value={formDateTime}
+                          onChange={(e) => setFormDateTime(e.target.value)}
                           size="md"
                         />
                       </FormControl>
