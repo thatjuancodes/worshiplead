@@ -64,7 +64,7 @@ import { getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../l
 import { DashboardHeader } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { useAuth } from '../contexts'
-import { formatServiceDate, getServiceTimeDisplay, getServiceDateISO, createServiceTime, formatForDateTimeInput } from '../utils/dateTime'
+import { formatServiceDate, getServiceTimeDisplay, getServiceDateISO, formatForDateTimeInput } from '../utils/dateTime'
 
 interface OrganizationData {
   organization_id: string
