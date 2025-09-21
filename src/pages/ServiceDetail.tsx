@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
+import { formatServiceDate, getServiceTimeDisplay } from '../utils/dateTime'
 import { 
   Box, 
   VStack, 
@@ -55,8 +56,7 @@ interface WorshipService {
   id: string
   organization_id: string
   title: string
-  service_date: string
-  service_time?: string
+  service_time: string // TIMESTAMPTZ - contains both date and time
   description?: string
   status: 'draft' | 'published' | 'completed'
   created_at: string
@@ -944,20 +944,18 @@ export function ServiceDetail() {
                     Service Date
                   </Text>
                   <Text fontSize="md" fontWeight="500" color={textColor}>
-                    {formatDate(service.service_date)}
+                    {formatServiceDate(service.service_time)}
                   </Text>
                 </Box>
 
-                {service.service_time && (
-                  <Box>
-                    <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
-                      Service Time
-                    </Text>
-                    <Text fontSize="md" fontWeight="500" color={textColor}>
-                      {service.service_time}
-                    </Text>
-                  </Box>
-                )}
+                <Box>
+                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                    Service Time
+                  </Text>
+                  <Text fontSize="md" fontWeight="500" color={textColor}>
+                    {getServiceTimeDisplay(service.service_time)}
+                  </Text>
+                </Box>
 
                 <Box>
                   <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>

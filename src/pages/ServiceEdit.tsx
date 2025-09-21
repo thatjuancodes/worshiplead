@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
+import { formatForDateTimeInput } from '../utils/dateTime'
 import { 
   Box, 
   VStack, 
@@ -44,8 +45,7 @@ interface WorshipService {
   id: string
   organization_id: string
   title: string
-  service_date: string
-  service_time?: string
+  service_time: string // TIMESTAMPTZ - contains both date and time
   description?: string
   status: 'draft' | 'published' | 'completed'
   created_at: string
@@ -68,7 +68,6 @@ export function ServiceEdit() {
   // Form state
   const [formData, setFormData] = useState({
     title: '',
-    service_date: '',
     service_time: '',
     description: '',
     status: 'draft' as 'draft' | 'published' | 'completed'
@@ -129,8 +128,7 @@ export function ServiceEdit() {
       // Set form data
       setFormData({
         title: data.title || '',
-        service_date: data.service_date ? data.service_date.split('T')[0] : '',
-        service_time: data.service_time || '',
+        service_time: data.service_time ? formatForDateTimeInput(data.service_time) : '',
         description: data.description || '',
         status: data.status || 'draft'
       })
@@ -175,8 +173,7 @@ export function ServiceEdit() {
         .from('worship_services')
         .update({
           title: formData.title,
-          service_date: formData.service_date,
-          service_time: formData.service_time || null,
+          service_time: new Date(formData.service_time).toISOString(),
           description: formData.description || null,
           status: formData.status,
           updated_at: new Date().toISOString()
@@ -375,23 +372,10 @@ export function ServiceEdit() {
                   <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={6}>
                     <FormControl isRequired>
                       <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Service Date *
+                        Service Date & Time *
                       </FormLabel>
                       <Input
-                        type="date"
-                        name="service_date"
-                        value={formData.service_date}
-                        onChange={handleInputChange}
-                        size="md"
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                        Service Time
-                      </FormLabel>
-                      <Input
-                        type="time"
+                        type="datetime-local"
                         name="service_time"
                         value={formData.service_time}
                         onChange={handleInputChange}

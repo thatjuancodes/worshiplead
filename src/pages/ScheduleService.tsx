@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader, DeleteServiceModal } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
+import { formatServiceDate, getServiceTimeDisplay, createServiceTime } from '../utils/dateTime'
 import { 
   Box, 
   VStack, 
@@ -32,8 +33,7 @@ interface WorshipService {
   id: string
   organization_id: string
   title: string
-  service_date: string
-  service_time?: string
+  service_time: string // TIMESTAMPTZ - contains both date and time
   description?: string
   status: 'draft' | 'published' | 'completed'
   created_at: string
@@ -117,7 +117,6 @@ export function ScheduleService() {
         .from('worship_services')
         .select('*')
         .eq('organization_id', organization.organization_id)
-        .order('service_date', { ascending: true })
         .order('service_time', { ascending: true })
 
       if (error) {
@@ -128,8 +127,8 @@ export function ScheduleService() {
       // Sort services to show nearest upcoming service first
       const now = new Date()
       const sortedServices = (data || []).sort((a, b) => {
-        const dateA = new Date(a.service_date + (a.service_time ? `T${a.service_time}` : 'T00:00'))
-        const dateB = new Date(b.service_date + (b.service_time ? `T${b.service_time}` : 'T00:00'))
+        const dateA = new Date(a.service_time)
+        const dateB = new Date(b.service_time)
         
         // If both services are in the past, show most recent first
         if (dateA < now && dateB < now) {
@@ -192,8 +191,7 @@ export function ScheduleService() {
         .insert({
           organization_id: organization.organization_id,
           title: title.trim(),
-          service_date: serviceDate,
-          service_time: serviceTime || null,
+          service_time: createServiceTime(serviceDate, serviceTime),
           description: description.trim() || null,
           status: 'draft',
           created_by: user.id
@@ -226,17 +224,9 @@ export function ScheduleService() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
 
-  const formatServiceTitle = (dateString: string, title: string) => {
-    const date = new Date(dateString)
+  const formatServiceTitle = (serviceTime: string, title: string) => {
+    const date = new Date(serviceTime)
     const month = date.toLocaleDateString('en-US', { month: 'short' })
     const day = date.getDate()
     return `${month} ${day} - ${title}`
@@ -537,7 +527,7 @@ export function ScheduleService() {
                         alignSelf={{ base: 'flex-start', sm: 'center' }}
                       >
                         <Heading as="h4" size="md" color={textColor} fontWeight="600">
-                          {formatServiceTitle(service.service_date, service.title)}
+                          {formatServiceTitle(service.service_time, service.title)}
                         </Heading>
                         <Badge
                           colorScheme={getStatusBadge(service.status)}
@@ -554,14 +544,12 @@ export function ScheduleService() {
                       {/* Service Details */}
                       <VStack spacing={2} align="stretch">
                         <Text fontWeight="500" color={textColor} fontSize="sm">
-                          {formatDate(service.service_date)}
+                          {formatServiceDate(service.service_time)}
                         </Text>
                         
-                        {service.service_time && (
-                          <Text color={textMutedColor} fontSize="sm">
-                            {service.service_time}
-                          </Text>
-                        )}
+                        <Text color={textMutedColor} fontSize="sm">
+                          {getServiceTimeDisplay(service.service_time)}
+                        </Text>
                         
                         {service.description && (
                           <Text color={textSecondaryColor} fontSize="sm" lineHeight="1.5">
