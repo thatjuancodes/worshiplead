@@ -548,7 +548,7 @@
     "organizationNotFound": "Organization not found",
     "goHome": "Go Home",
     "noServicesAvailable": "No services available for volunteering at the moment",
-    "viewDashboard": "View {{organizationName}} Dashboard",
+    "viewDashboard": "View Dashboard",
     "success": {
       "assigned": "You have been assigned to this service",
       "removed": "You have been removed from this service"

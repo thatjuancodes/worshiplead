@@ -548,7 +548,7 @@
     "organizationNotFound": "Không tìm thấy tổ chức",
     "goHome": "Về Trang chủ",
     "noServicesAvailable": "Hiện tại không có dịch vụ nào để tình nguyện",
-    "viewDashboard": "Xem Bảng điều khiển {{organizationName}}",
+    "viewDashboard": "Xem Bảng điều khiển",
     "success": {
       "assigned": "Bạn đã được phân công cho dịch vụ này",
       "removed": "Bạn đã được xóa khỏi dịch vụ này"

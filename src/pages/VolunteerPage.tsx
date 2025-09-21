@@ -17,19 +17,13 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
-  Tooltip,
-  Badge,
   Modal,
   ModalOverlay,
   ModalContent,
   ModalHeader,
-  ModalFooter,
   ModalBody,
   ModalCloseButton,
   useDisclosure,
-  Select,
-  FormControl,
-  FormLabel,
   Input,
   InputGroup,
   InputLeftElement
@@ -111,7 +105,6 @@ export function VolunteerPage() {
   const [loadingServices, setLoadingServices] = useState(false)
   const [userVolunteerAssignments, setUserVolunteerAssignments] = useState<VolunteerAssignment[]>(cached?.assignments || [])
   const [serviceIdToVolunteers, setServiceIdToVolunteers] = useState<Record<string, Volunteer[]>>({})
-  const [loadingVolunteers, setLoadingVolunteers] = useState(false)
   const [assigningService, setAssigningService] = useState<string | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
@@ -123,7 +116,6 @@ export function VolunteerPage() {
   const { isOpen: isInstrumentModalOpen, onOpen: onInstrumentModalOpen, onClose: onInstrumentModalClose } = useDisclosure()
   const [selectedServiceForInstrument, setSelectedServiceForInstrument] = useState<string | null>(null)
   const [availableInstruments, setAvailableInstruments] = useState<Array<{id: string, name: string}>>([])
-  const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>('')
   const [loadingInstruments, setLoadingInstruments] = useState(false)
   const [instrumentSearchQuery, setInstrumentSearchQuery] = useState<string>('')
   const [isReloading, setIsReloading] = useState(false)
@@ -139,7 +131,6 @@ export function VolunteerPage() {
   const greenHover = useColorModeValue('green.400', 'green.500')
   const blueHover = useColorModeValue('blue.300', 'blue.400')
   const grayCheckBorder = useColorModeValue('gray.300', 'gray.600')
-  const whiteCardBg = useColorModeValue('white', 'gray.800')
   const grayBorderTop = useColorModeValue('gray.200', 'gray.700')
 
   const loadOrganization = useCallback(async () => {
@@ -235,9 +226,9 @@ export function VolunteerPage() {
     }
   }, [organization])
 
-  const loadUserVolunteerAssignments = useCallback(async () => {
+  const loadUserVolunteerAssignments = useCallback(async (forceReload = false) => {
     if (!user || !organization) return
-    if (assignmentsLoaded) return
+    if (assignmentsLoaded && !forceReload) return
     
     try {
       // First, ensure user is a member of this organization
@@ -296,7 +287,6 @@ export function VolunteerPage() {
     if (!organization || serviceIds.length === 0) return
     
     try {
-      setLoadingVolunteers(true)
       console.log('Loading volunteers for service IDs:', serviceIds)
       
       // First get the volunteer records
@@ -395,8 +385,6 @@ export function VolunteerPage() {
       setServiceIdToVolunteers(mapping)
     } catch (error) {
       console.error('Error loading volunteers:', error)
-    } finally {
-      setLoadingVolunteers(false)
     }
   }, [organization])
 
@@ -447,7 +435,6 @@ export function VolunteerPage() {
     } else {
       // If not assigned, show instrument selection modal
       setSelectedServiceForInstrument(serviceId)
-      setSelectedInstrumentId('')
       setInstrumentSearchQuery('')
       loadAvailableInstruments(serviceId)
       onInstrumentModalOpen()
@@ -460,7 +447,6 @@ export function VolunteerPage() {
     // Close modal immediately
     onInstrumentModalClose()
     setSelectedServiceForInstrument(null)
-    setSelectedInstrumentId('')
     
     // Then process the selection
     await toggleVolunteerStatus(selectedServiceForInstrument, false, instrumentId)
@@ -549,23 +535,60 @@ export function VolunteerPage() {
         }
       }
 
-      // Refresh assignments by clearing cache and reloading
-      setAssignmentsLoaded(false)
-      setUserVolunteerAssignments([])
-      
-      // Clear cache for assignments
-      const current = cache.get(cacheKey)
-      if (current) {
-        cache.set(cacheKey, { ...current, assignments: [], loaded: { ...current.loaded, assignments: false } })
+      // Update assignments optimistically to prevent UI flicker
+      if (isAssigned) {
+        // Remove the assignment from the current state
+        setUserVolunteerAssignments(prev => 
+          prev.filter(assignment => assignment.worship_service_id !== serviceId)
+        )
+        
+        // Update cache
+        const current = cache.get(cacheKey)
+        if (current) {
+          const updatedAssignments = current.assignments.filter(
+            assignment => assignment.worship_service_id !== serviceId
+          )
+          cache.set(cacheKey, { 
+            ...current, 
+            assignments: updatedAssignments
+          })
+        }
+      } else {
+        // Add the new assignment to the current state
+        const newAssignment = {
+          id: `temp-${Date.now()}`, // Temporary ID
+          worship_service_id: serviceId,
+          user_id: user.id,
+          created_at: new Date().toISOString()
+        }
+        
+        setUserVolunteerAssignments(prev => [...prev, newAssignment])
+        
+        // Update cache
+        const current = cache.get(cacheKey)
+        if (current) {
+          cache.set(cacheKey, { 
+            ...current, 
+            assignments: [...current.assignments, newAssignment]
+          })
+        }
       }
       
-      await loadUserVolunteerAssignments()
-      
-      // Also refresh the volunteers list for all services
+      // Refresh the volunteers list for all services (this doesn't affect the green border)
       if (availableServices.length > 0) {
         const serviceIds = availableServices.map(service => service.id)
         await loadVolunteersForServices(serviceIds)
       }
+      
+      // Optionally reload assignments in the background to sync with server
+      // This happens after the UI has already updated, so no flicker
+      setTimeout(async () => {
+        try {
+          await loadUserVolunteerAssignments(true) // Force reload for background sync
+        } catch (error) {
+          console.error('Background sync failed:', error)
+        }
+      }, 100)
     } catch (err) {
       console.error('Unexpected error toggling volunteer status:', err)
       toast({
@@ -871,17 +894,6 @@ export function VolunteerPage() {
                     transition="all 0.2s ease-in-out"
                     position="relative"
                   >
-                    {assigningService === service.id && (
-                      <Box
-                        position="absolute"
-                        top="50%"
-                        left="50%"
-                        transform="translate(-50%, -50%)"
-                        zIndex={2}
-                      >
-                        <Spinner size="lg" color="blue.500" />
-                      </Box>
-                    )}
                     
                     <VStack spacing={3} align="stretch" w="100%">
                       <HStack justify="space-between" align="center" w="100%">
@@ -919,99 +931,83 @@ export function VolunteerPage() {
                         </Box>
                       </HStack>
 
-                      {/* Volunteer List */}
-                      {loadingVolunteers ? (
-                        <HStack spacing={2} align="center">
-                          <Spinner size="sm" />
-                          <Text fontSize="sm" color={subtitleColor}>
-                            {t('volunteerPage.loadingVolunteers')}
-                          </Text>
-                        </HStack>
-                      ) : volunteers.length > 0 ? (
-                        <VStack spacing={2} align="stretch">
-                          <Text fontSize="sm" fontWeight="600" color={subtitleColor}>
-                            {t('volunteerPage.currentVolunteers')}:
-                          </Text>
-                          <HStack spacing={2} align="flex-start" flexWrap="wrap">
-                            {volunteers
-                              .sort((a, b) => {
-                                const aInstruments = a.instruments || []
-                                const bInstruments = b.instruments || []
-                                
-                                // Check if volunteer has Mic 1
-                                const aHasMic1 = aInstruments.some(instrument => 
-                                  instrument.toLowerCase().includes('mic 1') || 
-                                  instrument.toLowerCase() === 'mic1'
-                                )
-                                const bHasMic1 = bInstruments.some(instrument => 
-                                  instrument.toLowerCase().includes('mic 1') || 
-                                  instrument.toLowerCase() === 'mic1'
-                                )
-                                
-                                // Mic 1 volunteers come first
-                                if (aHasMic1 && !bHasMic1) return -1
-                                if (!aHasMic1 && bHasMic1) return 1
-                                
-                                // For non-Mic 1 volunteers, sort alphabetically by first name
-                                const aFirstName = a.profiles.first_name || 'Unknown'
-                                const bFirstName = b.profiles.first_name || 'Unknown'
-                                return aFirstName.localeCompare(bFirstName)
+                      {/* Volunteer Badges */}
+                      {volunteers.length > 0 && (
+                        <HStack spacing={2} align="flex-start" flexWrap="wrap">
+                          {volunteers
+                            .sort((a, b) => {
+                              const aInstruments = a.instruments || []
+                              const bInstruments = b.instruments || []
+                              
+                              // Check if volunteer has Mic 1
+                              const aHasMic1 = aInstruments.some(instrument => 
+                                instrument.toLowerCase().includes('mic 1') || 
+                                instrument.toLowerCase() === 'mic1'
+                              )
+                              const bHasMic1 = bInstruments.some(instrument => 
+                                instrument.toLowerCase().includes('mic 1') || 
+                                instrument.toLowerCase() === 'mic1'
+                              )
+                              
+                              // Mic 1 volunteers come first
+                              if (aHasMic1 && !bHasMic1) return -1
+                              if (!aHasMic1 && bHasMic1) return 1
+                              
+                              // For non-Mic 1 volunteers, sort alphabetically by first name
+                              const aFirstName = a.profiles.first_name || 'Unknown'
+                              const bFirstName = b.profiles.first_name || 'Unknown'
+                              return aFirstName.localeCompare(bFirstName)
+                            })
+                            .map((volunteer) => {
+                              const firstName = volunteer.profiles.first_name || 'Unknown'
+                              const lastName = volunteer.profiles.last_name || ''
+                              const fullName = `${firstName} ${lastName}`.trim()
+                              const instruments = volunteer.instruments || []
+                              const role = instruments.length > 0 ? instruments.join(', ') : 'Volunteer'
+                              
+                              // Check if this is the current user
+                              const isCurrentUser = user && volunteer.user_id === user.id
+                              
+                              // Check if volunteer has Mic 1 or Worship Leader role
+                              const hasMic1OrWorshipLeader = instruments.some(instrument => {
+                                const lowerInstrument = instrument.toLowerCase()
+                                return lowerInstrument.includes('mic 1') || 
+                                       lowerInstrument === 'mic1' ||
+                                       lowerInstrument.includes('worship leader') ||
+                                       lowerInstrument === 'worship leader'
                               })
-                              .map((volunteer) => {
-                                const firstName = volunteer.profiles.first_name || 'Unknown'
-                                const lastName = volunteer.profiles.last_name || ''
-                                const fullName = `${firstName} ${lastName}`.trim()
-                                const instruments = volunteer.instruments || []
-                                const role = instruments.length > 0 ? instruments.join(', ') : 'Volunteer'
-                                
-                                // Check if this is the current user
-                                const isCurrentUser = user && volunteer.user_id === user.id
-                                
-                                // Check if volunteer has Mic 1 or Worship Leader role
-                                const hasMic1OrWorshipLeader = instruments.some(instrument => {
-                                  const lowerInstrument = instrument.toLowerCase()
-                                  return lowerInstrument.includes('mic 1') || 
-                                         lowerInstrument === 'mic1' ||
-                                         lowerInstrument.includes('worship leader') ||
-                                         lowerInstrument === 'worship leader'
-                                })
-                                
-                                // Use darker blue for current user or Mic 1/Worship Leader, lighter blue for others
-                                const shouldUseDarkBlue = isCurrentUser || hasMic1OrWorshipLeader
-                                
-                                return (
-                                  <Box
-                                    key={volunteer.id}
-                                    bg={shouldUseDarkBlue ? "blue.500" : useColorModeValue("blue.100", "blue.300")}
-                                    color={shouldUseDarkBlue ? "white" : useColorModeValue("blue.800", "blue.900")}
-                                    px={3}
-                                    py={2}
-                                    borderRadius="lg"
-                                    textAlign="center"
-                                    minW="fit-content"
-                                  >
-                                    <VStack spacing={0}>
-                                      <Text fontSize="xs" fontWeight="600" lineHeight="1.2">
-                                        {fullName}
-                                      </Text>
-                                      <Text 
-                                        fontSize="2xs" 
-                                        fontWeight="400" 
-                                        opacity={shouldUseDarkBlue ? 0.9 : 0.8} 
-                                        lineHeight="1.1"
-                                      >
-                                        {role}
-                                      </Text>
-                                    </VStack>
-                                  </Box>
-                                )
-                              })}
-                          </HStack>
-                        </VStack>
-                      ) : (
-                        <Text fontSize="sm" color={subtitleColor} fontStyle="italic">
-                          {t('volunteerPage.noVolunteersYet')}
-                        </Text>
+                              
+                              // Use darker blue for current user or Mic 1/Worship Leader, lighter blue for others
+                              const shouldUseDarkBlue = isCurrentUser || hasMic1OrWorshipLeader
+                              
+                              return (
+                                <Box
+                                  key={volunteer.id}
+                                  bg={shouldUseDarkBlue ? "blue.500" : useColorModeValue("blue.100", "blue.300")}
+                                  color={shouldUseDarkBlue ? "white" : useColorModeValue("blue.800", "blue.900")}
+                                  px={3}
+                                  py={2}
+                                  borderRadius="lg"
+                                  textAlign="center"
+                                  minW="fit-content"
+                                >
+                                  <VStack spacing={0}>
+                                    <Text fontSize="xs" fontWeight="600" lineHeight="1.2">
+                                      {fullName}
+                                    </Text>
+                                    <Text 
+                                      fontSize="2xs" 
+                                      fontWeight="400" 
+                                      opacity={shouldUseDarkBlue ? 0.9 : 0.8} 
+                                      lineHeight="1.1"
+                                    >
+                                      {role}
+                                    </Text>
+                                  </VStack>
+                                </Box>
+                              )
+                            })}
+                        </HStack>
                       )}
                     </VStack>
                   </Box>
