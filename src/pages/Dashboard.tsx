@@ -40,7 +40,7 @@ import {
   Tooltip
 } from '@chakra-ui/react'
 import { CloseButton } from '@chakra-ui/react'
-import { ChevronLeftIcon, ChevronRightIcon, WarningTwoIcon, CloseIcon } from '@chakra-ui/icons'
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, EditIcon } from '@chakra-ui/icons'
 import {
   DndContext,
   closestCenter,
@@ -314,39 +314,34 @@ export function Dashboard() {
       opacity: isDragging ? 0.6 : 1,
     }
 
-    const cardBgLocal = useColorModeValue('gray.50', 'gray.700')
-    const textColorLocal = useColorModeValue('gray.800', 'white')
-    const textMutedLocal = useColorModeValue('gray.500', 'gray.400')
 
     return (
       <Box
         ref={setNodeRef}
         style={style}
-        bg={cardBgLocal}
-        border="1px"
-        borderColor={cardBorderColor}
-        borderRadius="md"
-        p={3}
+        bg="#f9f9f9"
+        borderRadius="20px"
+        p={4}
         display="flex"
         alignItems="center"
         gap={3}
         transition="all 0.2s ease"
-        _hover={{ borderColor: useColorModeValue('gray.300', 'gray.500') }}
+        _hover={{ bg: "#f0f0f0" }}
         cursor={canManage ? 'grab' : 'default'}
         userSelect="none"
         {...attributes}
       >
         <Box
-          bg="blue.500"
+          bg="black"
           color="white"
           borderRadius="full"
-          w={7}
-          h={7}
+          w={8}
+          h={8}
           display="flex"
           alignItems="center"
           justifyContent="center"
           fontWeight="600"
-          fontSize="xs"
+          fontSize="sm"
           flexShrink={0}
           position="relative"
           {...(canManage ? listeners : {})}
@@ -355,34 +350,54 @@ export function Dashboard() {
         </Box>
 
         <Box flex="1" minW="0" cursor={canManage ? 'grab' : 'default'} {...(canManage ? listeners : {})}>
-          <Text fontWeight="600" color={textColorLocal} fontSize="sm" mb={0} noOfLines={1}>
-            {serviceSong.songs.title} - {serviceSong.songs.artist}
+          <Text fontWeight="600" color="black" fontSize="md" mb={0} noOfLines={1}>
+            {serviceSong.songs.title}
+          </Text>
+          <Text color="gray.600" fontSize="sm" mb={0} noOfLines={1}>
+            {serviceSong.songs.artist}
           </Text>
           {serviceSong.notes && (
-            <Text color={textMutedLocal} fontSize="xs" fontStyle="italic" noOfLines={2}>
+            <Text color="gray.500" fontSize="xs" fontStyle="italic" noOfLines={2} mt={1}>
               {serviceSong.notes}
             </Text>
           )}
         </Box>
 
         {canManage && (
-          <Tooltip label="Remove song from service">
-            <IconButton
-              aria-label="Remove song from service"
-              icon={removingServiceSongId === serviceSong.id ? <Spinner size="xs" /> : <CloseIcon boxSize="3" />}
-              variant="ghost"
-              colorScheme="gray"
-              size="sm"
-              opacity={0.5}
-              _hover={{ opacity: 1, bg: useColorModeValue('gray.200', 'gray.600') }}
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                onRemove(serviceSong.id)
-              }}
-              isDisabled={removingServiceSongId === serviceSong.id}
-            />
-          </Tooltip>
+          <HStack spacing={2}>
+            <Tooltip label="Edit song">
+              <IconButton
+                aria-label="Edit song"
+                icon={<EditIcon boxSize="4" />}
+                variant="ghost"
+                colorScheme="gray"
+                size="sm"
+                borderRadius="full"
+                _hover={{ bg: "gray.200" }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+              />
+            </Tooltip>
+            <Tooltip label="Remove song from service">
+              <IconButton
+                aria-label="Remove song from service"
+                icon={removingServiceSongId === serviceSong.id ? <Spinner size="xs" /> : <CloseIcon boxSize="3" />}
+                variant="ghost"
+                colorScheme="red"
+                size="sm"
+                borderRadius="full"
+                _hover={{ bg: "red.100" }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onRemove(serviceSong.id)
+                }}
+                isDisabled={removingServiceSongId === serviceSong.id}
+              />
+            </Tooltip>
+          </HStack>
         )}
       </Box>
     )
@@ -605,7 +620,14 @@ export function Dashboard() {
       }
 
       if (!volunteerRecords || volunteerRecords.length === 0) {
-        setServiceIdToVolunteers({})
+        // Don't clear all volunteer data, just ensure the requested services have empty arrays
+        setServiceIdToVolunteers(prev => {
+          const updated = { ...prev }
+          serviceIds.forEach(serviceId => {
+            updated[serviceId] = []
+          })
+          return updated
+        })
         return
       }
 
@@ -622,7 +644,7 @@ export function Dashboard() {
       }
 
       // Combine the data and create the mapping
-      const mapping: Record<string, Volunteer[]> = {}
+      const newMapping: Record<string, Volunteer[]> = {}
       volunteerRecords.forEach((volunteer) => {
         const profile = profiles?.find(p => p.id === volunteer.user_id)
         const volunteerWithProfile = {
@@ -631,12 +653,27 @@ export function Dashboard() {
         }
         
         const svcId = volunteer.worship_service_id
-        if (!mapping[svcId]) mapping[svcId] = []
-        mapping[svcId].push(volunteerWithProfile as Volunteer)
+        if (!newMapping[svcId]) newMapping[svcId] = []
+        newMapping[svcId].push(volunteerWithProfile as Volunteer)
       })
       
-      console.log('Volunteers mapping:', mapping)
-      setServiceIdToVolunteers(mapping)
+      console.log('Volunteers mapping:', newMapping)
+      
+      // Merge with existing volunteer data instead of replacing it
+      setServiceIdToVolunteers(prev => {
+        const updated = { ...prev }
+        // Update only the services we just loaded
+        Object.keys(newMapping).forEach(serviceId => {
+          updated[serviceId] = newMapping[serviceId]
+        })
+        // Ensure services with no volunteers have empty arrays
+        serviceIds.forEach(serviceId => {
+          if (!updated[serviceId]) {
+            updated[serviceId] = []
+          }
+        })
+        return updated
+      })
 
       // Load instrument assignments for these volunteers
       const volunteerIds = (volunteerRecords || []).map(v => v.id as string)
@@ -1225,7 +1262,6 @@ export function Dashboard() {
     }
   }
 
-  
 
   async function handleAddSongToService(serviceId: string, overrideSongId?: string) {
     if (!serviceId) return
@@ -1344,7 +1380,7 @@ export function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('worship_services')
-        .select('id, service_date, service_time, title')
+        .select('id, service_date, service_time, title, status')
         .eq('organization_id', organization.organization_id)
 
       if (error) {
@@ -1369,6 +1405,27 @@ export function Dashboard() {
     loadOrganizationInstruments()
   }, [organization])
 
+  // Load volunteers for upcoming services when services are loaded
+  useEffect(() => {
+    if (!organization || services.length === 0) return
+    
+    // Get upcoming services (same logic as in the render)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const upcomingServices = services
+      .filter(service => {
+        const serviceDate = new Date(service.service_date)
+        return serviceDate >= today
+      })
+      .slice(0, 8) // Show next 8 upcoming services
+    
+    if (upcomingServices.length > 0) {
+      const serviceIds = upcomingServices.map(service => service.id)
+      loadVolunteersForServices(serviceIds)
+    }
+  }, [organization, services, loadVolunteersForServices])
+
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
   const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
@@ -1385,6 +1442,11 @@ export function Dashboard() {
     0% { box-shadow: 0 0 0 0 rgba(49, 130, 206, 0.45) }
     70% { box-shadow: 0 0 0 10px rgba(49, 130, 206, 0) }
     100% { box-shadow: 0 0 0 0 rgba(49, 130, 206, 0) }
+  `
+  const volunteerPulse = keyframes`
+    0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.6) }
+    70% { box-shadow: 0 0 0 8px rgba(33, 150, 243, 0) }
+    100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0) }
   `
   const mobileTextSx = {
     '@media (max-width: 48em)': {
@@ -1452,46 +1514,51 @@ export function Dashboard() {
                     mb={4}
                     fontWeight="600"
                   >
-                    {t('dashboard.upcoming.title')}
+                    Upcoming 📅
                   </Heading>
                   
                   {(() => {
                     const today = new Date()
                     today.setHours(0, 0, 0, 0) // Set to start of today for accurate comparison
                     
-                    const upcomingVolunteerDates = userVolunteerDates
-                      .filter(date => new Date(date) >= today) // Only show today and future dates
-                      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-                      .slice(0, 5) // Show only next 5 volunteer services
+                    // Get all services from today forward, ordered chronologically
+                    const upcomingServices = services
+                      .filter(service => {
+                        const serviceDate = new Date(service.service_date)
+                        return serviceDate >= today
+                      })
+                      .sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
+                      .slice(0, 8) // Show next 8 upcoming services
                     
-                    return upcomingVolunteerDates.length === 0 ? (
+                    console.log('Debug - All services:', services.length)
+                    console.log('Debug - Upcoming services:', upcomingServices.length)
+                    console.log('Debug - Services statuses:', services.map(s => ({ id: s.id, status: s.status, date: s.service_date })))
+                    
+                    return upcomingServices.length === 0 ? (
                       <Text color={mutedTextColor} textAlign="center" py={4}>
-                        {userVolunteerDates.length === 0 
-                          ? t('dashboard.upcoming.noVolunteerServices')
-                          : t('dashboard.upcoming.noUpcomingServices')
-                        }
+                        No upcoming services
                       </Text>
                     ) : (
                       <VStack spacing={3} align="stretch">
-                        {upcomingVolunteerDates
-                          .map((date) => {
-                            // Find the service for this date
-                            const service = services.find(s => s.service_date === date)
-                            if (!service) return null
+                        {upcomingServices.map((service) => {
+                          const volunteers = serviceIdToVolunteers[service.id] || []
+                          const isUserVolunteer = user && volunteers.some(v => v.user_id === user.id)
                           
                           return (
                             <Box
                               key={service.id}
-                              bg={useColorModeValue('green.50', 'green.900')}
-                              borderRadius="lg"
-                              border="1px"
-                              borderColor="green.200"
-                              p={4}
+                              bg={isUserVolunteer 
+                                ? useColorModeValue('rgba(33, 150, 243, 0.05)', 'rgba(33, 150, 243, 0.1)') 
+                                : useColorModeValue('#f9f9f9', 'gray.700')
+                              }
+                              borderRadius="20px"
+                              p="12px 16px"
                               cursor="pointer"
                               _hover={{ 
-                                borderColor: 'green.400',
-                                transform: 'translateY(-1px)',
-                                boxShadow: 'md'
+                                bg: isUserVolunteer 
+                                  ? useColorModeValue('rgba(33, 150, 243, 0.08)', 'rgba(33, 150, 243, 0.15)')
+                                  : useColorModeValue('#f0f0f0', 'gray.600'),
+                                transform: 'translateY(-1px)'
                               }}
                               transition="all 0.2s"
                               onClick={() => {
@@ -1501,85 +1568,203 @@ export function Dashboard() {
                                 setIsAddingServiceMode(false)
                                 createDrawer.onOpen()
                               }}
+                              position="relative"
+                              {...(isUserVolunteer ? {
+                                animation: `${volunteerPulse} 2s ease-in-out infinite`,
+                                border: '2px solid #2196f3',
+                                boxShadow: '0 0 0 2px rgba(33, 150, 243, 0.3)'
+                              } : {})}
                             >
-                              <HStack justify="space-between" align="center">
-                                <Box flex="1">
-                                  {(() => {
-                                    const dateStr = new Date(service.service_date).toLocaleDateString('en-US', {
-                                      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-                                    })
-                                    const timePart = service.service_time ? (() => {
-                                      const [hStr, mStr] = service.service_time.split(':')
-                                      const hours = parseInt(hStr || '', 10)
-                                      const minutes = parseInt(mStr || '', 10)
-                                      if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
-                                      const d = new Date()
-                                      d.setHours(hours, minutes, 0, 0)
-                                      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-                                    })() : ''
-                                    const titleLine = `${dateStr}${timePart ? ` ${timePart}` : ''} - ${service.title}`
-                                    return (
-                                      <Text fontWeight={{ base: '700', md: '600' }} color={textColor} fontSize={{ base: 'lg', md: 'md' }} mb={2}>
-                                        {titleLine}
-                                      </Text>
-                                    )
-                                  })()}
-
-                                  {(() => {
-                                    const volunteers = serviceIdToVolunteers[service.id] || []
-                                    const mine = volunteers.find(v => v.user_id === user?.id)
-                                    const assignedIds = mine ? (volunteerToInstrumentIds[mine.id] || []) : []
-                                    const names = assignedIds
-                                      .map(id => instruments.find(i => i.id === id)?.name)
-                                      .filter((n): n is string => Boolean(n))
-                                    const songs = serviceIdToSongs[service.id] || []
-
-                                    if (!(names.length || songs.length === 0)) return null
-
-                                    return (
-                                      <HStack spacing={2} mb={2} align="center" flexWrap="wrap">
-                                        {names.map(name => (
-                                          <Badge
-                                            key={`${service.id}-${name}`}
-                                            colorScheme="blue"
-                                            variant="subtle"
-                                            fontSize="xs"
-                                            px={2}
-                                            py={0.5}
-                                            borderRadius="md"
-                                          >
-                                            {name}
-                                          </Badge>
-                                        ))}
-                                        {songs.length === 0 && (
-                                          <Badge
-                                            colorScheme="yellow"
-                                            variant="subtle"
-                                            display="inline-flex"
-                                            alignItems="center"
-                                            gap={1}
-                                            fontSize="xs"
-                                            px={2}
-                                            py={0.5}
-                                            borderRadius="md"
-                                          >
-                                            <WarningTwoIcon boxSize="3" />
-                                            {t('dashboard.upcoming.noSongsAssigned')}
-                                          </Badge>
-                                        )}
-                                      </HStack>
-                                    )
-                                  })()}
-                                </Box>
+                              {(() => {
+                                const serviceDate = new Date(service.service_date)
+                                const dateStr = serviceDate.toLocaleDateString('en-US', {
+                                  month: 'short', day: 'numeric', year: 'numeric'
+                                })
                                 
-                                <Box
-                                  w="8px"
-                                  h="8px"
-                                  borderRadius="full"
-                                  bg="green.400"
-                                  flexShrink={0}
-                                />
-                              </HStack>
+                                // Get ordinal for the Sunday of the month
+                                const firstDayOfMonth = new Date(serviceDate.getFullYear(), serviceDate.getMonth(), 1)
+                                const firstSunday = new Date(firstDayOfMonth)
+                                while (firstSunday.getDay() !== 0) {
+                                  firstSunday.setDate(firstSunday.getDate() + 1)
+                                }
+                                
+                                const weekNumber = Math.ceil((serviceDate.getDate() - firstSunday.getDate() + 1) / 7)
+                                const ordinals = ['', '1st', '2nd', '3rd', '4th', '5th']
+                                const ordinal = ordinals[weekNumber] || `${weekNumber}th`
+                                
+                                const timePart = service.service_time ? (() => {
+                                  const [hStr, mStr] = service.service_time.split(':')
+                                  const hours = parseInt(hStr || '', 10)
+                                  const minutes = parseInt(mStr || '', 10)
+                                  if (Number.isNaN(hours) || Number.isNaN(minutes)) return 'All day'
+                                  const d = new Date()
+                                  d.setHours(hours, minutes, 0, 0)
+                                  return d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }).replace(' ', '').toLowerCase()
+                                })() : 'All day'
+                                
+                                
+                                return (
+                                  <>
+                                    {/* Desktop: Single row layout */}
+                                    <HStack justify="space-between" align="center" w="100%" display={{ base: "none", md: "flex" }}>
+                                      {/* Date | Ordinal SUN | Time */}
+                                      <HStack spacing={3} align="center" flex="1">
+                                        <Box minW="90px">
+                                          <Text fontWeight="600" color={textColor} fontSize="sm" textAlign="left">
+                                            {dateStr}
+                                          </Text>
+                                        </Box>
+                                        <Text color={mutedTextColor} fontSize="sm">
+                                          |
+                                        </Text>
+                                        <Box minW="65px">
+                                          <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
+                                            {ordinal} SUN
+                                          </Text>
+                                        </Box>
+                                        <Text color={mutedTextColor} fontSize="sm">
+                                          |
+                                        </Text>
+                                        <Box minW="45px">
+                                          <Text fontWeight="500" color={textColor} fontSize="sm" textAlign="left">
+                                            {timePart}
+                                          </Text>
+                                        </Box>
+                                      </HStack>
+                                      
+                                      {/* Desktop: Volunteer circles on same row */}
+                                      <HStack spacing={2} align="center">
+                                        <HStack spacing={1}>
+                                          {(() => {
+                                            // Sort volunteers to put current user first
+                                            const sortedVolunteers = [...volunteers].sort((a, b) => {
+                                              if (user && a.user_id === user.id) return -1
+                                              if (user && b.user_id === user.id) return 1
+                                              return 0
+                                            })
+                                            
+                                            return sortedVolunteers.map((volunteer) => {
+                                              const firstName = volunteer.profiles.first_name || 'U'
+                                              const lastName = volunteer.profiles.last_name || 'U'
+                                              const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+                                              const isCurrentUser = user && volunteer.user_id === user.id
+                                              
+                                              return (
+                                                <Tooltip 
+                                                  key={volunteer.id}
+                                                  label={`${firstName} ${lastName}`}
+                                                  placement="top"
+                                                  hasArrow
+                                                >
+                                                  <Box
+                                                    bg={isCurrentUser 
+                                                      ? useColorModeValue('#2196f3', '#1976d2') 
+                                                      : useColorModeValue('#eee', 'gray.600')
+                                                    }
+                                                    borderRadius="50%"
+                                                    w="30px"
+                                                    h="30px"
+                                                    display="flex"
+                                                    alignItems="center"
+                                                    justifyContent="center"
+                                                    fontSize="14px"
+                                                    fontWeight="600"
+                                                    color={isCurrentUser ? 'white' : textColor}
+                                                    cursor="pointer"
+                                                  >
+                                                    {initials}
+                                                  </Box>
+                                                </Tooltip>
+                                              )
+                                            })
+                                          })()}
+                                        </HStack>
+                                        
+                                      </HStack>
+                                    </HStack>
+
+                                    {/* Mobile: Two row layout */}
+                                    <VStack spacing={2} align="stretch" w="100%" display={{ base: "flex", md: "none" }}>
+                                      {/* Mobile: Service details row */}
+                                      <HStack spacing={2} align="center" w="100%">
+                                        <Box minW="115px">
+                                          <Text fontWeight="600" color={textColor} fontSize="sm" textAlign="left">
+                                            {dateStr}
+                                          </Text>
+                                        </Box>
+                                        <Text color={mutedTextColor} fontSize="sm">
+                                          |
+                                        </Text>
+                                        <Box minW="55px">
+                                          <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
+                                            {ordinal} SUN
+                                          </Text>
+                                        </Box>
+                                        <Text color={mutedTextColor} fontSize="sm">
+                                          |
+                                        </Text>
+                                        <Box minW="35px">
+                                          <Text fontWeight="500" color={textColor} fontSize="sm" textAlign="left">
+                                            {timePart}
+                                          </Text>
+                                        </Box>
+                                      </HStack>
+                                      
+                                      {/* Mobile: Volunteer circles on separate row */}
+                                      {volunteers.length > 0 && (
+                                        <HStack spacing={1} align="center" justify="flex-start" flexWrap="wrap">
+                                          {(() => {
+                                            // Sort volunteers to put current user first
+                                            const sortedVolunteers = [...volunteers].sort((a, b) => {
+                                              if (user && a.user_id === user.id) return -1
+                                              if (user && b.user_id === user.id) return 1
+                                              return 0
+                                            })
+                                            
+                                            return sortedVolunteers.map((volunteer) => {
+                                              const firstName = volunteer.profiles.first_name || 'U'
+                                              const lastName = volunteer.profiles.last_name || 'U'
+                                              const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+                                              const isCurrentUser = user && volunteer.user_id === user.id
+                                              
+                                              return (
+                                                <Tooltip 
+                                                  key={volunteer.id}
+                                                  label={`${firstName} ${lastName}`}
+                                                  placement="top"
+                                                  hasArrow
+                                                >
+                                                  <Box
+                                                    bg={isCurrentUser 
+                                                      ? useColorModeValue('#2196f3', '#1976d2') 
+                                                      : useColorModeValue('#eee', 'gray.600')
+                                                    }
+                                                    borderRadius="50%"
+                                                    w="28px"
+                                                    h="28px"
+                                                    display="flex"
+                                                    alignItems="center"
+                                                    justifyContent="center"
+                                                    fontSize="12px"
+                                                    fontWeight="600"
+                                                    color={isCurrentUser ? 'white' : textColor}
+                                                    cursor="pointer"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                    }}
+                                                  >
+                                                    {initials}
+                                                  </Box>
+                                                </Tooltip>
+                                              )
+                                            })
+                                          })()}
+                                        </HStack>
+                                      )}
+                                    </VStack>
+                                  </>
+                                )
+                              })()}
                             </Box>
                           )
                           })
@@ -1659,10 +1844,19 @@ export function Dashboard() {
 
                 {canManagePrimary && (
                   <Button
-                    colorScheme="blue"
-                    size="md"
+                    bg="#2196f3"
+                    color="white"
+                    border="none"
+                    borderRadius="999px"
+                    px="24px"
+                    py="12px"
+                    fontSize="15px"
+                    fontWeight="bold"
+                    boxShadow="0 2px 4px rgba(0,0,0,0.2)"
                     mt={4}
                     w="100%"
+                    _hover={{ bg: "#1976d2" }}
+                    _active={{ bg: "#1565c0" }}
                     onClick={() => {
                       setSelectedDate('')
                       setDayServices([])
@@ -1671,7 +1865,7 @@ export function Dashboard() {
                       createDrawer.onOpen()
                     }}
                   >
-                    {t('dashboard.services.addNewService')}
+                    Add New Schedule
                   </Button>
                 )}
               </Box>
@@ -1712,9 +1906,17 @@ export function Dashboard() {
 
                 <VStack spacing={3} align="stretch">
                   <Button
-                    size="md"
-                    colorScheme="green"
-                    variant="outline"
+                    bg="#2196f3"
+                    color="white"
+                    border="none"
+                    borderRadius="999px"
+                    px="24px"
+                    py="12px"
+                    fontSize="15px"
+                    fontWeight="bold"
+                    boxShadow="0 2px 4px rgba(0,0,0,0.2)"
+                    _hover={{ bg: "#1976d2" }}
+                    _active={{ bg: "#1565c0" }}
                     onClick={copyVolunteerLink}
                     isLoading={loadingVolunteerLink || copyingLink}
                     loadingText={loadingVolunteerLink ? t('dashboard.volunteerLink.loading') : t('dashboard.volunteerLink.copying')}
@@ -1731,9 +1933,17 @@ export function Dashboard() {
 
                   {volunteerLink && (
                     <Button
-                      size="md"
-                      colorScheme="blue"
-                      variant="outline"
+                      bg="white"
+                      color="black"
+                      border="2px solid #000"
+                      borderRadius="999px"
+                      px="24px"
+                      py="12px"
+                      fontSize="15px"
+                      fontWeight="bold"
+                      boxShadow="0 2px 4px rgba(0,0,0,0.2)"
+                      _hover={{ bg: "#f5f5f5" }}
+                      _active={{ bg: "#e0e0e0" }}
                       onClick={() => navigate(`/volunteer/${volunteerLink}`)}
                       w="100%"
                     >
@@ -1829,36 +2039,42 @@ export function Dashboard() {
 
                 {canManagePrimary && (
                   <Button
+                    bg="#2196f3"
+                    color="white"
+                    border="none"
+                    borderRadius="999px"
+                    px="24px"
+                    py="12px"
+                    fontSize="15px"
+                    fontWeight="bold"
+                    boxShadow="0 2px 4px rgba(0,0,0,0.2)"
                     mt={5}
                     w="100%"
-                    colorScheme="blue"
-                    position="relative"
-                    overflow="hidden"
-                    _before={{
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: '-100%',
-                      width: '100%',
-                      height: '100%',
-                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
-                      animation: 'shimmer 4s infinite'
-                    }}
-                    sx={{
-                      '@keyframes shimmer': {
-                        '0%': { left: '-100%' },
-                        '50%': { left: '100%' },
-                        '100%': { left: '100%' }
-                      }
-                    }}
+                    _hover={{ bg: "#1976d2" }}
+                    _active={{ bg: "#1565c0" }}
                     onClick={addSongDrawer.onOpen}
                   >
-                    {t('dashboard.songs.addSong')}
+                    Add New Song
                   </Button>
                 )}
 
-                <Button mt={3} w="100%" variant="outline" colorScheme="blue" onClick={() => navigate('/songbank')}>
-                  {t('dashboard.songs.manageSongs')}
+                <Button 
+                  bg="white"
+                  color="black"
+                  border="2px solid #000"
+                  borderRadius="999px"
+                  px="24px"
+                  py="12px"
+                  fontSize="15px"
+                  fontWeight="bold"
+                  boxShadow="0 2px 4px rgba(0,0,0,0.2)"
+                  mt={3} 
+                  w="100%" 
+                  _hover={{ bg: "#f5f5f5" }}
+                  _active={{ bg: "#e0e0e0" }}
+                  onClick={() => navigate('/songbank')}
+                >
+                  Go to Song Bank
                 </Button>
               </Box>
             </VStack>
@@ -1921,7 +2137,7 @@ export function Dashboard() {
                               ref={idx === 0 ? firstServiceRef : undefined}
                             >
                               <h2>
-                                <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor}>
+                                <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor} px={4} py={3}>
                                   <Box as="span" flex='1' textAlign='left'>
                                     {(() => {
                                       const timePart = svc.service_time ? (() => {
@@ -1931,17 +2147,45 @@ export function Dashboard() {
                                         if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
                                         const d = new Date()
                                         d.setHours(hours, minutes, 0, 0)
-                                        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase()
                                       })() : 'All day'
-                                      const statusLabel = svc.status.charAt(0).toUpperCase() + svc.status.slice(1)
+                                      
+                                      const formattedDate = (() => {
+                                        try {
+                                          const serviceDate = new Date(selectedDate)
+                                          return serviceDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                        } catch {
+                                          return ''
+                                        }
+                                      })()
+                                      
+                                      const volunteerInitials = (() => {
+                                        const volunteers = serviceIdToVolunteers[svc.id] || []
+                                        return volunteers.slice(0, 3).map(v => {
+                                          const firstName = v.profiles?.first_name || ''
+                                          const lastName = v.profiles?.last_name || ''
+                                          return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+                                        }).join(' ')
+                                      })()
+                                      
                                       return (
-                                        <HStack spacing={3} align="center">
-                                          <Text m={0} fontWeight="800" fontSize="lg" color="blue.800">
-                                            {`${timePart} - ${svc.title}`}
-                                          </Text>
-                                          <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
-                                            {statusLabel}
-                                          </Badge>
+                                        <HStack spacing={3} align="center" justify="space-between" w="100%">
+                                          <HStack spacing={3} align="center">
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {formattedDate}
+                                            </Text>
+                                            <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
+                                              {svc.title}
+                                            </Badge>
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {timePart}
+                                            </Text>
+                                          </HStack>
+                                          {volunteerInitials && (
+                                            <Text fontSize="xs" fontWeight="500" color="gray.500">
+                                              {volunteerInitials}
+                                            </Text>
+                                          )}
                                         </HStack>
                                       )
                                     })()}
@@ -1990,10 +2234,14 @@ export function Dashboard() {
                                       <Box mt={3}>
                                         {!showAddSongFormByService[svc.id] && (
                                           <Button
-                                            variant="outline"
-                                            colorScheme="blue"
+                                            bg="#2196f3"
+                                            color="white"
+                                            borderRadius="999px"
+                                            px="24px"
+                                            py="12px"
                                             w="100%"
-                                            borderWidth="1px"
+                                            fontWeight="600"
+                                            _hover={{ bg: "#1976d2" }}
                                             onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: true }))}
                                             animation={`${addSongPulse} 2.5s ease-out infinite`}
                                           >
@@ -2147,53 +2395,49 @@ export function Dashboard() {
                                   </Box>
 
                                   <Box>
-                                    <Text fontWeight="700" mb={2} mt={2} fontSize="lg">Volunteers</Text>
+                                    <Text fontWeight="800" mb={3} mt={2} fontSize="lg">Musicians</Text>
                                     {(serviceIdToVolunteers[svc.id] || []).length === 0 ? (
-                                      <Text color={mutedTextColor} mb={3}>No volunteers yet</Text>
+                                      <Text color={mutedTextColor} mb={3}>No musicians yet</Text>
                                     ) : (
-                                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} alignItems="stretch" mb={3}>
+                                      <VStack spacing={3} align="stretch" mb={3}>
                                         {(serviceIdToVolunteers[svc.id] || []).map(volunteer => (
                                           <Box
                                             key={volunteer.id}
-                                            border="1px"
-                                            borderColor={cardBorderColor}
-                                            borderRadius="lg"
-                                            p={3}
-                                            h="100%"
+                                            bg="#f9f9f9"
+                                            borderRadius="20px"
+                                            p={4}
                                           >
-                                            <VStack align="stretch" spacing={1} h="100%">
-                                              <HStack spacing={2} align="center" justify="space-between">
-                                                <HStack spacing={2} align="center" flex="1">
-                                                  <Text fontWeight="600" fontSize="sm" m={0}>
+                                            <VStack align="stretch" spacing={3}>
+                                              <HStack spacing={3} align="center" justify="space-between">
+                                                <HStack spacing={3} align="center" flex="1">
+                                                  <Text fontWeight="600" fontSize="md" color="black" m={0}>
                                                     {volunteer.profiles.first_name} {volunteer.profiles.last_name}
                                                   </Text>
-                                                  <HStack spacing={1} flexWrap="wrap">
+                                                  <HStack spacing={2} flexWrap="wrap">
                                                     {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
                                                       const inst = instruments.find(i => i.id === instId)
                                                       if (!inst) return null
                                                       return (
                                                         <Box key={instId} as="span">
                                                           <Badge
-                                                            colorScheme="blue"
-                                                            variant="solid"
-                                                            borderRadius="md"
-                                                            fontSize="0.7rem"
+                                                            bg="black"
+                                                            color="white"
+                                                            borderRadius="full"
+                                                            px={3}
+                                                            py={1}
+                                                            fontSize="xs"
+                                                            fontWeight="600"
                                                             display="inline-flex"
                                                             alignItems="center"
-                                                            pl={2}
-                                                            pr={2}
-                                                            py={0.5}
-                                                            gap={0}
                                                             role="group"
                                                           >
                                                             {inst.name}
                                                             <Box
-                                                              h="14px"
-                                                              ml={0}
+                                                              ml={2}
                                                               display="none"
                                                               alignItems="center"
                                                               justifyContent="center"
-                                                              _groupHover={{ display: 'inline-flex', ml: 1 }}
+                                                              _groupHover={{ display: 'inline-flex' }}
                                                             >
                                                               <CloseButton
                                                                 size="xs"
@@ -2219,52 +2463,57 @@ export function Dashboard() {
                                                       variant="ghost"
                                                       colorScheme="red"
                                                       size="sm"
-                                                      opacity={0.6}
-                                                      _hover={{ opacity: 1, bg: useColorModeValue('red.100', 'red.800') }}
+                                                      borderRadius="full"
+                                                      _hover={{ bg: "red.100" }}
                                                       onClick={() => handleRemoveVolunteer(volunteer.id, svc.id)}
                                                       isDisabled={!!removingVolunteerById[volunteer.id]}
                                                     />
                                                   </Tooltip>
                                                 )}
                                               </HStack>
-                                              <HStack spacing={2} align="center" mt={2}>
-                                                <Select
-                                                  placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign role'}
-                                                  size="sm"
-                                                  value={selectedInstrumentByVolunteer[volunteer.id] || ''}
-                                                  onChange={async (e) => {
-                                                    const val = e.target.value
-                                                    setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: val }))
-                                                    await handleAssignInstrument(volunteer.id, val)
-                                                    setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: '' }))
-                                                  }}
-                                                  isDisabled={loadingInstruments || !!savingAssignmentByVolunteer[volunteer.id]}
-                                                  maxW={{ base: '100%', md: '320px' }}
-                                                >
-                                                  {(() => {
-                                                    const assigned = new Set<string>(Object.values(volunteerToInstrumentIds).flat())
-                                                    return instruments
-                                                      .filter(inst => !assigned.has(inst.id))
-                                                      .map(inst => (
-                                                        <option key={inst.id} value={inst.id}>{inst.name}</option>
-                                                      ))
-                                                  })()}
-                                                </Select>
-                                              </HStack>
+                                              <Select
+                                                placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign role'}
+                                                size="md"
+                                                bg="white"
+                                                borderRadius="10px"
+                                                border="1px solid #e0e0e0"
+                                                value={selectedInstrumentByVolunteer[volunteer.id] || ''}
+                                                onChange={async (e) => {
+                                                  const val = e.target.value
+                                                  setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: val }))
+                                                  await handleAssignInstrument(volunteer.id, val)
+                                                  setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: '' }))
+                                                }}
+                                                isDisabled={loadingInstruments || !!savingAssignmentByVolunteer[volunteer.id]}
+                                              >
+                                                {(() => {
+                                                  const assigned = new Set<string>(Object.values(volunteerToInstrumentIds).flat())
+                                                  return instruments
+                                                    .filter(inst => !assigned.has(inst.id))
+                                                    .map(inst => (
+                                                      <option key={inst.id} value={inst.id}>{inst.name}</option>
+                                                    ))
+                                                })()}
+                                              </Select>
                                             </VStack>
                                           </Box>
                                         ))}
-                                      </SimpleGrid>
+                                      </VStack>
                                     )}
                                     
                                     {canManagePrimary && (
                                       <Box mt={3} mb={3}>
                                         {!showAddVolunteerByService[svc.id] && (
                                           <Button
-                                            variant="outline"
-                                            colorScheme="blue"
+                                            bg="white"
+                                            color="black"
+                                            border="2px solid #000"
+                                            borderRadius="999px"
+                                            px="24px"
+                                            py="12px"
                                             w="100%"
-                                            borderWidth="1px"
+                                            fontWeight="600"
+                                            _hover={{ bg: "gray.50" }}
                                             onClick={() => setShowAddVolunteerByService(prev => ({ ...prev, [svc.id]: true }))}
                                             animation={`${addSongPulse} 2.5s ease-out infinite`}
                                           >
@@ -2380,7 +2629,7 @@ export function Dashboard() {
                               ref={idx === 0 ? firstServiceRef : undefined}
                             >
                               <h2>
-                                <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor}>
+                                <AccordionButton bg="transparent" borderBottom="1px" borderColor={cardBorderColor} px={4} py={3}>
                                   <Box as="span" flex='1' textAlign='left'>
                                     {(() => {
                                       const timePart = svc.service_time ? (() => {
@@ -2390,17 +2639,45 @@ export function Dashboard() {
                                         if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
                                         const d = new Date()
                                         d.setHours(hours, minutes, 0, 0)
-                                        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase()
                                       })() : 'All day'
-                                      const statusLabel = svc.status.charAt(0).toUpperCase() + svc.status.slice(1)
+                                      
+                                      const formattedDate = (() => {
+                                        try {
+                                          const serviceDate = new Date(selectedDate)
+                                          return serviceDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                        } catch {
+                                          return ''
+                                        }
+                                      })()
+                                      
+                                      const volunteerInitials = (() => {
+                                        const volunteers = serviceIdToVolunteers[svc.id] || []
+                                        return volunteers.slice(0, 3).map(v => {
+                                          const firstName = v.profiles?.first_name || ''
+                                          const lastName = v.profiles?.last_name || ''
+                                          return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+                                        }).join(' ')
+                                      })()
+                                      
                                       return (
-                                        <HStack spacing={3} align="center">
-                                          <Text m={0} fontWeight="600" fontSize="lg">
-                                            {`${timePart} - ${svc.title}`}
-                                          </Text>
-                                          <Badge colorScheme={svc.status === 'published' ? 'green' : svc.status === 'completed' ? 'blue' : 'yellow'}>
-                                            {statusLabel}
-                                          </Badge>
+                                        <HStack spacing={3} align="center" justify="space-between" w="100%">
+                                          <HStack spacing={3} align="center">
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {formattedDate}
+                                            </Text>
+                                            <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
+                                              {svc.title}
+                                            </Badge>
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {timePart}
+                                            </Text>
+                                          </HStack>
+                                          {volunteerInitials && (
+                                            <Text fontSize="xs" fontWeight="500" color="gray.500">
+                                              {volunteerInitials}
+                                            </Text>
+                                          )}
                                         </HStack>
                                       )
                                     })()}
@@ -2450,10 +2727,14 @@ export function Dashboard() {
                                       <Box mt={3}>
                                         {!showAddSongFormByService[svc.id] && (
                                           <Button
-                                            variant="outline"
-                                            colorScheme="blue"
+                                            bg="#2196f3"
+                                            color="white"
+                                            borderRadius="999px"
+                                            px="24px"
+                                            py="12px"
                                             w="100%"
-                                            borderWidth="1px"
+                                            fontWeight="600"
+                                            _hover={{ bg: "#1976d2" }}
                                             onClick={() => setShowAddSongFormByService(prev => ({ ...prev, [svc.id]: true }))}
                                             animation={`${addSongPulse} 2.5s ease-out infinite`}
                                           >
@@ -2718,10 +2999,15 @@ export function Dashboard() {
                                       <Box mt={3} mb={3}>
                                         {!showAddVolunteerByService[svc.id] && (
                                           <Button
-                                            variant="outline"
-                                            colorScheme="blue"
+                                            bg="white"
+                                            color="black"
+                                            border="2px solid #000"
+                                            borderRadius="999px"
+                                            px="24px"
+                                            py="12px"
                                             w="100%"
-                                            borderWidth="1px"
+                                            fontWeight="600"
+                                            _hover={{ bg: "gray.50" }}
                                             onClick={() => setShowAddVolunteerByService(prev => ({ ...prev, [svc.id]: true }))}
                                             animation={`${addSongPulse} 2.5s ease-out infinite`}
                                           >
@@ -3119,22 +3405,36 @@ function CalendarGrid({ year, month, scheduledDates, userVolunteerDates, onDateC
           const iso = toISO(year, month, day)
           const hasEvent = scheduledSet.has(iso)
           const hasVolunteered = volunteerSet.has(iso)
+          
+          // Check if this date is today
+          const today = new Date()
+          const isToday = iso === today.toISOString().split('T')[0]
+          
+          // Check if this date is in the past
+          const cellDate = new Date(year, month, day)
+          const isPast = cellDate < today && !isToday
 
           return (
             <Box
               key={iso}
               h="70px"
-              border="1px"
-              borderColor={cellBorderColor}
+              border={isToday ? "3px solid" : "1px"}
+              borderColor={isToday ? "#2196f3" : cellBorderColor}
               borderRadius="md"
               p={2}
               bg={hasEvent ? eventBg : 'transparent'}
               position="relative"
               onClick={() => onDateClick && onDateClick(iso)}
               cursor="pointer"
-              _hover={{ borderColor: 'blue.300' }}
+              _hover={{ borderColor: isToday ? "#2196f3" : 'blue.300' }}
+              opacity={isPast ? 0.4 : 1}
             >
-              <Text fontSize="sm" color={cellTextColor} fontWeight="500" m={0}>
+              <Text 
+                fontSize="sm" 
+                color={isPast ? useColorModeValue('gray.400', 'gray.600') : cellTextColor} 
+                fontWeight="500" 
+                m={0}
+              >
                 {day}
               </Text>
 
@@ -3145,7 +3445,9 @@ function CalendarGrid({ year, month, scheduledDates, userVolunteerDates, onDateC
                     h="12px"
                     borderRadius="full"
                     bg="green.400"
-                    animation={`${pulse} 1.2s ease-in-out infinite, ${ringPulse} 1.2s ease-out infinite`}
+                    {...(!isPast ? {
+                      animation: `${pulse} 1.2s ease-in-out infinite, ${ringPulse} 1.2s ease-out infinite`
+                    } : {})}
                   />
                 </Box>
               )}

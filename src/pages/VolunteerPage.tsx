@@ -64,6 +64,18 @@ interface VolunteerAssignment {
   created_at: string
 }
 
+interface Volunteer {
+  id: string
+  user_id: string
+  worship_service_id: string
+  created_at: string
+  profiles: {
+    first_name: string
+    last_name: string
+    email: string
+  }
+}
+
 export function VolunteerPage() {
   const { publicUrl } = useParams<{ publicUrl: string }>()
   const navigate = useNavigate()
@@ -80,6 +92,8 @@ export function VolunteerPage() {
   const [availableServices, setAvailableServices] = useState<WorshipService[]>(cached?.services || [])
   const [loadingServices, setLoadingServices] = useState(false)
   const [userVolunteerAssignments, setUserVolunteerAssignments] = useState<VolunteerAssignment[]>(cached?.assignments || [])
+  const [serviceIdToVolunteers, setServiceIdToVolunteers] = useState<Record<string, Volunteer[]>>({})
+  const [loadingVolunteers, setLoadingVolunteers] = useState(false)
   const [assigningService, setAssigningService] = useState<string | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
@@ -251,6 +265,65 @@ export function VolunteerPage() {
     }
   }, [user, organization])
 
+  const loadVolunteersForServices = useCallback(async (serviceIds: string[]) => {
+    if (!organization || serviceIds.length === 0) return
+    
+    try {
+      setLoadingVolunteers(true)
+      console.log('Loading volunteers for service IDs:', serviceIds)
+      
+      // First get the volunteer records
+      const { data: volunteerRecords, error: volunteerError } = await supabase
+        .from('worship_service_volunteers')
+        .select('*')
+        .in('worship_service_id', serviceIds)
+        .order('created_at', { ascending: true })
+
+      if (volunteerError) {
+        console.error('Error loading volunteers:', volunteerError)
+        return
+      }
+
+      if (!volunteerRecords || volunteerRecords.length === 0) {
+        setServiceIdToVolunteers({})
+        return
+      }
+
+      // Then get the profile information for each volunteer
+      const userIds = [...new Set(volunteerRecords.map(v => v.user_id))]
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError)
+        return
+      }
+
+      // Combine the data and create the mapping
+      const mapping: Record<string, Volunteer[]> = {}
+      volunteerRecords.forEach((volunteer) => {
+        const profile = profiles?.find(p => p.id === volunteer.user_id)
+        const volunteerWithProfile = {
+          ...volunteer,
+          profiles: profile || { first_name: 'Unknown', last_name: 'User', email: 'N/A' }
+        }
+        
+        const svcId = volunteer.worship_service_id
+        if (!mapping[svcId]) mapping[svcId] = []
+        mapping[svcId].push(volunteerWithProfile as Volunteer)
+      })
+      
+      console.log('Volunteers mapping:', mapping)
+      setServiceIdToVolunteers(mapping)
+    } catch (error) {
+      console.error('Error loading volunteers:', error)
+    } finally {
+      setLoadingVolunteers(false)
+    }
+  }, [organization])
+
   const toggleVolunteerStatus = async (serviceId: string, isAssigned: boolean) => {
     if (!user || !organization) return
     
@@ -325,6 +398,12 @@ export function VolunteerPage() {
       }
       
       await loadUserVolunteerAssignments()
+      
+      // Also refresh the volunteers list for all services
+      if (availableServices.length > 0) {
+        const serviceIds = availableServices.map(service => service.id)
+        await loadVolunteersForServices(serviceIds)
+      }
     } catch (err) {
       console.error('Unexpected error toggling volunteer status:', err)
       toast({
@@ -427,6 +506,14 @@ export function VolunteerPage() {
       }
     }
   }, [organization, user])
+
+  useEffect(() => {
+    // Load volunteers for all available services
+    if (availableServices.length > 0) {
+      const serviceIds = availableServices.map(service => service.id)
+      loadVolunteersForServices(serviceIds)
+    }
+  }, [availableServices, loadVolunteersForServices])
 
   // Only show loading spinner if we're still loading the organization
   if (loading && !organization) {
@@ -553,6 +640,7 @@ export function VolunteerPage() {
                 const isAssigned = userVolunteerAssignments.some(
                   assignment => assignment.worship_service_id === service.id
                 )
+                const volunteers = serviceIdToVolunteers[service.id] || []
                 
                 return (
                   <Box
@@ -586,40 +674,90 @@ export function VolunteerPage() {
                       </Box>
                     )}
                     
-                    <HStack justify="space-between" align="center" w="100%">
-                      <Text color={titleColor} fontWeight="700" fontSize={{ base: "lg", md: "xl" }} flex={1}>
-                        {new Date(service.service_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                        {service.service_time && (
-                          ` ${new Date(`2000-01-01T${service.service_time}`).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })}`
-                        )} - {service.title}
-                      </Text>
-                      
-                      {/* Check Circle */}
-                      <Box
-                        w="28px"
-                        h="28px"
-                        borderRadius="full"
-                        bg={isAssigned ? "green.500" : "transparent"}
-                        border={isAssigned ? "none" : "2px"}
-                        borderColor={grayCheckBorder}
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        flexShrink={0}
-                      >
-                        {isAssigned && (
-                          <CheckIcon color="white" w={4} h={4} />
-                        )}
-                      </Box>
-                    </HStack>
+                    <VStack spacing={3} align="stretch" w="100%">
+                      <HStack justify="space-between" align="center" w="100%">
+                        <Text color={titleColor} fontWeight="700" fontSize={{ base: "lg", md: "xl" }} flex={1}>
+                          {new Date(service.service_date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                          {service.service_time && (
+                            ` ${new Date(`2000-01-01T${service.service_time}`).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}`
+                          )} - {service.title}
+                        </Text>
+                        
+                        {/* Check Circle */}
+                        <Box
+                          w="28px"
+                          h="28px"
+                          borderRadius="full"
+                          bg={isAssigned ? "green.500" : "transparent"}
+                          border={isAssigned ? "none" : "2px"}
+                          borderColor={grayCheckBorder}
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          flexShrink={0}
+                        >
+                          {isAssigned && (
+                            <CheckIcon color="white" w={4} h={4} />
+                          )}
+                        </Box>
+                      </HStack>
+
+                      {/* Volunteer List */}
+                      {loadingVolunteers ? (
+                        <HStack spacing={2} align="center">
+                          <Spinner size="sm" />
+                          <Text fontSize="sm" color={subtitleColor}>
+                            {t('volunteerPage.loadingVolunteers')}
+                          </Text>
+                        </HStack>
+                      ) : volunteers.length > 0 ? (
+                        <VStack spacing={2} align="stretch">
+                          <Text fontSize="sm" fontWeight="600" color={subtitleColor}>
+                            {t('volunteerPage.currentVolunteers')} ({volunteers.length})
+                          </Text>
+                          <VStack spacing={1} align="stretch">
+                            {volunteers.slice(0, 3).map((volunteer) => (
+                              <HStack key={volunteer.id} spacing={2} align="center">
+                                <Box
+                                  w="6"
+                                  h="6"
+                                  borderRadius="full"
+                                  bg="blue.500"
+                                  display="flex"
+                                  alignItems="center"
+                                  justifyContent="center"
+                                  flexShrink={0}
+                                >
+                                  <Text fontSize="xs" fontWeight="600" color="white">
+                                    {volunteer.profiles.first_name.charAt(0)}{volunteer.profiles.last_name.charAt(0)}
+                                  </Text>
+                                </Box>
+                                <Text fontSize="sm" color={textColor}>
+                                  {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                                </Text>
+                              </HStack>
+                            ))}
+                            {volunteers.length > 3 && (
+                              <Text fontSize="xs" color={subtitleColor} fontStyle="italic">
+                                +{volunteers.length - 3} more volunteers
+                              </Text>
+                            )}
+                          </VStack>
+                        </VStack>
+                      ) : (
+                        <Text fontSize="sm" color={subtitleColor} fontStyle="italic">
+                          {t('volunteerPage.noVolunteersYet')}
+                        </Text>
+                      )}
+                    </VStack>
                   </Box>
                 )
                 })}
