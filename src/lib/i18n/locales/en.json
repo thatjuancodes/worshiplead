@@ -163,7 +163,7 @@
     "dashboard": "Dashboard",
     "songbank": "Songbank",
     "teamManagement": "Team Management",
-    "scheduleService": "Schedule Service",
+    "scheduleService": "Services",
     "signOut": "Sign Out",
     "login": "Login",
     "tryForFree": "Try for Free",
@@ -238,7 +238,7 @@
     }
   },
   "scheduleService": {
-    "title": "Schedule Service",
+    "title": "Services",
     "description": "Create and manage worship services for your organization",
     "createNewService": "Create New Service",
     "cancel": "Cancel",

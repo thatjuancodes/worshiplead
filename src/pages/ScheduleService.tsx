@@ -12,8 +12,9 @@ import {
   Heading, 
   Text, 
   Button, 
-  Spinner, 
   useColorModeValue,
+  Skeleton,
+  SkeletonText,
   FormControl,
   FormLabel,
   Input,
@@ -21,7 +22,6 @@ import {
   Select,
   Badge,
   Flex,
-  Center,
   Table,
   Thead,
   Tbody,
@@ -475,21 +475,6 @@ export function ScheduleService() {
     return statusColorScheme[status as keyof typeof statusColorScheme] || 'yellow'
   }
 
-  if (loading) {
-    return (
-      <Box minH="100vh" bg={bgColor}>
-        <DashboardHeader user={user} organization={organization} />
-        <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
-          <Center h="50vh">
-            <VStack spacing={4}>
-              <Spinner size="xl" color="blue.500" />
-              <Text color={textColor}>Loading services...</Text>
-            </VStack>
-          </Center>
-        </Box>
-      </Box>
-    )
-  }
 
   return (
     <Box minH="100vh" bg={bgColor}>
@@ -509,7 +494,7 @@ export function ScheduleService() {
           </Button>
         </Box>
 
-        {/* Header Section */}
+          {/* Header Section */}
         <Box
           bg={cardBg}
           p={4}
@@ -519,7 +504,7 @@ export function ScheduleService() {
           borderColor={cardBorderColor}
           mb={3}
         >
-          <Flex
+          <Flex 
             direction={{ base: 'column', md: 'row' }}
             justify="space-between"
             align={{ base: 'stretch', md: 'center' }}
@@ -527,15 +512,16 @@ export function ScheduleService() {
           >
             <Box>
               <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
-                📅 Schedule Services
+                📅 Services
               </Heading>
             </Box>
-
-            {canManagePrimary && (
-              <Button
-                colorScheme="blue"
+            
+              {canManagePrimary && (
+                <Button
+                  colorScheme="blue"
                 onClick={onAddDrawerOpen}
                 size="md"
+                isDisabled={loading}
               >
                 + Add Service
               </Button>
@@ -544,13 +530,13 @@ export function ScheduleService() {
         </Box>
 
         {/* Search and Filters */}
-        <Box
-          bg={cardBg}
+            <Box
+              bg={cardBg}
           p={4}
-          borderRadius="lg"
-          boxShadow="sm"
-          border="1px"
-          borderColor={cardBorderColor}
+              borderRadius="lg"
+              boxShadow="sm"
+              border="1px"
+              borderColor={cardBorderColor}
           mb={4}
         >
           <Flex
@@ -561,35 +547,96 @@ export function ScheduleService() {
           >
             {/* Search */}
             <Box flex="6" minW="200px">
-              <Input
-                placeholder="Search services..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="md"
-                w="full"
-              />
+              {loading ? (
+                <Skeleton height="40px" borderRadius="md" />
+              ) : (
+                      <Input
+                  placeholder="Search services..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                        size="md"
+                  w="full"
+                />
+              )}
             </Box>
 
             {/* Status Filter */}
             <Box flex="3" minW="120px" maxW="200px">
-              <Select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                size="md"
-                minW="100px"
-                w="full"
-              >
-                <option value="">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-                <option value="completed">Completed</option>
-              </Select>
+              {loading ? (
+                <Skeleton height="40px" borderRadius="md" />
+              ) : (
+                <Select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                        size="md"
+                  minW="100px"
+                  w="full"
+                >
+                  <option value="">All Status</option>
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="completed">Completed</option>
+                </Select>
+              )}
             </Box>
           </Flex>
         </Box>
 
         {/* Services Table */}
-        {filteredServices.length === 0 ? (
+        {loading ? (
+          /* Skeleton Loading */
+          <Box
+            bg={cardBg}
+            borderRadius="lg"
+            boxShadow="sm"
+            border="1px"
+            borderColor={cardBorderColor}
+            overflow="hidden"
+          >
+            <Box overflowX="auto">
+              <Table variant="simple" minW="800px">
+                <Thead>
+                  <Tr>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Title</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Date</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Time</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Status</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Description</Th>
+                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Actions</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {[...Array(5)].map((_, index) => (
+                    <Tr key={index}>
+                      <Td minW="200px">
+                        <Skeleton height="20px" />
+                      </Td>
+                      <Td minW="150px">
+                        <Skeleton height="20px" />
+                      </Td>
+                      <Td minW="100px">
+                        <Skeleton height="20px" />
+                      </Td>
+                      <Td minW="100px">
+                        <Skeleton height="20px" borderRadius="md" />
+                      </Td>
+                      <Td minW="200px">
+                        <SkeletonText noOfLines={2} spacing={2} />
+                      </Td>
+                      <Td minW="150px">
+                        <HStack spacing={2}>
+                          <Skeleton height="24px" width="50px" borderRadius="md" />
+                          <Skeleton height="24px" width="40px" borderRadius="md" />
+                          <Skeleton height="24px" width="50px" borderRadius="md" />
+                        </HStack>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
+          </Box>
+        ) : filteredServices.length === 0 ? (
           <Box
             bg={cardBg}
             p={12}
@@ -601,15 +648,15 @@ export function ScheduleService() {
           >
             <Text color={mutedTextColor} fontSize="md">
               {services.length === 0 ? 'No services yet' : 'No services found'}
-            </Text>
-          </Box>
-        ) : (
-          <Box
-            bg={cardBg}
-            borderRadius="lg"
+                </Text>
+              </Box>
+            ) : (
+                  <Box
+                    bg={cardBg}
+                    borderRadius="lg"
             boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
+                    border="1px"
+                    borderColor={cardBorderColor}
             overflow="hidden"
           >
             <Box overflowX="auto">
@@ -684,8 +731,8 @@ export function ScheduleService() {
                   ))}
                 </Tbody>
               </Table>
-            </Box>
-          </Box>
+                    </Box>
+                  </Box>
         )}
       </Box>
 
@@ -770,7 +817,7 @@ export function ScheduleService() {
                   </Button>
                 </Flex>
               </VStack>
-            </Box>
+          </Box>
           </DrawerBody>
         </DrawerContent>
       </Drawer>
@@ -859,7 +906,7 @@ export function ScheduleService() {
                   </Button>
                 </Flex>
               </VStack>
-            </Box>
+      </Box>
           </DrawerBody>
         </DrawerContent>
       </Drawer>

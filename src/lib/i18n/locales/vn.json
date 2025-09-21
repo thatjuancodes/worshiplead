@@ -163,7 +163,7 @@
     "dashboard": "Bảng điều khiển",
     "songbank": "Kho bài hát",
     "teamManagement": "Quản lý Nhóm",
-    "scheduleService": "Lên lịch Dịch vụ",
+    "scheduleService": "Dịch vụ",
     "signOut": "Đăng xuất",
     "login": "Đăng nhập",
     "tryForFree": "Dùng thử Miễn phí",
@@ -238,7 +238,7 @@
     }
   },
   "scheduleService": {
-    "title": "Lên lịch Dịch vụ",
+    "title": "Dịch vụ",
     "description": "Tạo và quản lý các dịch vụ thờ cúng cho tổ chức của bạn",
     "createNewService": "Tạo Dịch vụ Mới",
     "cancel": "Hủy",
