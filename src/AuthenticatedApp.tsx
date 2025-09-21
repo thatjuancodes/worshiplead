@@ -18,7 +18,6 @@ import { Songbank } from './pages/Songbank'
 import { TeamManagement } from './pages/TeamManagement'
 import { ScheduleService } from './pages/ScheduleService'
 import { ServiceDetail } from './pages/ServiceDetail'
-import { ServiceEdit } from './pages/ServiceEdit'
 import { OnboardingFlow } from './pages/OnboardingFlow'
 import { VolunteerPage } from './pages/VolunteerPage'
 import { OrganizationAccessDemo } from './pages/OrganizationAccessDemo'
@@ -87,7 +86,6 @@ function AppRoutes() {
       <Route path="/team" element={<TeamManagement />} />
       <Route path="/schedule" element={<ScheduleService />} />
       <Route path="/service/:id" element={<ServiceDetail />} />
-      <Route path="/service/:id/edit" element={<ServiceEdit />} />
       <Route path="/onboarding" element={<OnboardingFlow />} />
       <Route path="/volunteer/:publicUrl" element={<VolunteerPage />} />
       <Route path="/org-access-demo" element={<OrganizationAccessDemo />} />

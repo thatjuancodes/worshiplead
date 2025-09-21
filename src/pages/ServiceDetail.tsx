@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
 import { DashboardHeader } from '../components'
@@ -15,21 +14,31 @@ import {
   Button, 
   Spinner, 
   useColorModeValue,
-  Container,
   FormControl,
   FormLabel,
   Input,
   Select,
-  Alert,
-  AlertIcon,
   Flex,
   Center,
   Grid,
   Badge,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  useDisclosure,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  useToast,
   IconButton,
   Tooltip
 } from '@chakra-ui/react'
-import { CloseButton } from '@chakra-ui/react'
 import { CloseIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 import {
@@ -129,7 +138,6 @@ function SortableSongItem({
   isRemoving: boolean
   canManage: boolean
 }) {
-  const { t } = useTranslation()
   const {
     attributes,
     listeners,
@@ -150,7 +158,6 @@ function SortableSongItem({
   const hoverBg = useColorModeValue('gray.100', 'gray.600')
   const textColor = useColorModeValue('gray.800', 'white')
   const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
-  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
 
   return (
     <Box 
@@ -189,24 +196,10 @@ function SortableSongItem({
         fontSize="sm"
         flexShrink={0}
         cursor={canManage ? "grab" : "default"}
-        position="relative"
         _active={{ cursor: canManage ? "grabbing" : "default" }}
         {...(canManage ? listeners : {})}
       >
         {serviceSong.position}
-        {canManage && (
-          <Text
-            position="absolute"
-            bottom="-6px"
-            left="50%"
-            transform="translateX(-50%)"
-            fontSize="xs"
-            color={textMutedColor}
-            opacity={0.6}
-          >
-            ⋮⋮
-          </Text>
-        )}
       </Box>
 
       {/* Song Info */}
@@ -235,9 +228,9 @@ function SortableSongItem({
       {/* Actions */}
       <Box flexShrink={0}>
         {canManage && (
-          <Tooltip label={t('serviceDetail.removeSong')}>
+          <Tooltip label="Remove Song">
             <IconButton
-              aria-label={t('serviceDetail.removeSong')}
+              aria-label="Remove Song"
               icon={isRemoving ? <Spinner size="sm" /> : <CloseIcon />}
               colorScheme="red"
               size="sm"
@@ -258,9 +251,9 @@ function SortableSongItem({
 }
 
 export function ServiceDetail() {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const toast = useToast()
   const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   
@@ -270,27 +263,24 @@ export function ServiceDetail() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+  
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [service, setService] = useState<WorshipService | null>(null)
   const [serviceSongs, setServiceSongs] = useState<ServiceSong[]>([])
   const [availableSongs, setAvailableSongs] = useState<Song[]>([])
-  const [showAddSongForm, setShowAddSongForm] = useState(false)
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [instruments, setInstruments] = useState<Instrument[]>([])
+  
+  // Add song drawer state
+  const { isOpen: isAddSongDrawerOpen, onOpen: onAddSongDrawerOpen, onClose: onAddSongDrawerClose } = useDisclosure()
   const [selectedSongId, setSelectedSongId] = useState('')
   const [songNotes, setSongNotes] = useState('')
   const [addingSong, setAddingSong] = useState(false)
   const [removingSong, setRemovingSong] = useState<string | null>(null)
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
-  const [loadingVolunteers, setLoadingVolunteers] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState<string>('')
-
-  // Instruments
-  const [instruments, setInstruments] = useState<Instrument[]>([])
-  const [loadingInstruments, setLoadingInstruments] = useState(false)
+  
+  // Volunteer management
   const [volunteerToInstrumentIds, setVolunteerToInstrumentIds] = useState<Record<string, string[]>>({})
-  const [selectedInstrumentByVolunteer, setSelectedInstrumentByVolunteer] = useState<Record<string, string>>({})
-  const [savingAssignmentByVolunteer, setSavingAssignmentByVolunteer] = useState<Record<string, boolean>>({})
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -298,7 +288,8 @@ export function ServiceDetail() {
   const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
   const textColor = useColorModeValue('gray.800', 'white')
   const textSecondaryColor = useColorModeValue('gray.600', 'gray.300')
-  const textMutedColor = useColorModeValue('gray.500', 'gray.400')
+  const mutedTextColor = useColorModeValue('gray.500', 'gray.400')
+  const titleColor = useColorModeValue('gray.800', 'white')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -335,9 +326,21 @@ export function ServiceDetail() {
       if (error) {
         console.error('Error loading service:', error)
         if (error.code === 'PGRST116') {
-          setError('Service not found or you do not have access to it.')
+          toast({
+            title: 'Error',
+            description: 'Service not found or you do not have access to it.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          })
         } else {
-          setError('Failed to load service details.')
+          toast({
+            title: 'Error',
+            description: 'Failed to load service details.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          })
         }
         return
       }
@@ -345,11 +348,17 @@ export function ServiceDetail() {
       setService(data)
     } catch (error) {
       console.error('Error loading service:', error)
-      setError('Failed to load service details.')
+      toast({
+        title: 'Error',
+        description: 'Failed to load service details.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
     } finally {
       setLoading(false)
     }
-  }, [id, organization])
+  }, [id, organization, toast])
 
   useEffect(() => {
     checkUserAndOrganization()
@@ -418,10 +427,6 @@ export function ServiceDetail() {
     if (!service) return
 
     try {
-      setLoadingVolunteers(true)
-      console.log('Loading volunteers for service ID:', service.id)
-      
-      // First get the volunteer records
       const { data: volunteerRecords, error: volunteerError } = await supabase
         .from('worship_service_volunteers')
         .select('*')
@@ -438,7 +443,6 @@ export function ServiceDetail() {
         return
       }
 
-      // Then get the profile information for each volunteer
       const userIds = volunteerRecords.map(v => v.user_id)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -450,7 +454,6 @@ export function ServiceDetail() {
         return
       }
 
-      // Combine the data
       const volunteersWithProfiles = volunteerRecords.map(volunteer => {
         const profile = profiles?.find(p => p.id === volunteer.user_id)
         return {
@@ -459,22 +462,17 @@ export function ServiceDetail() {
         }
       })
 
-      console.log('Volunteers data:', volunteersWithProfiles)
       setVolunteers(volunteersWithProfiles)
-      // Load instrument assignments for these volunteers
       const volunteerIds = volunteerRecords.map(v => v.id as string)
       if (volunteerIds.length) await loadVolunteerInstruments(volunteerIds)
     } catch (error) {
       console.error('Error loading volunteers:', error)
-    } finally {
-      setLoadingVolunteers(false)
     }
   }, [service])
 
   const loadOrganizationInstruments = useCallback(async () => {
     if (!organization) return
     try {
-      setLoadingInstruments(true)
       const { data, error } = await supabase
         .from('instruments')
         .select('*')
@@ -488,8 +486,6 @@ export function ServiceDetail() {
       setInstruments(data || [])
     } catch (err) {
       console.error('Unexpected error loading instruments:', err)
-    } finally {
-      setLoadingInstruments(false)
     }
   }, [organization])
 
@@ -518,96 +514,33 @@ export function ServiceDetail() {
     }
   }, [])
 
-  const handleAssignInstrument = useCallback(async (volunteerId: string, instrumentId: string) => {
-    if (!canManagePrimary) {
-      setError('You do not have permission to assign instruments.')
-      return
-    }
-    if (!instrumentId) return
-    try {
-      // Prevent assigning instruments already assigned to any volunteer in this service
-      const assignedInstrumentIds = new Set<string>(
-        Object.values(volunteerToInstrumentIds).flat()
-      )
-      if (assignedInstrumentIds.has(instrumentId)) {
-        setError('That instrument is already assigned to another volunteer.')
-        return
-      }
-
-      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: true }))
-      const { error } = await supabase
-        .from('volunteer_instruments')
-        .insert({ volunteer_id: volunteerId, instrument_id: instrumentId })
-
-      if (error) {
-        console.error('Error assigning instrument:', error)
-        setError('Failed to assign instrument')
-        return
-      }
-
-      setVolunteerToInstrumentIds(prev => {
-        const existing = prev[volunteerId] || []
-        if (existing.includes(instrumentId)) return prev
-        return { ...prev, [volunteerId]: [...existing, instrumentId] }
-      })
-      setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteerId]: '' }))
-    } catch (err) {
-      console.error('Unexpected error assigning instrument:', err)
-      setError('Failed to assign instrument')
-    } finally {
-      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
-    }
-  }, [canManagePrimary])
-
-  const handleRemoveInstrument = useCallback(async (volunteerId: string, instrumentId: string) => {
-    if (!canManagePrimary) {
-      setError('You do not have permission to remove instruments.')
-      return
-    }
-    try {
-      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: true }))
-      const { error } = await supabase
-        .from('volunteer_instruments')
-        .delete()
-        .eq('volunteer_id', volunteerId)
-        .eq('instrument_id', instrumentId)
-
-      if (error) {
-        console.error('Error removing instrument:', error)
-        setError('Failed to remove instrument')
-        return
-      }
-
-      setVolunteerToInstrumentIds(prev => {
-        const existing = prev[volunteerId] || []
-        return { ...prev, [volunteerId]: existing.filter(id => id !== instrumentId) }
-      })
-    } catch (err) {
-      console.error('Unexpected error removing instrument:', err)
-      setError('Failed to remove instrument')
-    } finally {
-      setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
-    }
-  }, [canManagePrimary])
-
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!service || !selectedSongId) {
-      setError('Please select a song to add.')
+      toast({
+        title: 'Error',
+        description: 'Please select a song to add.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
       return
     }
 
     if (!canManagePrimary) {
-      setError('You do not have permission to add songs to services. Only admins and owners can manage service songs.')
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to add songs to services. Only admins and owners can manage service songs.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
       return
     }
 
     try {
       setAddingSong(true)
-      setError('')
-
-      // Get the next position number
       const nextPosition = serviceSongs.length + 1
 
       const { error } = await supabase
@@ -618,27 +551,40 @@ export function ServiceDetail() {
           position: nextPosition,
           notes: songNotes.trim() || null
         })
-        .select()
-        .single()
 
       if (error) {
         console.error('Error adding song to service:', error)
-        setError('Failed to add song to service. Please try again.')
+        toast({
+          title: 'Error',
+          description: 'Failed to add song to service. Please try again.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
 
-      setSuccess('Song added to service successfully!')
       setSelectedSongId('')
       setSongNotes('')
-      setShowAddSongForm(false)
-      
+      onAddSongDrawerClose()
       await loadServiceSongs()
       
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000)
+      toast({
+        title: 'Success',
+        description: 'Song added to service successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
     } catch (error) {
       console.error('Error adding song to service:', error)
-      setError('Failed to add song to service. Please try again.')
+      toast({
+        title: 'Error',
+        description: 'Failed to add song to service. Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     } finally {
       setAddingSong(false)
     }
@@ -646,7 +592,13 @@ export function ServiceDetail() {
 
   const handleRemoveSong = async (serviceSongId: string) => {
     if (!canManagePrimary) {
-      setError('You do not have permission to remove songs from services. Only admins and owners can manage service songs.')
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to remove songs from services. Only admins and owners can manage service songs.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
       return
     }
 
@@ -654,8 +606,6 @@ export function ServiceDetail() {
 
     try {
       setRemovingSong(serviceSongId)
-      setError('')
-      setSuccess('')
       
       const { error } = await supabase
         .from('service_songs')
@@ -664,18 +614,33 @@ export function ServiceDetail() {
 
       if (error) {
         console.error('Error removing song from service:', error)
-        setError('Failed to remove song from service. Please try again.')
+        toast({
+          title: 'Error',
+          description: 'Failed to remove song from service. Please try again.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
         return
       }
 
-      setSuccess('Song removed from service successfully!')
       await loadServiceSongs()
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000)
+      toast({
+        title: 'Success',
+        description: 'Song removed from service successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
     } catch (error) {
       console.error('Error removing song from service:', error)
-      setError('Failed to remove song from service. Please try again.')
+      toast({
+        title: 'Error',
+        description: 'Failed to remove song from service. Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
     } finally {
       setRemovingSong(null)
     }
@@ -683,7 +648,13 @@ export function ServiceDetail() {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     if (!canManagePrimary) {
-      setError('You do not have permission to reorder songs. Only admins and owners can manage service songs.')
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to reorder songs. Only admins and owners can manage service songs.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
       return
     }
 
@@ -694,22 +665,17 @@ export function ServiceDetail() {
       const newIndex = serviceSongs.findIndex(song => song.id === over?.id)
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        // Store original order for potential rollback
         const originalSongs = [...serviceSongs]
-        
-        // Update local state immediately for smooth UX with new positions
         const newSongs = arrayMove(serviceSongs, oldIndex, newIndex).map((song, index) => ({
           ...song,
           position: index + 1
         }))
         setServiceSongs(newSongs)
 
-        // Update positions in Supabase using temporary positions to avoid conflicts
         try {
-          // First, set all positions to temporary negative values to avoid conflicts
           for (let i = 0; i < newSongs.length; i++) {
             const song = newSongs[i]
-            const tempPosition = -(i + 1) // Use negative values as temporary positions
+            const tempPosition = -(i + 1)
             
             const { error } = await supabase
               .from('service_songs')
@@ -718,14 +684,18 @@ export function ServiceDetail() {
 
             if (error) {
               console.error('Error setting temporary position:', error)
-              setError('Failed to save new song order.')
-              // Revert to original order immediately
               setServiceSongs(originalSongs)
+              toast({
+                title: 'Error',
+                description: 'Failed to save new song order.',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+              })
               return
             }
           }
 
-          // Then, set the final positions
           for (let i = 0; i < newSongs.length; i++) {
             const song = newSongs[i]
             const finalPosition = i + 1
@@ -737,20 +707,35 @@ export function ServiceDetail() {
 
             if (error) {
               console.error('Error setting final position:', error)
-              setError('Failed to save new song order.')
-              // Revert to original order immediately
               setServiceSongs(originalSongs)
+              toast({
+                title: 'Error',
+                description: 'Failed to save new song order.',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+              })
               return
             }
           }
 
-          setSuccess('Song order updated successfully!')
-          setTimeout(() => setSuccess(''), 3000)
+          toast({
+            title: 'Success',
+            description: 'Song order updated successfully!',
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          })
         } catch (error) {
           console.error('Error updating song positions:', error)
-          setError('Failed to save new song order.')
-          // Revert to original order immediately
           setServiceSongs(originalSongs)
+          toast({
+            title: 'Error',
+            description: 'Failed to save new song order.',
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          })
         }
       }
     }
@@ -765,15 +750,6 @@ export function ServiceDetail() {
     }
   }, [service, loadServiceSongs, loadAvailableSongs, loadVolunteers, loadOrganizationInstruments])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
-
   const getStatusBadge = (status: string) => {
     const statusColorScheme = {
       draft: 'yellow',
@@ -786,39 +762,14 @@ export function ServiceDetail() {
   if (loading) {
     return (
       <Box minH="100vh" bg={bgColor}>
-        <Center h="100vh">
-          <VStack spacing={4}>
-            <Spinner size="xl" color="blue.500" />
-            <Text color={textColor}>{t('serviceDetail.loadingServiceDetails')}</Text>
-          </VStack>
-        </Center>
-      </Box>
-    )
-  }
-
-  if (error) {
-    return (
-      <Box minH="100vh" bg={bgColor}>
         <DashboardHeader user={user} organization={organization} />
-
-        <Box as="main" py={8}>
-          <Container maxW="1200px" px={6}>
-            <Box textAlign="center" py={12}>
-              <Heading as="h2" size="lg" color="red.500" mb={4}>
-                Error
-              </Heading>
-              <Text color={textMutedColor} mb={6}>
-                {error}
-              </Text>
-              <Button
-                colorScheme="blue"
-                onClick={() => navigate('/schedule')}
-                size="md"
-              >
-                Back to Services
-              </Button>
-            </Box>
-          </Container>
+        <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+          <Center h="50vh">
+            <VStack spacing={4}>
+              <Spinner size="xl" color="blue.500" />
+              <Text color={textColor}>Loading service details...</Text>
+            </VStack>
+          </Center>
         </Box>
       </Box>
     )
@@ -827,18 +778,21 @@ export function ServiceDetail() {
   if (!service) {
     return (
       <Box minH="100vh" bg={bgColor}>
-        <Center h="100vh">
-          <VStack spacing={4}>
-            <Text color={textColor}>Service not found</Text>
-            <Button
-              colorScheme="blue"
-              onClick={() => navigate('/schedule')}
-              size="md"
-            >
-              Back to Services
-            </Button>
-          </VStack>
-        </Center>
+        <DashboardHeader user={user} organization={organization} />
+        <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+          <Center h="50vh">
+            <VStack spacing={4}>
+              <Text color={textColor}>Service not found</Text>
+              <Button
+                colorScheme="blue"
+                onClick={() => navigate('/schedule')}
+                size="md"
+              >
+                Back to Services
+              </Button>
+            </VStack>
+          </Center>
+        </Box>
       </Box>
     )
   }
@@ -847,473 +801,330 @@ export function ServiceDetail() {
     <Box minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" py={8}>
-        <Container maxW="1200px" px={6}>
-          {/* Header Section */}
+      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+        {/* Back Button */}
+        <Box mb={4}>
+          <Button
+            variant="ghost"
+            colorScheme="gray"
+            onClick={() => navigate('/schedule')}
+            leftIcon={<Text>←</Text>}
+            size="sm"
+          >
+            Back to Services
+          </Button>
+        </Box>
+
+        {/* Header Section */}
+        <Box
+          bg={cardBg}
+          p={6}
+          borderRadius="lg"
+          boxShadow="sm"
+          border="1px"
+          borderColor={cardBorderColor}
+          mb={6}
+        >
           <Flex 
             justify="space-between" 
-            align="flex-start" 
-            mb={8}
-            direction={{ base: 'column', md: 'row' }}
-            gap={{ base: 4, md: 0 }}
+            align="center" 
+            mb={6}
+            direction={{ base: 'column', sm: 'row' }}
+            gap={{ base: 3, sm: 0 }}
           >
-            <Box flex="1">
-              <Heading as="h2" size="xl" color={textColor} mb={2}>
-                {t('serviceDetail.title')}
-              </Heading>
-              <Text color={textSecondaryColor} fontSize="lg">
-                {t('serviceDetail.description')}
-              </Text>
-            </Box>
-            
-            <HStack spacing={3}>
-              {canManagePrimary && (
-                <Button
-                  colorScheme="blue"
-                  onClick={() => navigate(`/service/${service.id}/edit`)}
-                  size="md"
-                >
-                  Edit Service
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                colorScheme="gray"
-                onClick={() => navigate('/schedule')}
-                size="md"
-              >
-                Back to Services
-              </Button>
-            </HStack>
+            <Heading as="h3" size="lg" color={titleColor}>
+              {service.title}
+            </Heading>
+            <Badge
+              colorScheme={getStatusBadge(service.status)}
+              variant="subtle"
+              textTransform="capitalize"
+              fontSize="sm"
+              px={3}
+              py={1}
+            >
+              {service.status}
+            </Badge>
           </Flex>
 
-          {/* Messages */}
-          {error && (
-            <Alert status="error" borderRadius="md" mb={6}>
-              <AlertIcon />
-              {error}
-            </Alert>
-          )}
-
-          {success && (
-            <Alert status="success" borderRadius="md" mb={6}>
-              <AlertIcon />
-              {success}
-            </Alert>
-          )}
-
-          <VStack spacing={6} align="stretch">
-            {/* Service Info Section */}
-            <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
-            >
-              <Flex 
-                justify="space-between" 
-                align="center" 
-                mb={6}
-                direction={{ base: 'column', sm: 'row' }}
-                gap={{ base: 3, sm: 0 }}
-              >
-                <Heading as="h3" size="lg" color={textColor}>
-                  {service.title}
-                </Heading>
-                <Badge
-                  colorScheme={getStatusBadge(service.status)}
-                  variant="subtle"
-                  textTransform="capitalize"
-                  fontSize="sm"
-                  px={3}
-                  py={1}
-                >
-                  {service.status}
-                </Badge>
-              </Flex>
-
-              <Grid 
-                templateColumns={{ base: '1fr', md: 'repeat(auto-fit, minmax(200px, 1fr))' }} 
-                gap={5} 
-                mb={6}
-              >
-                <Box>
-                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
-                    Service Date
-                  </Text>
-                  <Text fontSize="md" fontWeight="500" color={textColor}>
-                    {formatServiceDate(service.service_time)}
-                  </Text>
-                </Box>
-
-                <Box>
-                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
-                    Service Time
-                  </Text>
-                  <Text fontSize="md" fontWeight="500" color={textColor}>
-                    {getServiceTimeDisplay(service.service_time)}
-                  </Text>
-                </Box>
-
-                <Box>
-                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
-                    Created
-                  </Text>
-                  <Text fontSize="md" fontWeight="500" color={textColor}>
-                    {formatDate(service.created_at)}
-                  </Text>
-                </Box>
-
-                <Box>
-                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
-                    Last Updated
-                  </Text>
-                  <Text fontSize="md" fontWeight="500" color={textColor}>
-                    {formatDate(service.updated_at)}
-                  </Text>
-                </Box>
-              </Grid>
-
-              {service.description && (
-                <Box borderTop="1px" borderColor={cardBorderColor} pt={5}>
-                  <Text fontSize="xs" fontWeight="500" color={textMutedColor} textTransform="uppercase" letterSpacing="0.05em" mb={2}>
-                    Description
-                  </Text>
-                  <Text color={textSecondaryColor} lineHeight="1.6">
-                    {service.description}
-                  </Text>
-                </Box>
-              )}
+          <Grid 
+            templateColumns={{ base: '1fr', md: 'repeat(auto-fit, minmax(200px, 1fr))' }} 
+            gap={5} 
+            mb={6}
+          >
+            <Box>
+              <Text fontSize="xs" fontWeight="500" color={mutedTextColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                Service Date
+              </Text>
+              <Text fontSize="md" fontWeight="500" color={textColor}>
+                {formatServiceDate(service.service_time)}
+              </Text>
             </Box>
 
-            {/* Service Songs Section */}
-            <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
-            >
-              <Flex 
-                justify="space-between" 
-                align="center" 
-                mb={5}
-                direction={{ base: 'column', sm: 'row' }}
-                gap={{ base: 3, sm: 0 }}
-              >
-                <Heading as="h3" size="md" color={textColor}>
-                  Service Songs
-                </Heading>
-                {canManagePrimary && (
-                  <Button 
-                    colorScheme="blue"
-                    size="sm"
-                    onClick={() => setShowAddSongForm(!showAddSongForm)}
-                  >
-                    {showAddSongForm ? 'Cancel' : 'Add Songs'}
-                  </Button>
-                )}
-              </Flex>
-
-              {showAddSongForm && canManagePrimary && (
-                <Box
-                  bg={useColorModeValue('gray.50', 'gray.700')}
-                  border="1px"
-                  borderColor={cardBorderColor}
-                  borderRadius="lg"
-                  p={5}
-                  mb={5}
-                >
-                  <Heading as="h4" size="sm" color={textColor} mb={4}>
-                    Add Song to Service
-                  </Heading>
-                  <form onSubmit={handleAddSong}>
-                    <VStack spacing={4} align="stretch">
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                          Select Song
-                        </FormLabel>
-                        <Select
-                          value={selectedSongId}
-                          onChange={(e) => setSelectedSongId(e.target.value)}
-                          size="md"
-                        >
-                          <option value="">Choose a song...</option>
-                          {availableSongs.map(song => (
-                            <option key={song.id} value={song.id}>
-                              {song.title} - {song.artist}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      
-                      <FormControl>
-                        <FormLabel fontSize="sm" fontWeight="500" color={textColor}>
-                          Notes (optional)
-                        </FormLabel>
-                        <Input
-                          type="text"
-                          value={songNotes}
-                          onChange={(e) => setSongNotes(e.target.value)}
-                          placeholder="e.g., special number, ending song"
-                          size="md"
-                        />
-                      </FormControl>
-                      
-                      <HStack spacing={3} pt={2}>
-                        <Button 
-                          type="submit" 
-                          colorScheme="blue"
-                          isLoading={addingSong}
-                          loadingText="Adding Song..."
-                          disabled={!selectedSongId}
-                          size="md"
-                        >
-                          Add Song
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline"
-                          colorScheme="gray"
-                          onClick={() => setShowAddSongForm(false)}
-                          size="md"
-                        >
-                          Cancel
-                        </Button>
-                      </HStack>
-                    </VStack>
-                  </form>
-                </Box>
-              )}
-              
-              {serviceSongs.length === 0 ? (
-                <Box textAlign="center" py={10}>
-                  <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
-                    No songs added to this service yet
-                  </Text>
-                  <Text color={textMutedColor}>
-                    {canManagePrimary 
-                      ? 'Add songs from your songbank to create a setlist'
-                      : 'No songs have been added to this service yet.'
-                    }
-                  </Text>
-                </Box>
-              ) : (
-                <Box>
-                  {canManagePrimary && (
-                    <Text fontSize="xs" color={textMutedColor} fontStyle="italic" mb={3}>
-                      Drag to reorder songs
-                    </Text>
-                  )}
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={serviceSongs.map(song => song.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <VStack spacing={3} align="stretch">
-                        {serviceSongs.map((serviceSong) => (
-                          <SortableSongItem
-                            key={serviceSong.id}
-                            serviceSong={serviceSong}
-                            onRemove={handleRemoveSong}
-                            isRemoving={removingSong === serviceSong.id}
-                            canManage={canManagePrimary}
-                          />
-                        ))}
-                      </VStack>
-                    </SortableContext>
-                  </DndContext>
-                </Box>
-              )}
+            <Box>
+              <Text fontSize="xs" fontWeight="500" color={mutedTextColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                Service Time
+              </Text>
+              <Text fontSize="md" fontWeight="500" color={textColor}>
+                {getServiceTimeDisplay(service.service_time)}
+              </Text>
             </Box>
 
-            {/* Volunteers Section */}
-            <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
-            >
-              <Heading as="h3" size="md" color={textColor} mb={5}>
-                Volunteers
-              </Heading>
-              
-              {loadingVolunteers ? (
-                <Center py={8}>
-                  <VStack spacing={3}>
-                    <Spinner size="lg" />
-                    <Text color={textMutedColor}>Loading volunteers...</Text>
+            <Box>
+              <Text fontSize="xs" fontWeight="500" color={mutedTextColor} textTransform="uppercase" letterSpacing="0.05em" mb={1}>
+                Created
+              </Text>
+              <Text fontSize="md" fontWeight="500" color={textColor}>
+                {new Date(service.created_at).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </Text>
+            </Box>
+          </Grid>
+
+          {service.description && (
+            <Box borderTop="1px" borderColor={cardBorderColor} pt={5}>
+              <Text fontSize="xs" fontWeight="500" color={mutedTextColor} textTransform="uppercase" letterSpacing="0.05em" mb={2}>
+                Description
+              </Text>
+              <Text color={textSecondaryColor} lineHeight="1.6">
+                {service.description}
+              </Text>
+            </Box>
+          )}
+        </Box>
+
+        {/* Service Songs Section */}
+        <Box
+          bg={cardBg}
+          borderRadius="lg"
+          boxShadow="sm"
+          border="1px"
+          borderColor={cardBorderColor}
+          p={6}
+          mb={6}
+        >
+          <Flex 
+            justify="space-between" 
+            align="center" 
+            mb={5}
+            direction={{ base: 'column', sm: 'row' }}
+            gap={{ base: 3, sm: 0 }}
+          >
+            <Heading as="h3" size="md" color={titleColor}>
+              Service Songs ({serviceSongs.length})
+            </Heading>
+            {canManagePrimary && (
+              <Button 
+                colorScheme="green"
+                size="sm"
+                onClick={onAddSongDrawerOpen}
+              >
+                + Add Songs
+              </Button>
+            )}
+          </Flex>
+          
+          {serviceSongs.length === 0 ? (
+            <Box textAlign="center" py={10}>
+              <Text fontSize="lg" fontWeight="500" color={mutedTextColor} mb={2}>
+                No songs added to this service yet
+              </Text>
+              <Text color={mutedTextColor}>
+                {canManagePrimary 
+                  ? 'Add songs from your songbank to create a setlist'
+                  : 'No songs have been added to this service yet.'
+                }
+              </Text>
+            </Box>
+          ) : (
+            <Box>
+              {canManagePrimary && (
+                <Text fontSize="xs" color={mutedTextColor} fontStyle="italic" mb={3}>
+                  Drag to reorder songs
+                </Text>
+              )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={serviceSongs.map(song => song.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <VStack spacing={3} align="stretch">
+                    {serviceSongs.map((serviceSong) => (
+                      <SortableSongItem
+                        key={serviceSong.id}
+                        serviceSong={serviceSong}
+                        onRemove={handleRemoveSong}
+                        isRemoving={removingSong === serviceSong.id}
+                        canManage={canManagePrimary}
+                      />
+                    ))}
                   </VStack>
-                </Center>
-              ) : volunteers.length === 0 ? (
-                <Box textAlign="center" py={10}>
-                  <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
-                    No volunteers yet
-                  </Text>
-                  <Text color={textMutedColor}>
-                    Share the volunteer link to get people to sign up for this service
-                  </Text>
-                </Box>
-              ) : (
-                <VStack spacing={3} align="stretch">
-                  {volunteers.map((volunteer) => (
-                    <Box
-                      key={volunteer.id}
-                      bg={useColorModeValue('gray.50', 'gray.700')}
-                      border="1px"
-                      borderColor={cardBorderColor}
-                      borderRadius="lg"
-                      p={4}
-                    >
-                      <HStack justify="space-between" align="center">
-                        <VStack align="start" spacing={1}>
-                          <HStack spacing={2} align="center">
-                            <Text fontWeight="600" color={textColor}>
-                              {volunteer.profiles.first_name} {volunteer.profiles.last_name}
-                            </Text>
-                            {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
-                              const inst = instruments.find(i => i.id === instId)
-                              if (!inst) return null
-                              return (
-                                <Box key={instId} as="span">
-                                  <Badge
-                                    colorScheme="blue"
-                                    variant="solid"
-                                    borderRadius="md"
-                                    fontSize="0.7rem"
-                                    display="inline-flex"
-                                    alignItems="center"
-                                    pl={2}
-                                    pr={2}
-                                    py={0.5}
-                                    gap={0}
-                                    role="group"
-                                  >
-                                    {inst.name}
-                                    {canManagePrimary && (
-                                      <Box
-                                        h="14px"
-                                        ml={0}
-                                        display="none"
-                                        alignItems="center"
-                                        justifyContent="center"
-                                        _groupHover={{ display: 'inline-flex', ml: 1 }}
-                                      >
-                                        <CloseButton
-                                          size="xs"
-                                          aria-label={`Unassign ${inst.name}`}
-                                          onClick={() => handleRemoveInstrument(volunteer.id, instId)}
-                                          isDisabled={!!savingAssignmentByVolunteer[volunteer.id]}
-                                          variant="ghost"
-                                          color="whiteAlpha.800"
-                                          _hover={{ color: 'white' }}
-                                        />
-                                      </Box>
-                                    )}
-                                  </Badge>
-                                </Box>
-                              )
-                            }).filter(Boolean)}
-                          </HStack>
-
-                          <Text fontSize="sm" color={textSecondaryColor}>
-                            {volunteer.profiles.email}
-                          </Text>
-                        </VStack>
-                        <Text fontSize="xs" color={textMutedColor}>
-                          Joined {new Date(volunteer.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </Text>
-                      </HStack>
-
-                      {canManagePrimary && (
-                        <HStack spacing={2} align="center" mt={3}>
-                          <Select
-                            placeholder={loadingInstruments ? 'Loading instruments...' : 'Assign instrument'}
-                            size="sm"
-                            value={selectedInstrumentByVolunteer[volunteer.id] || ''}
-                            onChange={async (e) => {
-                              const val = e.target.value
-                              setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: val }))
-                              await handleAssignInstrument(volunteer.id, val)
-                              setSelectedInstrumentByVolunteer(prev => ({ ...prev, [volunteer.id]: '' }))
-                            }}
-                            isDisabled={loadingInstruments || !!savingAssignmentByVolunteer[volunteer.id]}
-                            maxW={{ base: '100%', sm: '320px' }}
-                          >
-                            {(() => {
-                              const assigned = new Set<string>(Object.values(volunteerToInstrumentIds).flat())
-                              return instruments
-                                .filter(inst => !assigned.has(inst.id))
-                                .map(inst => (
-                                  <option key={inst.id} value={inst.id}>{inst.name}</option>
-                                ))
-                            })()}
-                          </Select>
-                        </HStack>
-                      )}
-                    </Box>
-                  ))}
-                </VStack>
-              )}
+                </SortableContext>
+              </DndContext>
             </Box>
+          )}
+        </Box>
 
-            {/* Service Notes Section */}
+        {/* Volunteers Section */}
+        <Box
+          bg={cardBg}
+          borderRadius="lg"
+          boxShadow="sm"
+          border="1px"
+          borderColor={cardBorderColor}
+          p={6}
+        >
+          <Heading as="h3" size="md" color={titleColor} mb={5}>
+            Volunteers ({volunteers.length})
+          </Heading>
+          
+          {volunteers.length === 0 ? (
+            <Box textAlign="center" py={10}>
+              <Text fontSize="lg" fontWeight="500" color={mutedTextColor} mb={2}>
+                No volunteers yet
+              </Text>
+              <Text color={mutedTextColor}>
+                Share the volunteer link to get people to sign up for this service
+              </Text>
+            </Box>
+          ) : (
             <Box
-              bg={cardBg}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-              p={6}
+              overflowX="auto"
             >
-              <Flex 
-                justify="space-between" 
-                align="center" 
-                mb={5}
-                direction={{ base: 'column', sm: 'row' }}
-                gap={{ base: 3, sm: 0 }}
-              >
-                <Heading as="h3" size="md" color={textColor}>
-                  Service Notes
-                </Heading>
-                {canManagePrimary && (
-                  <Button 
-                    variant="outline"
-                    colorScheme="gray"
-                    size="sm"
-                  >
-                    Add Notes
-                  </Button>
-                )}
-              </Flex>
-              
-              <Box textAlign="center" py={10}>
-                <Text fontSize="lg" fontWeight="500" color={textMutedColor} mb={2}>
-                  No notes added yet
-                </Text>
-                <Text color={textMutedColor}>
-                  {canManagePrimary 
-                    ? 'Add notes for the worship team, announcements, or special instructions'
-                    : 'No notes have been added to this service yet.'
-                  }
-                </Text>
-              </Box>
+              <Table variant="simple" minW="600px">
+                <Thead>
+                  <Tr>
+                    <Th color={textColor} fontSize="sm" fontWeight="600">Name</Th>
+                    <Th color={textColor} fontSize="sm" fontWeight="600">Email</Th>
+                    <Th color={textColor} fontSize="sm" fontWeight="600">Instruments</Th>
+                    <Th color={textColor} fontSize="sm" fontWeight="600">Joined</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {volunteers.map((volunteer) => (
+                    <Tr key={volunteer.id}>
+                      <Td fontWeight="500" color={titleColor}>
+                        {volunteer.profiles.first_name} {volunteer.profiles.last_name}
+                      </Td>
+                      <Td>{volunteer.profiles.email}</Td>
+                      <Td>
+                        <HStack spacing={1} flexWrap="wrap">
+                          {(volunteerToInstrumentIds[volunteer.id] || []).map(instId => {
+                            const inst = instruments.find(i => i.id === instId)
+                            if (!inst) return null
+                            return (
+                              <Badge
+                                key={instId}
+                                colorScheme="blue"
+                                variant="solid"
+                                fontSize="xs"
+                              >
+                                {inst.name}
+                              </Badge>
+                            )
+                          })}
+                          {(!volunteerToInstrumentIds[volunteer.id] || volunteerToInstrumentIds[volunteer.id].length === 0) && (
+                            <Text fontSize="sm" color={mutedTextColor}>-</Text>
+                          )}
+                        </HStack>
+                      </Td>
+                      <Td fontSize="sm" color={mutedTextColor}>
+                        {new Date(volunteer.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
             </Box>
-          </VStack>
-        </Container>
+          )}
+        </Box>
       </Box>
+
+      {/* Add Song Drawer */}
+      <Drawer
+        isOpen={isAddSongDrawerOpen}
+        placement="right"
+        onClose={onAddSongDrawerClose}
+        size={{ base: 'full', md: 'md', lg: 'lg' }}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+            <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
+              Add Song to Service
+            </Heading>
+          </DrawerHeader>
+          
+          <DrawerBody bg={bgColor} p={6}>
+            <Box as="form" onSubmit={handleAddSong}>
+              <VStack spacing={6} align="stretch">
+                <FormControl isRequired>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                    Select Song
+                  </FormLabel>
+                  <Select
+                    value={selectedSongId}
+                    onChange={(e) => setSelectedSongId(e.target.value)}
+                    size="md"
+                  >
+                    <option value="">Choose a song...</option>
+                    {availableSongs.map(song => (
+                      <option key={song.id} value={song.id}>
+                        {song.title} - {song.artist}
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                <FormControl>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                    Notes (optional)
+                  </FormLabel>
+                  <Input
+                    type="text"
+                    value={songNotes}
+                    onChange={(e) => setSongNotes(e.target.value)}
+                    placeholder="e.g., special number, ending song"
+                    size="md"
+                  />
+                </FormControl>
+
+                <Flex gap={4} justify="flex-end" pt={4}>
+                  <Button
+                    variant="outline"
+                    onClick={onAddSongDrawerClose}
+                    size="md"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    colorScheme="green"
+                    size="md"
+                    isLoading={addingSong}
+                    loadingText="Adding Song..."
+                    disabled={!selectedSongId}
+                  >
+                    Add Song
+                  </Button>
+                </Flex>
+              </VStack>
+            </Box>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
     </Box>
   )
 } 
