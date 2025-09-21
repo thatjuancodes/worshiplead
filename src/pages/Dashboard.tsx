@@ -1537,9 +1537,10 @@ export function Dashboard() {
                       </Text>
                     ) : (
                       <VStack spacing={3} align="stretch">
-                        {upcomingServices.map((service) => {
+                        {upcomingServices.map((service, index) => {
                           const volunteers = serviceIdToVolunteers[service.id] || []
                           const isUserVolunteer = user && volunteers.some(v => v.user_id === user.id)
+                          const isNextService = index < 2 // First 2 services are "Next Service"
                           
                           return (
                             <Box
@@ -1618,6 +1619,19 @@ export function Dashboard() {
                                             {timePart}
                                           </Text>
                                         </Box>
+                                        {isNextService && (
+                                          <Badge
+                                            colorScheme="orange"
+                                            variant="solid"
+                                            fontSize="xs"
+                                            px={2}
+                                            py={1}
+                                            borderRadius="md"
+                                            ml={2}
+                                          >
+                                            Next Service
+                                          </Badge>
+                                        )}
                                       </HStack>
                                       
                                       {/* Desktop: Volunteer circles on same row */}
@@ -1697,6 +1711,22 @@ export function Dashboard() {
                                           </Text>
                                         </Box>
                                       </HStack>
+                                      
+                                      {/* Mobile: Next Service badge row */}
+                                      {isNextService && (
+                                        <HStack spacing={2} align="center" justify="flex-start" w="100%">
+                                          <Badge
+                                            colorScheme="orange"
+                                            variant="solid"
+                                            fontSize="xs"
+                                            px={2}
+                                            py={1}
+                                            borderRadius="md"
+                                          >
+                                            Next Service
+                                          </Badge>
+                                        </HStack>
+                                      )}
                                       
                                       {/* Mobile: Volunteer circles on separate row */}
                                       {volunteers.length > 0 && (

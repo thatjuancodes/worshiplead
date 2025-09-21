@@ -26,7 +26,8 @@ import {
   useDisclosure,
   Input,
   InputGroup,
-  InputLeftElement
+  InputLeftElement,
+  Badge
 } from '@chakra-ui/react'
 import { CheckIcon, ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
 import { keyframes } from '@emotion/react'
@@ -868,11 +869,12 @@ export function VolunteerPage() {
               </Box>
             ) : (
               <VStack spacing={4} align="stretch">
-                {availableServices.map(service => {
+                {availableServices.map((service, index) => {
                 const isAssigned = userVolunteerAssignments.some(
                   assignment => assignment.worship_service_id === service.id
                 )
                 const volunteers = serviceIdToVolunteers[service.id] || []
+                const isNextService = index < 2 // First 2 services are "Next Service"
                 
                 return (
                   <Box
@@ -897,9 +899,26 @@ export function VolunteerPage() {
                     
                     <VStack spacing={3} align="stretch" w="100%">
                       <HStack justify="space-between" align="center" w="100%">
-                        <Text color={titleColor} fontWeight="700" fontSize={{ base: "lg", md: "xl" }} flex={1}>
-                          {formatServiceDate(service.service_time)} {getServiceTimeDisplay(service.service_time)} - {service.title}
-                        </Text>
+                        <VStack spacing={2} align="flex-start" flex={1}>
+                          <HStack spacing={2} align="center">
+                            <Text color={titleColor} fontWeight="700" fontSize={{ base: "lg", md: "xl" }}>
+                              {formatServiceDate(service.service_time)} {getServiceTimeDisplay(service.service_time)} - {service.title}
+                            </Text>
+                            {isNextService && (
+                              <Badge
+                                colorScheme="orange"
+                                variant="solid"
+                                fontSize="xs"
+                                px={2}
+                                py={1}
+                                borderRadius="md"
+                                ml={3}
+                              >
+                                Next Service
+                              </Badge>
+                            )}
+                          </HStack>
+                        </VStack>
                         
                         {/* Check Circle */}
                         <Box
