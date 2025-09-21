@@ -21,6 +21,9 @@ import { ServiceDetail } from './pages/ServiceDetail'
 import { OnboardingFlow } from './pages/OnboardingFlow'
 import { VolunteerPage } from './pages/VolunteerPage'
 import { OrganizationAccessDemo } from './pages/OrganizationAccessDemo'
+import { About } from './pages/About'
+import { Privacy } from './pages/Privacy'
+import { Terms } from './pages/Terms'
 
 // Component to handle onboarding for authenticated users
 function AuthenticatedHome() {
@@ -89,6 +92,9 @@ function AppRoutes() {
       <Route path="/onboarding" element={<OnboardingFlow />} />
       <Route path="/volunteer/:publicUrl" element={<VolunteerPage />} />
       <Route path="/org-access-demo" element={<OrganizationAccessDemo />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
     </Routes>
   )
 }

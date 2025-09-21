@@ -120,6 +120,48 @@ export function Header() {
           </Box>
 
           <Flex gap={3} alignItems="center">
+            {/* Navigation Menu Items - only show when not logged in */}
+            {!loading && !user && (
+              <HStack spacing={6} display={{ base: 'none', md: 'flex' }}>
+                <Link to="#features">
+                  <Text
+                    color={useColorModeValue('gray.700', 'gray.200')}
+                    _hover={{ color: 'blue.600' }}
+                    fontSize="sm"
+                    fontWeight="medium"
+                    transition="colors 0.2s"
+                    cursor="pointer"
+                  >
+                    Features
+                  </Text>
+                </Link>
+                <Link to="#pricing">
+                  <Text
+                    color={useColorModeValue('gray.700', 'gray.200')}
+                    _hover={{ color: 'blue.600' }}
+                    fontSize="sm"
+                    fontWeight="medium"
+                    transition="colors 0.2s"
+                    cursor="pointer"
+                  >
+                    Pricing
+                  </Text>
+                </Link>
+                <Link to="#faq">
+                  <Text
+                    color={useColorModeValue('gray.700', 'gray.200')}
+                    _hover={{ color: 'blue.600' }}
+                    fontSize="sm"
+                    fontWeight="medium"
+                    transition="colors 0.2s"
+                    cursor="pointer"
+                  >
+                    FAQ
+                  </Text>
+                </Link>
+              </HStack>
+            )}
+
             {/* Language Selector */}
             <Menu>
               <MenuButton as={Button} variant="outline" size="md" rightIcon={<ChevronDownIcon />}>
@@ -153,7 +195,7 @@ export function Header() {
                     </Button>
 
                     <Button as={Link} to="/signup" colorScheme="blue" size="md">
-                      {translate('header.tryForFree', 'Try for Free')}
+                      {translate('header.tryForFree', 'Start Free Trial')}
                     </Button>
                   </>
                 )}
