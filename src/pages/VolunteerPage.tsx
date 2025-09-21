@@ -16,9 +16,26 @@ import {
   Menu,
   MenuButton,
   MenuList,
-  MenuItem
+  MenuItem,
+  Tooltip,
+  Badge,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  Select,
+  FormControl,
+  FormLabel,
+  Input,
+  InputGroup,
+  InputLeftElement
 } from '@chakra-ui/react'
-import { CheckIcon, ChevronDownIcon } from '@chakra-ui/icons'
+import { CheckIcon, ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
+import { keyframes } from '@emotion/react'
 import { useTranslation } from 'react-i18next'
 import { useLanguage } from '../hooks/useLanguage'
 import { supabase } from '../lib/supabase'
@@ -74,6 +91,7 @@ interface Volunteer {
     last_name: string
     email: string
   }
+  instruments?: string[]
 }
 
 export function VolunteerPage() {
@@ -100,6 +118,15 @@ export function VolunteerPage() {
   const [organizationLoaded, setOrganizationLoaded] = useState(cached?.loaded.organization || false)
   const [servicesLoaded, setServicesLoaded] = useState(cached?.loaded.services || false)
   const [assignmentsLoaded, setAssignmentsLoaded] = useState(cached?.loaded.assignments || false)
+
+  // Instrument selection modal state
+  const { isOpen: isInstrumentModalOpen, onOpen: onInstrumentModalOpen, onClose: onInstrumentModalClose } = useDisclosure()
+  const [selectedServiceForInstrument, setSelectedServiceForInstrument] = useState<string | null>(null)
+  const [availableInstruments, setAvailableInstruments] = useState<Array<{id: string, name: string}>>([])
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>('')
+  const [loadingInstruments, setLoadingInstruments] = useState(false)
+  const [instrumentSearchQuery, setInstrumentSearchQuery] = useState<string>('')
+  const [isReloading, setIsReloading] = useState(false)
 
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
@@ -301,13 +328,62 @@ export function VolunteerPage() {
         return
       }
 
+      // Get instrument assignments for volunteers
+      const volunteerIds = volunteerRecords.map(v => v.id)
+      let volunteerInstruments: Record<string, string[]> = {}
+      let allInstruments: Record<string, string> = {}
+      
+      if (volunteerIds.length > 0) {
+        // First get the instrument assignments
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from('volunteer_instruments')
+          .select('volunteer_id, instrument_id')
+          .in('volunteer_id', volunteerIds)
+
+        if (!assignmentsError && assignments) {
+          // Get all unique instrument IDs
+          const instrumentIds = [...new Set(assignments.map(a => a.instrument_id))]
+          
+          if (instrumentIds.length > 0) {
+            // Get instrument names
+            const { data: instruments, error: instrumentsError } = await supabase
+              .from('instruments')
+              .select('id, name')
+              .in('id', instrumentIds)
+
+            if (!instrumentsError && instruments) {
+              // Create instrument ID to name mapping
+              instruments.forEach(instrument => {
+                allInstruments[instrument.id] = instrument.name
+              })
+            }
+          }
+
+          // Create volunteer to instrument names mapping
+          assignments.forEach(assignment => {
+            const volunteerId = assignment.volunteer_id
+            const instrumentName = allInstruments[assignment.instrument_id]
+            
+            if (instrumentName) {
+              if (!volunteerInstruments[volunteerId]) {
+                volunteerInstruments[volunteerId] = []
+              }
+              volunteerInstruments[volunteerId].push(instrumentName)
+            }
+          })
+        }
+      }
+
       // Combine the data and create the mapping
       const mapping: Record<string, Volunteer[]> = {}
       volunteerRecords.forEach((volunteer) => {
         const profile = profiles?.find(p => p.id === volunteer.user_id)
+        const instruments = volunteerInstruments[volunteer.id] || []
+        
         const volunteerWithProfile = {
           ...volunteer,
-          profiles: profile || { first_name: 'Unknown', last_name: 'User', email: 'N/A' }
+          profiles: profile || { first_name: 'Unknown', last_name: 'User', email: 'N/A' },
+          instruments: instruments
         }
         
         const svcId = volunteer.worship_service_id
@@ -324,11 +400,78 @@ export function VolunteerPage() {
     }
   }, [organization])
 
-  const toggleVolunteerStatus = async (serviceId: string, isAssigned: boolean) => {
+  const loadAvailableInstruments = useCallback(async (serviceId: string) => {
+    if (!organization || loadingInstruments) return
+    
+    try {
+      setLoadingInstruments(true)
+      
+      // Get all instruments for this organization
+      const { data: instruments, error: instrumentsError } = await supabase
+        .from('instruments')
+        .select('id, name')
+        .eq('organization_id', organization.id)
+        .order('name', { ascending: true })
+
+      if (instrumentsError) {
+        console.error('Error loading instruments:', instrumentsError)
+        return
+      }
+
+      // Get already taken instruments for this service
+      const volunteers = serviceIdToVolunteers[serviceId] || []
+      const takenInstrumentNames = new Set<string>()
+      volunteers.forEach(volunteer => {
+        volunteer.instruments?.forEach(instrument => {
+          takenInstrumentNames.add(instrument)
+        })
+      })
+
+      // Filter out already taken instruments
+      const availableInstruments = (instruments || []).filter(instrument => 
+        !takenInstrumentNames.has(instrument.name)
+      )
+
+      setAvailableInstruments(availableInstruments)
+    } catch (error) {
+      console.error('Error loading instruments:', error)
+    } finally {
+      setLoadingInstruments(false)
+    }
+  }, [organization, loadingInstruments, serviceIdToVolunteers])
+
+  const handleVolunteerClick = (serviceId: string, isAssigned: boolean) => {
+    if (isAssigned) {
+      // If already assigned, remove directly
+      toggleVolunteerStatus(serviceId, true)
+    } else {
+      // If not assigned, show instrument selection modal
+      setSelectedServiceForInstrument(serviceId)
+      setSelectedInstrumentId('')
+      setInstrumentSearchQuery('')
+      loadAvailableInstruments(serviceId)
+      onInstrumentModalOpen()
+    }
+  }
+
+  const handleInstrumentSelection = async (instrumentId: string) => {
+    if (!selectedServiceForInstrument) return
+    
+    // Close modal immediately
+    onInstrumentModalClose()
+    setSelectedServiceForInstrument(null)
+    setSelectedInstrumentId('')
+    
+    // Then process the selection
+    await toggleVolunteerStatus(selectedServiceForInstrument, false, instrumentId)
+  }
+
+  const toggleVolunteerStatus = async (serviceId: string, isAssigned: boolean, instrumentId?: string) => {
     if (!user || !organization) return
     
     try {
       setAssigningService(serviceId)
+      setIsReloading(true)
       
       // If already assigned, remove the assignment
       if (isAssigned) {
@@ -385,6 +528,25 @@ export function VolunteerPage() {
           duration: 3000,
           isClosable: true
         })
+
+        // If an instrument was selected, assign it to the volunteer
+        if (instrumentId) {
+          const { data: volunteerRecord } = await supabase
+            .from('worship_service_volunteers')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('worship_service_id', serviceId)
+            .single()
+
+          if (volunteerRecord) {
+            await supabase
+              .from('volunteer_instruments')
+              .insert({
+                volunteer_id: volunteerRecord.id,
+                instrument_id: instrumentId
+              })
+          }
+        }
       }
 
       // Refresh assignments by clearing cache and reloading
@@ -415,6 +577,7 @@ export function VolunteerPage() {
       })
     } finally {
       setAssigningService(null)
+      setIsReloading(false)
     }
   }
 
@@ -563,23 +726,69 @@ export function VolunteerPage() {
       <Box as="main" maxW="800px" mx="auto" p={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
         {/* Header */}
         {user && (
-          <VStack spacing={4} mb={{ base: 6, md: 8 }} mt={{ base: 4, md: 8 }} textAlign="center">
-            <Heading as="h1" size={{ base: "lg", md: "xl" }} color={titleColor} fontWeight="600">
-              {t('volunteerPage.title', { organizationName: organization.name })}
-            </Heading>
-            <Text color={subtitleColor} fontSize={{ base: "md", md: "lg" }}>
-              {t('volunteerPage.subtitle')}
-            </Text>
-          </VStack>
+          <HStack justify="space-between" align="flex-start" mb={{ base: 6, md: 8 }} mt={{ base: 4, md: 8 }}>
+            <VStack spacing={2} align="flex-start" flex="1">
+              <Heading as="h1" size={{ base: "lg", md: "xl" }} color={titleColor} fontWeight="600" textAlign="left">
+                {t('volunteerPage.title', { organizationName: organization.name })}
+              </Heading>
+              <Text color={subtitleColor} fontSize={{ base: "md", md: "lg" }} textAlign="left">
+                {t('volunteerPage.subtitle')}
+              </Text>
+            </VStack>
+            
+            {/* Language Dropdown - Moved to header */}
+            <Menu>
+              <MenuButton as={Button} variant="outline" size="sm" rightIcon={<ChevronDownIcon />}>
+                <Text fontSize="sm">{availableLanguages.find(lang => lang.code === currentLanguage)?.name || 'EN'}</Text>
+              </MenuButton>
+              <MenuList>
+                {availableLanguages.map((language) => (
+                  <MenuItem
+                    key={language.code}
+                    onClick={() => changeLanguage(language.code)}
+                    bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
+                  >
+                    {language.name}
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Menu>
+          </HStack>
+        )}
+
+        {/* Header for non-logged in users */}
+        {!user && (
+          <HStack justify="space-between" align="flex-start" mb={{ base: 6, md: 8 }} mt={{ base: 4, md: 8 }}>
+            <VStack spacing={2} align="flex-start" flex="1">
+              <Heading as="h1" size={{ base: "lg", md: "xl" }} color={titleColor} fontWeight="600" textAlign="left">
+                {t('volunteerPage.title', { organizationName: organization.name })}
+              </Heading>
+            </VStack>
+            
+            {/* Language Dropdown - For non-logged in users */}
+            <Menu>
+              <MenuButton as={Button} variant="outline" size="sm" rightIcon={<ChevronDownIcon />}>
+                <Text fontSize="sm">{availableLanguages.find(lang => lang.code === currentLanguage)?.name || 'EN'}</Text>
+              </MenuButton>
+              <MenuList>
+                {availableLanguages.map((language) => (
+                  <MenuItem
+                    key={language.code}
+                    onClick={() => changeLanguage(language.code)}
+                    bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
+                  >
+                    {language.name}
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Menu>
+          </HStack>
         )}
 
         {/* Login Section */}
         {!user && (
           <Box bg={cardBg} mb={6} p={{ base: 4, md: 6 }} borderRadius="lg">
             <VStack spacing={4}>
-              <Heading as="h1" size={{ base: "md", md: "lg" }} color={titleColor} fontWeight="600" textAlign="center">
-                {t('volunteerPage.title', { organizationName: organization.name })}
-              </Heading>
               <Text color={textColor} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
                 {t('volunteerPage.signInPrompt')}
               </Text>
@@ -651,9 +860,9 @@ export function VolunteerPage() {
                     borderRadius="lg"
                     py={{ base: 6, md: 7 }}
                     px={{ base: 4, md: 5 }}
-                    cursor={assigningService === service.id ? 'not-allowed' : 'pointer'}
-                    opacity={assigningService === service.id ? 0.6 : 1}
-                    onClick={() => assigningService !== service.id && toggleVolunteerStatus(service.id, isAssigned)}
+                    cursor={assigningService === service.id || isReloading ? 'not-allowed' : 'pointer'}
+                    opacity={assigningService === service.id || isReloading ? 0.6 : 1}
+                    onClick={() => !assigningService && !isReloading && handleVolunteerClick(service.id, isAssigned)}
                     _hover={assigningService !== service.id ? {
                       transform: 'translateY(-2px)',
                       boxShadow: 'lg',
@@ -721,36 +930,83 @@ export function VolunteerPage() {
                       ) : volunteers.length > 0 ? (
                         <VStack spacing={2} align="stretch">
                           <Text fontSize="sm" fontWeight="600" color={subtitleColor}>
-                            {t('volunteerPage.currentVolunteers')} ({volunteers.length})
+                            {t('volunteerPage.currentVolunteers')}:
                           </Text>
-                          <VStack spacing={1} align="stretch">
-                            {volunteers.slice(0, 3).map((volunteer) => (
-                              <HStack key={volunteer.id} spacing={2} align="center">
-                                <Box
-                                  w="6"
-                                  h="6"
-                                  borderRadius="full"
-                                  bg="blue.500"
-                                  display="flex"
-                                  alignItems="center"
-                                  justifyContent="center"
-                                  flexShrink={0}
-                                >
-                                  <Text fontSize="xs" fontWeight="600" color="white">
-                                    {volunteer.profiles.first_name.charAt(0)}{volunteer.profiles.last_name.charAt(0)}
-                                  </Text>
-                                </Box>
-                                <Text fontSize="sm" color={textColor}>
-                                  {volunteer.profiles.first_name} {volunteer.profiles.last_name}
-                                </Text>
-                              </HStack>
-                            ))}
-                            {volunteers.length > 3 && (
-                              <Text fontSize="xs" color={subtitleColor} fontStyle="italic">
-                                +{volunteers.length - 3} more volunteers
-                              </Text>
-                            )}
-                          </VStack>
+                          <HStack spacing={2} align="flex-start" flexWrap="wrap">
+                            {volunteers
+                              .sort((a, b) => {
+                                const aInstruments = a.instruments || []
+                                const bInstruments = b.instruments || []
+                                
+                                // Check if volunteer has Mic 1
+                                const aHasMic1 = aInstruments.some(instrument => 
+                                  instrument.toLowerCase().includes('mic 1') || 
+                                  instrument.toLowerCase() === 'mic1'
+                                )
+                                const bHasMic1 = bInstruments.some(instrument => 
+                                  instrument.toLowerCase().includes('mic 1') || 
+                                  instrument.toLowerCase() === 'mic1'
+                                )
+                                
+                                // Mic 1 volunteers come first
+                                if (aHasMic1 && !bHasMic1) return -1
+                                if (!aHasMic1 && bHasMic1) return 1
+                                
+                                // For non-Mic 1 volunteers, sort alphabetically by first name
+                                const aFirstName = a.profiles.first_name || 'Unknown'
+                                const bFirstName = b.profiles.first_name || 'Unknown'
+                                return aFirstName.localeCompare(bFirstName)
+                              })
+                              .map((volunteer) => {
+                                const firstName = volunteer.profiles.first_name || 'Unknown'
+                                const lastName = volunteer.profiles.last_name || ''
+                                const fullName = `${firstName} ${lastName}`.trim()
+                                const instruments = volunteer.instruments || []
+                                const role = instruments.length > 0 ? instruments.join(', ') : 'Volunteer'
+                                
+                                // Check if this is the current user
+                                const isCurrentUser = user && volunteer.user_id === user.id
+                                
+                                // Check if volunteer has Mic 1 or Worship Leader role
+                                const hasMic1OrWorshipLeader = instruments.some(instrument => {
+                                  const lowerInstrument = instrument.toLowerCase()
+                                  return lowerInstrument.includes('mic 1') || 
+                                         lowerInstrument === 'mic1' ||
+                                         lowerInstrument.includes('worship leader') ||
+                                         lowerInstrument === 'worship leader'
+                                })
+                                
+                                // Use darker blue for current user or Mic 1/Worship Leader, lighter blue for others
+                                const shouldUseDarkBlue = isCurrentUser || hasMic1OrWorshipLeader
+                                
+                                return (
+                                  <Box
+                                    key={volunteer.id}
+                                    bg={shouldUseDarkBlue ? "blue.500" : useColorModeValue("blue.100", "blue.300")}
+                                    color={shouldUseDarkBlue ? "white" : useColorModeValue("blue.800", "blue.900")}
+                                    px={3}
+                                    py={2}
+                                    borderRadius="lg"
+                                    textAlign="center"
+                                    minW="fit-content"
+                                  >
+                                    <VStack spacing={0}>
+                                      <Text fontSize="xs" fontWeight="600" lineHeight="1.2">
+                                        {fullName}
+                                      </Text>
+                                      <Text 
+                                        fontSize="2xs" 
+                                        fontWeight="400" 
+                                        opacity={shouldUseDarkBlue ? 0.9 : 0.8} 
+                                        lineHeight="1.1"
+                                      >
+                                        {role}
+                                      </Text>
+                                    </VStack>
+                                  </Box>
+                                )
+                              })}
+                          </HStack>
                         </VStack>
                       ) : (
                         <Text fontSize="sm" color={subtitleColor} fontStyle="italic">
@@ -766,53 +1022,170 @@ export function VolunteerPage() {
 
             <Box
               position={{ base: "fixed", md: "static" }}
-              bottom={{ base: 4, md: "auto" }}
-              left={{ base: 4, md: "auto" }}
-              right={{ base: 4, md: "auto" }}
+              bottom={{ base: 0, md: "auto" }}
+              left={{ base: 0, md: "auto" }}
+              right={{ base: 0, md: "auto" }}
               zIndex={10}
-              bg={{ base: whiteCardBg, md: "transparent" }}
-              pt={{ base: 4, md: 0 }}
+              bg={{ base: "white", md: "transparent" }}
               borderTop={{ base: "1px", md: "none" }}
               borderColor={{ base: grayBorderTop, md: "transparent" }}
             >
-              <Button
-                size="lg"
-                colorScheme="blue"
-                onClick={() => navigate('/dashboard')}
-                w="full"
-                fontSize={{ base: "lg", md: "xl" }}
-                py={{ base: 6, md: 6 }}
-              >
-                {t('volunteerPage.viewDashboard', { organizationName: organization.name })}
-              </Button>
+              <Box px={{ base: 4, md: 0 }} pt={{ base: 4, md: 0 }} pb={{ base: 4, md: 0 }}>
+                <Button
+                  size="lg"
+                  colorScheme="blue"
+                  onClick={() => navigate('/dashboard')}
+                  w="full"
+                  fontSize={{ base: "lg", md: "xl" }}
+                  py={{ base: 6, md: 6 }}
+                >
+                  {t('volunteerPage.viewDashboard', { organizationName: organization.name })}
+                </Button>
+              </Box>
             </Box>
           </VStack>
         )}
 
-        {/* Language Dropdown - Fixed at Bottom */}
-        <Box
-          position="fixed"
-          bottom={4}
-          right={4}
-          zIndex={20}
-        >
-          <Menu>
-            <MenuButton as={Button} variant="outline" size="sm" rightIcon={<ChevronDownIcon />}>
-              <Text fontSize="sm">{availableLanguages.find(lang => lang.code === currentLanguage)?.name || 'EN'}</Text>
-            </MenuButton>
-            <MenuList>
-              {availableLanguages.map((language) => (
-                <MenuItem
-                  key={language.code}
-                  onClick={() => changeLanguage(language.code)}
-                  bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
-                >
-                  {language.name}
-                </MenuItem>
-              ))}
-            </MenuList>
-          </Menu>
-        </Box>
+
+        {/* Instrument Selection Modal */}
+        <Modal isOpen={isInstrumentModalOpen} onClose={onInstrumentModalClose} isCentered>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Select Your Instrument/Role</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody p={0}>
+              {loadingInstruments ? (
+                <Center py={8}>
+                  <VStack spacing={3}>
+                    <Spinner size="lg" />
+                    <Text color={subtitleColor}>Loading instruments...</Text>
+                  </VStack>
+                </Center>
+              ) : availableInstruments.length === 0 ? (
+                <Center py={8}>
+                  <Text color={subtitleColor}>No instruments available</Text>
+                </Center>
+              ) : (
+                <>
+                  {/* Search Field */}
+                  <Box p={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
+                    <InputGroup>
+                      <InputLeftElement pointerEvents="none">
+                        <SearchIcon color={subtitleColor} />
+                      </InputLeftElement>
+                      <Input
+                        placeholder="Search instruments..."
+                        value={instrumentSearchQuery}
+                        onChange={(e) => setInstrumentSearchQuery(e.target.value)}
+                        size="md"
+                      />
+                    </InputGroup>
+                  </Box>
+
+                  {/* Scrollable List */}
+                  <Box position="relative">
+                    <VStack 
+                      spacing={0} 
+                      align="stretch" 
+                      maxH="350px" 
+                      overflowY="auto"
+                      id="instrument-list"
+                    >
+                      {(() => {
+                        const filteredInstruments = availableInstruments.filter(instrument =>
+                          instrument.name.toLowerCase().includes(instrumentSearchQuery.toLowerCase())
+                        )
+
+                        if (filteredInstruments.length === 0) {
+                          return (
+                            <Center py={8}>
+                              <Text color={subtitleColor}>No instruments match your search</Text>
+                            </Center>
+                          )
+                        }
+
+                        return filteredInstruments.map((instrument) => (
+                          <Box
+                            key={instrument.id}
+                            px={6}
+                            py={4}
+                            cursor="pointer"
+                            _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                            borderBottom="1px"
+                            borderColor={useColorModeValue('gray.200', 'gray.600')}
+                            onClick={() => handleInstrumentSelection(instrument.id)}
+                            transition="background-color 0.2s"
+                          >
+                            <Text fontWeight="500" color={textColor}>
+                              {instrument.name}
+                            </Text>
+                          </Box>
+                        ))
+                      })()}
+                    </VStack>
+
+                    {/* Pulsing Chevron Down - Only show if there are more items to scroll */}
+                    {(() => {
+                      const filteredInstruments = availableInstruments.filter(instrument =>
+                        instrument.name.toLowerCase().includes(instrumentSearchQuery.toLowerCase())
+                      )
+                      
+                      // Show chevron if there are more than 7 items (approximate items visible in 350px)
+                      if (filteredInstruments.length > 7) {
+                        const chevronPulse = keyframes`
+                          0% { opacity: 0.4; transform: translateY(0px); }
+                          50% { opacity: 1; transform: translateY(3px); }
+                          100% { opacity: 0.4; transform: translateY(0px); }
+                        `
+
+                        return (
+                          <Box
+                            position="absolute"
+                            bottom="10px"
+                            left="50%"
+                            transform="translateX(-50%)"
+                            pointerEvents="none"
+                            zIndex={1}
+                          >
+                            <ChevronDownIcon
+                              boxSize={6}
+                              color={useColorModeValue('blue.500', 'blue.300')}
+                              animation={`${chevronPulse} 2s ease-in-out infinite`}
+                            />
+                          </Box>
+                        )
+                      }
+                      return null
+                    })()}
+                  </Box>
+                </>
+              )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+
+        {/* Global Loading Overlay */}
+        {isReloading && (
+          <Box
+            position="fixed"
+            top={0}
+            left={0}
+            right={0}
+            bottom={0}
+            bg="rgba(0, 0, 0, 0.3)"
+            zIndex={9999}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <VStack spacing={4}>
+              <Spinner size="xl" color="blue.500" thickness="4px" />
+              <Text color="white" fontWeight="600" fontSize="lg">
+                Updating volunteer assignment...
+              </Text>
+            </VStack>
+          </Box>
+        )}
       </Box>
     </Box>
   )

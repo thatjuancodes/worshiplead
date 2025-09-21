@@ -538,7 +538,7 @@
     }
   },
   "volunteerPage": {
-    "title": "Volunteer for {{organizationName}}",
+    "title": "{{organizationName}}",
     "subtitle": "Choose a service to volunteer for",
     "signInPrompt": "Please sign in with Google to volunteer for services",
     "continueWithGoogle": "Continue with Google",
@@ -563,6 +563,9 @@
     },
     "warning": {
       "profileFailed": "Failed to create user profile. Some features may not work properly."
-    }
+    },
+    "loadingVolunteers": "Loading volunteers...",
+    "currentVolunteers": "Current volunteers",
+    "noVolunteersYet": "No volunteers yet"
   }
 }

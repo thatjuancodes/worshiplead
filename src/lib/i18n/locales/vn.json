@@ -538,7 +538,7 @@
     }
   },
   "volunteerPage": {
-    "title": "Tình nguyện cho {{organizationName}}",
+    "title": "{{organizationName}}",
     "subtitle": "Chọn một dịch vụ để tình nguyện",
     "signInPrompt": "Vui lòng đăng nhập bằng Google để tình nguyện cho các dịch vụ",
     "continueWithGoogle": "Tiếp tục với Google",
