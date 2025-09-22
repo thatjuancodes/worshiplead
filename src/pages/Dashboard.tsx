@@ -37,10 +37,19 @@ import {
   useDisclosure,
   Center,
   useToast,
-  Tooltip
+  Tooltip,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  InputGroup,
+  InputLeftElement
 } from '@chakra-ui/react'
 import { CloseButton } from '@chakra-ui/react'
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, EditIcon } from '@chakra-ui/icons'
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, EditIcon, SearchIcon, CheckIcon } from '@chakra-ui/icons'
 import {
   DndContext,
   closestCenter,
@@ -64,7 +73,7 @@ import { getUserPrimaryOrganization, ensureUserProfileAndMembership } from '../l
 import { DashboardHeader } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { useAuth } from '../contexts'
-import { formatServiceDate, getServiceTimeDisplay, getServiceDateISO, formatForDateTimeInput } from '../utils/dateTime'
+import { formatServiceDate, getServiceTimeDisplay, getServiceDateISO } from '../utils/dateTime'
 
 interface OrganizationData {
   organization_id: string
@@ -157,6 +166,26 @@ export function Dashboard() {
   const [singleExpanded, setSingleExpanded] = useState(false)
   const [isAddingServiceMode, setIsAddingServiceMode] = useState(false)
   const firstServiceRef = useRef<HTMLDivElement | null>(null)
+
+  // Drawer mode state
+  const [drawerMode, setDrawerMode] = useState<'day' | 'single'>('day')
+  const [selectedSingleService, setSelectedSingleService] = useState<WorshipService | null>(null)
+
+  // Song selection modal state
+  const songSelectionModal = useDisclosure()
+  const [selectedServiceForSong, setSelectedServiceForSong] = useState<string | null>(null)
+  const [songSearchQuery, setSongSearchQuery] = useState<string>('')
+
+  // Volunteer selection modal state
+  const volunteerSelectionModal = useDisclosure()
+  const [selectedServiceForVolunteer, setSelectedServiceForVolunteer] = useState<string | null>(null)
+  const [volunteerSearchQuery, setVolunteerSearchQuery] = useState<string>('')
+
+  // Instrument selection modal state
+  const instrumentSelectionModal = useDisclosure()
+  const [selectedVolunteerForInstruments, setSelectedVolunteerForInstruments] = useState<string | null>(null)
+  const [pendingInstrumentChanges, setPendingInstrumentChanges] = useState<{[volunteerId: string]: {add: string[], remove: string[]}}>({})
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // User volunteer dates
   const [userVolunteerDates, setUserVolunteerDates] = useState<string[]>([])
@@ -297,6 +326,259 @@ export function Dashboard() {
     }
   }, [organization])
 
+  const handleSongSelection = async (songId: string) => {
+    if (!selectedServiceForSong) return
+    
+    // Close modal immediately
+    songSelectionModal.onClose()
+    const serviceId = selectedServiceForSong
+    setSelectedServiceForSong(null)
+    setSongSearchQuery('')
+    
+    // Add song to service using the existing function
+    await handleAddSongToService(serviceId, songId)
+  }
+
+  const openSongSelectionModal = (serviceId: string) => {
+    setSelectedServiceForSong(serviceId)
+    setSongSearchQuery('')
+    songSelectionModal.onOpen()
+  }
+
+  const handleVolunteerSelection = async (userId: string) => {
+    if (!selectedServiceForVolunteer) return
+    
+    try {
+      await handleAddVolunteer(selectedServiceForVolunteer, userId)
+      volunteerSelectionModal.onClose()
+      setVolunteerSearchQuery('')
+    } catch (error) {
+      console.error('Error adding volunteer:', error)
+    }
+  }
+
+  const openVolunteerSelectionModal = (serviceId: string) => {
+    setSelectedServiceForVolunteer(serviceId)
+    setVolunteerSearchQuery('')
+    if (!usersLoaded) {
+      loadAvailableUsers()
+    }
+    volunteerSelectionModal.onOpen()
+  }
+
+  const openInstrumentSelectionModal = (volunteerId: string) => {
+    setSelectedVolunteerForInstruments(volunteerId)
+    if (!instrumentsLoaded) {
+      loadOrganizationInstruments()
+    }
+    instrumentSelectionModal.onOpen()
+  }
+
+
+  const handleInstrumentToggle = (instrumentId: string) => {
+    if (!selectedVolunteerForInstruments) return
+    
+    const volunteerId = selectedVolunteerForInstruments
+    const currentInstruments = volunteerToInstrumentIds[volunteerId] || []
+    const isCurrentlySelected = currentInstruments.includes(instrumentId)
+    
+    // Update UI immediately for responsive feedback
+    setVolunteerToInstrumentIds(prev => {
+      const updated = { ...prev }
+      if (isCurrentlySelected) {
+        // Remove from current instruments
+        updated[volunteerId] = currentInstruments.filter(id => id !== instrumentId)
+      } else {
+        // Add to current instruments
+        updated[volunteerId] = [...currentInstruments, instrumentId]
+      }
+      return updated
+    })
+
+    // Track pending changes for debounced processing
+    setPendingInstrumentChanges(prev => {
+      const current = prev[volunteerId] || { add: [], remove: [] }
+      const updated = { ...prev }
+      
+      if (isCurrentlySelected) {
+        // Remove from add list if it was there, otherwise add to remove list
+        if (current.add.includes(instrumentId)) {
+          updated[volunteerId] = {
+            ...current,
+            add: current.add.filter(id => id !== instrumentId)
+          }
+        } else {
+          updated[volunteerId] = {
+            ...current,
+            remove: [...current.remove.filter(id => id !== instrumentId), instrumentId]
+          }
+        }
+      } else {
+        // Remove from remove list if it was there, otherwise add to add list
+        if (current.remove.includes(instrumentId)) {
+          updated[volunteerId] = {
+            ...current,
+            remove: current.remove.filter(id => id !== instrumentId)
+          }
+        } else {
+          updated[volunteerId] = {
+            ...current,
+            add: [...current.add.filter(id => id !== instrumentId), instrumentId]
+          }
+        }
+      }
+      
+      return updated
+    })
+
+    // Trigger debounced update
+    debouncedInstrumentUpdate(volunteerId)
+  }
+
+  // Function to render single service content (no accordion)
+  function renderSingleServiceContent(service: WorshipService) {
+    return (
+      <VStack align="stretch" spacing={4}>
+        {/* Service Description (if exists) */}
+        {service.description && (
+          <Box>
+            <Text color={mutedTextColor} whiteSpace="pre-wrap" fontSize="md">{service.description}</Text>
+          </Box>
+        )}
+
+        {/* Songs Section */}
+        <Box>
+          <HStack justify="space-between" align="center" mb={2}>
+            <Text fontWeight="700" fontSize="lg">Songs</Text>
+            {canManagePrimary && (
+              <Button
+                size="sm"
+                variant="outline"
+                colorScheme="blue"
+                onClick={() => openSongSelectionModal(service.id)}
+              >
+                + Add Song
+              </Button>
+            )}
+          </HStack>
+
+          {(serviceIdToSongs[service.id] || []).length === 0 ? (
+            <Text color={mutedTextColor}>No songs added yet</Text>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => handleReorderServiceSongs(service.id, event)}
+            >
+              <SortableContext
+                items={(serviceIdToSongs[service.id] || []).map(row => row.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <VStack spacing={2} align="stretch">
+                  {(serviceIdToSongs[service.id] || []).map((serviceSong) => (
+                    <SortableServiceSongItem
+                      key={serviceSong.id}
+                      serviceSong={serviceSong}
+                      canManage={canManagePrimary}
+                      onRemove={() => handleRemoveServiceSong(serviceSong.id, service.id)}
+                    />
+                  ))}
+                </VStack>
+              </SortableContext>
+            </DndContext>
+          )}
+        </Box>
+
+        {/* Volunteers Section */}
+        <Box>
+          <HStack justify="space-between" align="center" mb={2}>
+            <Text fontWeight="700" fontSize="lg">Volunteers</Text>
+            {canManagePrimary && (
+              <Button
+                size="sm"
+                variant="outline"
+                colorScheme="blue"
+                onClick={() => openVolunteerSelectionModal(service.id)}
+              >
+                + Add Volunteer
+              </Button>
+            )}
+          </HStack>
+
+
+          {(serviceIdToVolunteers[service.id] || []).length === 0 ? (
+            <Text color={mutedTextColor}>No volunteers assigned yet</Text>
+          ) : (
+            <VStack spacing={2} align="stretch">
+              {(serviceIdToVolunteers[service.id] || []).map((volunteer) => (
+                <Box
+                  key={volunteer.id}
+                  bg="#f9f9f9"
+                  borderRadius="20px"
+                  p={4}
+                  display="flex"
+                  alignItems="center"
+                  gap={3}
+                  cursor="pointer"
+                  _hover={{ bg: "#f0f0f0" }}
+                  onClick={() => openInstrumentSelectionModal(volunteer.id)}
+                  transition="background-color 0.2s"
+                >
+                  <Box
+                    bg="blue.500"
+                    color="white"
+                    borderRadius="full"
+                    w="32px"
+                    h="32px"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    fontSize="xs"
+                    fontWeight="600"
+                  >
+                    {(() => {
+                      const firstName = volunteer.profiles?.first_name || ''
+                      const lastName = volunteer.profiles?.last_name || ''
+                      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+                    })()}
+                  </Box>
+                  <VStack align="start" spacing={0} flex={1}>
+                    <Text fontWeight="600" fontSize="sm">
+                      {volunteer.profiles?.first_name} {volunteer.profiles?.last_name}
+                    </Text>
+                    {(volunteerToInstrumentIds[volunteer.id] || []).length > 0 && (
+                      <Text fontSize="xs" color="gray.600">
+                        {(volunteerToInstrumentIds[volunteer.id] || [])
+                          .map(instId => instruments.find(i => i.id === instId)?.name)
+                          .filter(Boolean)
+                          .join(', ')}
+                      </Text>
+                    )}
+                  </VStack>
+                  {canManagePrimary && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorScheme="red"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveVolunteer(volunteer.id, service.id)
+                      }}
+                      isLoading={removingVolunteerById[volunteer.id]}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </Box>
+              ))}
+            </VStack>
+          )}
+        </Box>
+
+      </VStack>
+    )
+  }
+
   function SortableServiceSongItem({ serviceSong, canManage, onRemove }: { serviceSong: ServiceSong, canManage: boolean, onRemove: (id: string) => void }) {
     const {
       attributes,
@@ -331,7 +613,7 @@ export function Dashboard() {
         {...attributes}
       >
         <Box
-          bg="black"
+          bg="blue.500"
           color="white"
           borderRadius="full"
           w={8}
@@ -772,6 +1054,44 @@ export function Dashboard() {
       setSavingAssignmentByVolunteer(prev => ({ ...prev, [volunteerId]: false }))
     }
   }, [])
+
+  const processPendingInstrumentChanges = useCallback(async (volunteerId: string) => {
+    const changes = pendingInstrumentChanges[volunteerId]
+    if (!changes) return
+
+    try {
+      // Process removals first
+      for (const instrumentId of changes.remove) {
+        await handleRemoveInstrument(volunteerId, instrumentId)
+      }
+
+      // Then process additions
+      for (const instrumentId of changes.add) {
+        await handleAssignInstrument(volunteerId, instrumentId)
+      }
+
+      // Clear pending changes for this volunteer
+      setPendingInstrumentChanges(prev => {
+        const updated = { ...prev }
+        delete updated[volunteerId]
+        return updated
+      })
+    } catch (error) {
+      console.error('Error processing pending instrument changes:', error)
+    }
+  }, [pendingInstrumentChanges, handleRemoveInstrument, handleAssignInstrument])
+
+  const debouncedInstrumentUpdate = useCallback((volunteerId: string) => {
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
+    }
+
+    // Set new timeout for 2 seconds
+    debounceTimeoutRef.current = setTimeout(() => {
+      processPendingInstrumentChanges(volunteerId)
+    }, 2000)
+  }, [processPendingInstrumentChanges])
 
   const handleRemoveVolunteer = useCallback(async (volunteerId: string, serviceId: string) => {
     try {
@@ -1422,6 +1742,25 @@ export function Dashboard() {
     }
   }, [organization, services, loadVolunteersForServices])
 
+  // Load data for single service when selected
+  useEffect(() => {
+    if (drawerMode === 'single' && selectedSingleService && organization) {
+      // Load songs for this service
+      loadSongsForServices([selectedSingleService.id])
+      // Load volunteers for this service
+      loadVolunteersForServices([selectedSingleService.id])
+    }
+  }, [drawerMode, selectedSingleService, organization, loadSongsForServices, loadVolunteersForServices])
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
   const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
@@ -1564,10 +1903,9 @@ export function Dashboard() {
                               }}
                               transition="all 0.2s"
                               onClick={() => {
-                                const serviceDate = getServiceDateISO(service.service_time)
-                                setFormDateTime(formatForDateTimeInput(service.service_time))
-                                setSelectedDate(serviceDate)
-                                loadServicesForDate(serviceDate)
+                                // Set single service mode for upcoming service clicks
+                                setDrawerMode('single')
+                                setSelectedSingleService(service)
                                 setIsAddingServiceMode(false)
                                 createDrawer.onOpen()
                               }}
@@ -1987,6 +2325,9 @@ export function Dashboard() {
                     scheduledDates={[...new Set(services.map(s => getServiceDateISO(s.service_time)))]}
                     userVolunteerDates={userVolunteerDates}
                     onDateClick={(iso) => {
+                      // Set day mode for calendar clicks
+                      setDrawerMode('day')
+                      setSelectedSingleService(null)
                       const defaultDateTime = `${iso}T10:00`
                       setFormDateTime(defaultDateTime)
                       setSelectedDate(iso)
@@ -2244,7 +2585,9 @@ export function Dashboard() {
               <DrawerHeader>
                 <HStack justify="space-between" align="center">
                   <Text m={0} fontWeight="800" fontSize={{ base: 'xl', md: 'lg' }}>
-                    {selectedDate && dayServices.length > 0
+                    {drawerMode === 'single' && selectedSingleService
+                      ? `${selectedSingleService.title} - ${formatServiceDate(selectedSingleService.service_time)} - ${getServiceTimeDisplay(selectedSingleService.service_time)}`
+                      : selectedDate && dayServices.length > 0
                       ? `${new Date(selectedDate).toLocaleDateString('en-US', {
                           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                         })}`
@@ -2264,7 +2607,10 @@ export function Dashboard() {
                 </HStack>
               </DrawerHeader>
               <DrawerBody>
-                {selectedDate && !isAddingServiceMode && (
+                {drawerMode === 'single' && selectedSingleService ? (
+                  // Single service view - no accordion, direct content
+                  renderSingleServiceContent(selectedSingleService)
+                ) : selectedDate && !isAddingServiceMode && (
                   <Box mb={4}>
                     {loadingDayServices ? (
                       <HStack>
@@ -2299,33 +2645,17 @@ export function Dashboard() {
                                       
                                       const formattedDate = selectedDate ? formatServiceDate(svc.service_time) : ''
                                       
-                                      const volunteerInitials = (() => {
-                                        const volunteers = serviceIdToVolunteers[svc.id] || []
-                                        return volunteers.slice(0, 3).map(v => {
-                                          const firstName = v.profiles?.first_name || ''
-                                          const lastName = v.profiles?.last_name || ''
-                                          return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
-                                        }).join(' ')
-                                      })()
-                                      
                                       return (
-                                        <HStack spacing={3} align="center" justify="space-between" w="100%">
-                                          <HStack spacing={3} align="center">
-                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                              {formattedDate}
-                                            </Text>
-                                            <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
-                                              {svc.title}
-                                            </Badge>
-                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                              {timePart}
-                                            </Text>
-                                          </HStack>
-                                          {volunteerInitials && (
-                                            <Text fontSize="xs" fontWeight="500" color="gray.500">
-                                              {volunteerInitials}
-                                            </Text>
-                                          )}
+                                        <HStack spacing={3} align="center">
+                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                            {formattedDate}
+                                          </Text>
+                                          <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
+                                            {svc.title}
+                                          </Badge>
+                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                            {timePart}
+                                          </Text>
                                         </HStack>
                                       )
                                     })()}
@@ -2776,33 +3106,17 @@ export function Dashboard() {
                                       
                                       const formattedDate = selectedDate ? formatServiceDate(svc.service_time) : ''
                                       
-                                      const volunteerInitials = (() => {
-                                        const volunteers = serviceIdToVolunteers[svc.id] || []
-                                        return volunteers.slice(0, 3).map(v => {
-                                          const firstName = v.profiles?.first_name || ''
-                                          const lastName = v.profiles?.last_name || ''
-                                          return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
-                                        }).join(' ')
-                                      })()
-                                      
                                       return (
-                                        <HStack spacing={3} align="center" justify="space-between" w="100%">
-                                          <HStack spacing={3} align="center">
-                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                              {formattedDate}
-                                            </Text>
-                                            <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
-                                              {svc.title}
-                                            </Badge>
-                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                              {timePart}
-                                            </Text>
-                                          </HStack>
-                                          {volunteerInitials && (
-                                            <Text fontSize="xs" fontWeight="500" color="gray.500">
-                                              {volunteerInitials}
-                                            </Text>
-                                          )}
+                                        <HStack spacing={3} align="center">
+                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                            {formattedDate}
+                                          </Text>
+                                          <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
+                                            {svc.title}
+                                          </Badge>
+                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                            {timePart}
+                                          </Text>
                                         </HStack>
                                       )
                                     })()}
@@ -3238,7 +3552,7 @@ export function Dashboard() {
                     {formError}
                   </Alert>
                 )}
-                {(isAddingServiceMode || !selectedDate || dayServices.length === 0) && (
+                {drawerMode !== 'single' && (isAddingServiceMode || !selectedDate || dayServices.length === 0) && (
                   <form onSubmit={handleCreateServiceSubmit}>
                     <VStack spacing={5} align="stretch">
                       <FormControl isRequired>
@@ -3277,7 +3591,15 @@ export function Dashboard() {
                   </form>
                 )}
               </DrawerBody>
-              {(isAddingServiceMode || !selectedDate || dayServices.length === 0) ? (
+              {drawerMode === 'single' ? (
+                <DrawerFooter>
+                  <HStack w="100%" justify="flex-end">
+                    <Button colorScheme="blue" onClick={createDrawer.onClose}>
+                      Close
+                    </Button>
+                  </HStack>
+                </DrawerFooter>
+              ) : (isAddingServiceMode || !selectedDate || dayServices.length === 0) ? (
                 <DrawerFooter>
                   <HStack w="100%" justify="flex-end">
                     <Button variant="outline" colorScheme="gray" onClick={createDrawer.onClose}>
@@ -3442,6 +3764,413 @@ export function Dashboard() {
               </DrawerFooter>
             </DrawerContent>
           </Drawer>
+
+          {/* Song Selection Modal */}
+          <Modal isOpen={songSelectionModal.isOpen} onClose={songSelectionModal.onClose} isCentered size="lg">
+            <ModalOverlay />
+            <ModalContent maxH="600px">
+              <ModalHeader>Select a Song</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody p={0} display="flex" flexDirection="column" minH="0">
+                {availableSongs.length === 0 ? (
+                  <Center py={8}>
+                    <Text color={mutedTextColor}>No songs available</Text>
+                  </Center>
+                ) : (
+                  <>
+                    {/* Search Field */}
+                    <Box p={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')} flexShrink={0}>
+                      <InputGroup>
+                        <InputLeftElement pointerEvents="none">
+                          <SearchIcon color={mutedTextColor} />
+                        </InputLeftElement>
+                        <Input
+                          placeholder="Search songs..."
+                          value={songSearchQuery}
+                          onChange={(e) => setSongSearchQuery(e.target.value)}
+                          size="md"
+                        />
+                      </InputGroup>
+                    </Box>
+
+                    {/* Scrollable List */}
+                    <Box 
+                      flex="1"
+                      overflowY="auto"
+                      minH="300px"
+                      maxH="400px"
+                      tabIndex={0}
+                      css={{
+                        '&': {
+                          scrollBehavior: 'smooth',
+                          outline: 'none',
+                        },
+                        '&::-webkit-scrollbar': {
+                          width: '8px',
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          background: 'transparent',
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          background: '#CBD5E0',
+                          borderRadius: '4px',
+                        },
+                        '&::-webkit-scrollbar-thumb:hover': {
+                          background: '#A0AEC0',
+                        },
+                      }}
+                      onWheel={(e) => {
+                        // Prevent event from bubbling up to modal
+                        e.stopPropagation();
+                      }}
+                      onMouseEnter={(e) => {
+                        // Focus the scroll container when mouse enters
+                        e.currentTarget.focus();
+                      }}
+                    >
+                      {(() => {
+                        const filteredSongs = availableSongs.filter(song =>
+                          song.title.toLowerCase().includes(songSearchQuery.toLowerCase()) ||
+                          song.artist.toLowerCase().includes(songSearchQuery.toLowerCase())
+                        )
+
+                        if (filteredSongs.length === 0) {
+                          return (
+                            <Center py={8}>
+                              <Text color={mutedTextColor}>No songs match your search</Text>
+                            </Center>
+                          )
+                        }
+
+                        return (
+                          <div style={{ minHeight: 'fit-content' }}>
+                            {filteredSongs.map((song) => (
+                              <Box
+                                key={song.id}
+                                px={6}
+                                py={4}
+                                cursor="pointer"
+                                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                                borderBottom="1px"
+                                borderColor={useColorModeValue('gray.200', 'gray.600')}
+                                onClick={() => handleSongSelection(song.id)}
+                                transition="background-color 0.2s"
+                              >
+                                <VStack align="start" spacing={1}>
+                                  <Text fontWeight="600" color={titleColor}>
+                                    {song.title}
+                                  </Text>
+                                  <Text fontSize="sm" color={mutedTextColor}>
+                                    {song.artist}
+                                  </Text>
+                                </VStack>
+                              </Box>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </Box>
+                  </>
+                )}
+              </ModalBody>
+            </ModalContent>
+          </Modal>
+
+          {/* Volunteer Selection Modal */}
+          <Modal isOpen={volunteerSelectionModal.isOpen} onClose={volunteerSelectionModal.onClose} isCentered size="lg">
+            <ModalOverlay />
+            <ModalContent maxH="600px">
+              <ModalHeader>Select a Volunteer</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody p={0} display="flex" flexDirection="column" minH="0">
+                {availableUsers.length === 0 ? (
+                  <Center py={8}>
+                    <Text color={mutedTextColor}>No volunteers available</Text>
+                  </Center>
+                ) : (
+                  <>
+                    {/* Search Field */}
+                    <Box p={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')} flexShrink={0}>
+                      <InputGroup>
+                        <InputLeftElement pointerEvents="none">
+                          <SearchIcon color={mutedTextColor} />
+                        </InputLeftElement>
+                        <Input
+                          placeholder="Search volunteers..."
+                          value={volunteerSearchQuery}
+                          onChange={(e) => setVolunteerSearchQuery(e.target.value)}
+                          size="md"
+                        />
+                      </InputGroup>
+                    </Box>
+
+                    {/* Scrollable List */}
+                    <Box 
+                      flex="1"
+                      overflowY="auto"
+                      minH="300px"
+                      maxH="400px"
+                      tabIndex={0}
+                      css={{
+                        '&': {
+                          scrollBehavior: 'smooth',
+                          outline: 'none',
+                        },
+                        '&::-webkit-scrollbar': {
+                          width: '8px',
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          background: 'transparent',
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          background: '#CBD5E0',
+                          borderRadius: '4px',
+                        },
+                        '&::-webkit-scrollbar-thumb:hover': {
+                          background: '#A0AEC0',
+                        },
+                      }}
+                      onWheel={(e) => {
+                        // Prevent event from bubbling up to modal
+                        e.stopPropagation();
+                      }}
+                      onMouseEnter={(e) => {
+                        // Focus the scroll container when mouse enters
+                        e.currentTarget.focus();
+                      }}
+                    >
+                      {(() => {
+                        const currentVolunteerUserIds = selectedServiceForVolunteer 
+                          ? new Set((serviceIdToVolunteers[selectedServiceForVolunteer] || []).map(v => v.user_id))
+                          : new Set()
+                        
+                        const filteredUsers = availableUsers
+                          .filter(user => !currentVolunteerUserIds.has(user.id))
+                          .filter(user => {
+                            if (!volunteerSearchQuery.trim()) return true
+                            const fullName = `${user.first_name} ${user.last_name}`.toLowerCase()
+                            const email = user.email.toLowerCase()
+                            const searchQuery = volunteerSearchQuery.toLowerCase()
+                            return fullName.includes(searchQuery) || email.includes(searchQuery)
+                          })
+
+                        if (filteredUsers.length === 0) {
+                          return (
+                            <Center py={8}>
+                              <Text color={mutedTextColor}>No volunteers match your search</Text>
+                            </Center>
+                          )
+                        }
+
+                        return (
+                          <div style={{ minHeight: 'fit-content' }}>
+                            {filteredUsers.map((user) => (
+                              <Box
+                                key={user.id}
+                                px={6}
+                                py={4}
+                                cursor="pointer"
+                                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                                borderBottom="1px"
+                                borderColor={useColorModeValue('gray.200', 'gray.600')}
+                                onClick={() => handleVolunteerSelection(user.id)}
+                                transition="background-color 0.2s"
+                              >
+                                <VStack align="start" spacing={1}>
+                                  <Text fontWeight="600" color={titleColor}>
+                                    {user.first_name} {user.last_name}
+                                  </Text>
+                                  <Text fontSize="sm" color={mutedTextColor}>
+                                    {user.email}
+                                  </Text>
+                                </VStack>
+                              </Box>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </Box>
+                  </>
+                )}
+              </ModalBody>
+            </ModalContent>
+          </Modal>
+
+          {/* Instrument Selection Modal */}
+          <Modal 
+            isOpen={instrumentSelectionModal.isOpen} 
+            onClose={() => {
+              // Process any pending changes immediately when closing via X or overlay
+              if (selectedVolunteerForInstruments && pendingInstrumentChanges[selectedVolunteerForInstruments]) {
+                if (debounceTimeoutRef.current) {
+                  clearTimeout(debounceTimeoutRef.current)
+                }
+                processPendingInstrumentChanges(selectedVolunteerForInstruments)
+              }
+              instrumentSelectionModal.onClose()
+            }} 
+            isCentered 
+            size="lg"
+          >
+            <ModalOverlay />
+            <ModalContent maxH="600px">
+              <ModalHeader>
+                Select Instruments
+                {selectedVolunteerForInstruments && (
+                  <Text fontSize="sm" fontWeight="normal" color={mutedTextColor} mt={1}>
+                    {(() => {
+                      const volunteer = Object.values(serviceIdToVolunteers).flat()
+                        .find(v => v.id === selectedVolunteerForInstruments)
+                      return volunteer ? 
+                        `${volunteer.profiles?.first_name} ${volunteer.profiles?.last_name}` : 
+                        'Volunteer'
+                    })()}
+                  </Text>
+                )}
+              </ModalHeader>
+              <ModalCloseButton />
+              <ModalBody p={0} display="flex" flexDirection="column" minH="0">
+                {instruments.length === 0 ? (
+                  <Center py={8}>
+                    <Text color={mutedTextColor}>No instruments available</Text>
+                  </Center>
+                ) : (
+                  <Box 
+                    flex="1"
+                    overflowY="auto"
+                    minH="300px"
+                    maxH="400px"
+                    tabIndex={0}
+                    css={{
+                      '&': {
+                        scrollBehavior: 'smooth',
+                        outline: 'none',
+                      },
+                      '&::-webkit-scrollbar': {
+                        width: '8px',
+                      },
+                      '&::-webkit-scrollbar-track': {
+                        background: 'transparent',
+                      },
+                      '&::-webkit-scrollbar-thumb': {
+                        background: '#CBD5E0',
+                        borderRadius: '4px',
+                      },
+                      '&::-webkit-scrollbar-thumb:hover': {
+                        background: '#A0AEC0',
+                      },
+                    }}
+                    onWheel={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.focus();
+                    }}
+                  >
+                    <div style={{ minHeight: 'fit-content' }}>
+                      {instruments.map((instrument) => {
+                        const isSelected = selectedVolunteerForInstruments ? 
+                          (volunteerToInstrumentIds[selectedVolunteerForInstruments] || []).includes(instrument.id) : 
+                          false
+                        
+                        // Find which service this volunteer belongs to
+                        const currentVolunteerService = Object.entries(serviceIdToVolunteers).find(([, volunteers]) =>
+                          volunteers.some(v => v.id === selectedVolunteerForInstruments)
+                        )
+                        
+                        // Check if instrument is already assigned to another volunteer in the SAME service
+                        const isAssignedToOther = currentVolunteerService ? 
+                          currentVolunteerService[1].some(volunteer => 
+                            volunteer.id !== selectedVolunteerForInstruments && 
+                            (volunteerToInstrumentIds[volunteer.id] || []).includes(instrument.id)
+                          ) : false
+                        
+                        const isDisabled = isAssignedToOther
+                        
+                        return (
+                          <Box
+                            key={instrument.id}
+                            px={6}
+                            py={4}
+                            cursor={isDisabled ? "not-allowed" : "pointer"}
+                            bg={isSelected ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
+                            _hover={!isDisabled ? { 
+                              bg: isSelected ? useColorModeValue('blue.100', 'blue.800') : useColorModeValue('gray.50', 'gray.700') 
+                            } : {}}
+                            borderBottom="1px"
+                            borderColor={useColorModeValue('gray.200', 'gray.600')}
+                            onClick={() => !isDisabled && handleInstrumentToggle(instrument.id)}
+                            transition="background-color 0.2s"
+                            opacity={isDisabled ? 0.5 : 1}
+                          >
+                            <HStack justify="space-between" align="center">
+                              <VStack align="start" spacing={1}>
+                                <Text 
+                                  fontWeight="600" 
+                                  color={isDisabled ? mutedTextColor : titleColor}
+                                >
+                                  {instrument.name}
+                                  {isDisabled && (
+                                    <Text as="span" fontSize="xs" ml={2} color={mutedTextColor}>
+                                      (Already assigned)
+                                    </Text>
+                                  )}
+                                </Text>
+                                {instrument.description && (
+                                  <Text 
+                                    fontSize="sm" 
+                                    color={isDisabled ? mutedTextColor : mutedTextColor}
+                                  >
+                                    {instrument.description}
+                                  </Text>
+                                )}
+                              </VStack>
+                              <Box
+                                w="28px"
+                                h="28px"
+                                borderRadius="full"
+                                bg={isSelected ? "green.500" : "transparent"}
+                                border={isSelected ? "none" : "2px"}
+                                borderColor={isDisabled ? mutedTextColor : useColorModeValue('gray.300', 'gray.600')}
+                                display="flex"
+                                alignItems="center"
+                                justifyContent="center"
+                                flexShrink={0}
+                                transition="all 0.2s"
+                              >
+                                {isSelected && (
+                                  <CheckIcon color="white" w={4} h={4} />
+                                )}
+                              </Box>
+                            </HStack>
+                          </Box>
+                        )
+                      })}
+                    </div>
+                  </Box>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <HStack spacing={3}>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      // Process any pending changes immediately when closing
+                      if (selectedVolunteerForInstruments && pendingInstrumentChanges[selectedVolunteerForInstruments]) {
+                        if (debounceTimeoutRef.current) {
+                          clearTimeout(debounceTimeoutRef.current)
+                        }
+                        processPendingInstrumentChanges(selectedVolunteerForInstruments)
+                      }
+                      instrumentSelectionModal.onClose()
+                    }}
+                  >
+                    Done
+                  </Button>
+                </HStack>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
         </VStack>
       </Box>
     </Box>
