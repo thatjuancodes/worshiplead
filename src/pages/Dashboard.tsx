@@ -49,7 +49,7 @@ import {
   InputLeftElement
 } from '@chakra-ui/react'
 import { CloseButton } from '@chakra-ui/react'
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, EditIcon, SearchIcon, CheckIcon } from '@chakra-ui/icons'
+import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CloseIcon, EditIcon, SearchIcon, CheckIcon } from '@chakra-ui/icons'
 import {
   DndContext,
   closestCenter,
@@ -173,6 +173,10 @@ export function Dashboard() {
   
   // Tab state for drawer
   const [activeDrawerTab, setActiveDrawerTab] = useState<'songs' | 'volunteers'>('songs')
+  
+  // Scroll indicator state
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
   
   // Description editing state
   const [isEditingDescription, setIsEditingDescription] = useState(false)
@@ -443,6 +447,30 @@ export function Dashboard() {
     debouncedInstrumentUpdate(volunteerId)
   }
 
+  // Scroll indicator functions
+  const checkScrollIndicator = useCallback(() => {
+    const element = scrollRef.current
+    if (!element) return
+    
+    const hasScroll = element.scrollHeight > element.clientHeight
+    const isAtBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 10
+    
+    // Show indicator if there's scrollable content and user is not at bottom
+    setShowScrollIndicator(hasScroll && !isAtBottom)
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    checkScrollIndicator()
+  }, [checkScrollIndicator])
+
+  // Check scroll indicator when drawer opens or content changes
+  useEffect(() => {
+    if (createDrawer.isOpen) {
+      const timer = setTimeout(checkScrollIndicator, 100) // Small delay for content to render
+      return () => clearTimeout(timer)
+    }
+  }, [createDrawer.isOpen, services, selectedSingleService, checkScrollIndicator])
+
   // Function to render single service content (no accordion)
   function renderSingleServiceContent(service: WorshipService) {
     // Show different content based on active tab
@@ -459,7 +487,7 @@ export function Dashboard() {
       <VStack align="stretch" spacing={4}>
         {/* Songs Section */}
         <Box>
-          <HStack justify="space-between" align="center" mb={2} mt={4}>
+          <HStack justify="space-between" align="center" mb={2}>
             <Text fontWeight="700" fontSize="xl">Songs</Text>
             {canManagePrimary && (
               <Button
@@ -509,7 +537,7 @@ export function Dashboard() {
       <VStack align="stretch" spacing={4}>
         {/* Volunteers Section */}
         <Box>
-          <HStack justify="space-between" align="center" mb={2} mt={4}>
+          <HStack justify="space-between" align="center" mb={2}>
             <Text fontWeight="700" fontSize="xl">Volunteers</Text>
             {canManagePrimary && (
               <Button
@@ -1869,6 +1897,18 @@ export function Dashboard() {
     }
   }, [])
 
+  // Chevron pulse animation for scroll indicator
+  const chevronPulse = keyframes`
+    0%, 100% {
+      transform: translateY(0);
+      opacity: 0.6;
+    }
+    50% {
+      transform: translateY(4px);
+      opacity: 1;
+    }
+  `
+
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
   const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
@@ -2690,7 +2730,7 @@ export function Dashboard() {
             <DrawerOverlay />
             <DrawerContent sx={mobileTextSx}>
               <DrawerCloseButton display={{ base: 'none', md: 'inline-flex' }} />
-              <DrawerHeader>
+              <DrawerHeader boxShadow="sm" borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
                 <HStack justify="space-between" align="center">
                   {drawerMode === 'single' && selectedSingleService ? (
                     <Box>
@@ -2724,12 +2764,12 @@ export function Dashboard() {
                     </Box>
                   ) : (
                     <Text m={0} fontWeight="800" fontSize={{ base: '4xl', md: '2xl' }}>
-                      {selectedDate && dayServices.length > 0
-                        ? `${new Date(selectedDate).toLocaleDateString('en-US', {
-                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                          })}`
-                        : 'Schedule New Service'}
-                    </Text>
+                    {selectedDate && dayServices.length > 0
+                      ? `${new Date(selectedDate).toLocaleDateString('en-US', {
+                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                        })}`
+                      : 'Schedule New Service'}
+                  </Text>
                   )}
                   <IconButton
                     aria-label="Close drawer"
@@ -2737,40 +2777,47 @@ export function Dashboard() {
                     variant="solid"
                     colorScheme="gray"
                     size="md"
-                    borderRadius="md"
+                    borderRadius="full"
                     display={{ base: 'inline-flex', md: 'none' }}
                     onClick={createDrawer.onClose}
-                    h="auto"
                   />
                 </HStack>
               </DrawerHeader>
               
-              {/* Service Description Section - above tab navigation */}
-              {drawerMode === 'single' && selectedSingleService && (
-                <Box px={6} py={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
-                  <HStack justify="space-between" align="center" mb={2}>
-                    <Text fontWeight="700" fontSize="xl" color={titleColor}>
-                      Description
-                    </Text>
-                    {canManagePrimary && !isEditingDescription && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        colorScheme="blue"
-                        onClick={() => handleEditDescription(selectedSingleService)}
-                        leftIcon={<EditIcon />}
-                      >
-                        Edit
-                      </Button>
-                    )}
-                  </HStack>
-                  
-                  {isEditingDescription ? (
-                    <VStack align="stretch" spacing={3}>
-                      <Textarea
-                        value={editingDescription}
-                        onChange={(e) => setEditingDescription(e.target.value)}
-                        placeholder="Enter service description using markdown formatting:
+              <DrawerBody 
+                ref={scrollRef} 
+                overflowY="auto" 
+                p={0} 
+                onScroll={handleScroll}
+                position="relative"
+              >
+                {drawerMode === 'single' && selectedSingleService ? (
+                  <VStack align="stretch" spacing={0}>
+                    {/* Service Description Section */}
+                    <Box px={6} py={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
+                      <HStack justify="space-between" align="center" mb={2}>
+                        <Text fontWeight="700" fontSize="xl" color={titleColor}>
+                          Description
+                        </Text>
+                        {canManagePrimary && !isEditingDescription && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            colorScheme="blue"
+                            onClick={() => handleEditDescription(selectedSingleService)}
+                            leftIcon={<EditIcon />}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </HStack>
+                      
+                      {isEditingDescription ? (
+                        <VStack align="stretch" spacing={3}>
+                          <Textarea
+                            value={editingDescription}
+                            onChange={(e) => setEditingDescription(e.target.value)}
+                            placeholder="Enter service description using markdown formatting:
 
 # Main Title
 ## Section Heading
@@ -2790,150 +2837,148 @@ Please arrive **15 minutes early** for sound check.
 - Your music sheets
 - Water bottle
 - Positive attitude!"
-                        rows={6}
-                        resize="vertical"
-                      />
-                      <HStack spacing={2}>
-                        <Button
-                          size="sm"
-                          colorScheme="blue"
-                          onClick={handleSaveDescription}
-                          isLoading={savingDescription}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={handleCancelEditDescription}
-                        >
-                          Cancel
-                        </Button>
-                      </HStack>
-                    </VStack>
-                  ) : (
-                    <Box
-                      p={3}
-                      bg={useColorModeValue('gray.50', 'gray.700')}
-                      borderRadius="md"
-                      minH="60px"
-                      border="1px"
-                      borderColor={useColorModeValue('gray.200', 'gray.600')}
-                      cursor={canManagePrimary ? "pointer" : "default"}
-                      _hover={canManagePrimary ? {
-                        borderColor: useColorModeValue('blue.300', 'blue.500'),
-                        bg: useColorModeValue('blue.50', 'gray.600')
-                      } : {}}
-                      onClick={canManagePrimary ? () => handleEditDescription(selectedSingleService) : undefined}
-                      transition="all 0.2s"
-                    >
-                      {selectedSingleService.description ? (
-                        <Box
-                          dangerouslySetInnerHTML={{
-                            __html: renderMarkdown(selectedSingleService.description)
-                          }}
-                          sx={{
-                            '& h1, & h2, & h3': {
-                              color: titleColor,
-                            },
-                            '& p': {
-                              margin: '0.5rem 0',
-                            },
-                            '& li': {
-                              color: textColor,
-                            },
-                            '& strong': {
-                              fontWeight: '600',
-                            },
-                            '& em': {
-                              fontStyle: 'italic',
-                            }
-                          }}
-                        />
+                            rows={6}
+                            resize="vertical"
+                          />
+                          <HStack spacing={2}>
+                            <Button
+                              size="sm"
+                              colorScheme="blue"
+                              onClick={handleSaveDescription}
+                              isLoading={savingDescription}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleCancelEditDescription}
+                            >
+                              Cancel
+                            </Button>
+                          </HStack>
+                        </VStack>
                       ) : (
-                        <Text color={mutedTextColor} fontStyle="italic">
-                          {canManagePrimary ? 'Click here to add a description...' : 'No description available'}
-                        </Text>
+                        <Box
+                          p={3}
+                          bg={useColorModeValue('gray.50', 'gray.700')}
+                          borderRadius="md"
+                          minH="60px"
+                          border="1px"
+                          borderColor={useColorModeValue('gray.200', 'gray.600')}
+                          cursor={canManagePrimary ? "pointer" : "default"}
+                          _hover={canManagePrimary ? {
+                            borderColor: useColorModeValue('blue.300', 'blue.500'),
+                            bg: useColorModeValue('blue.50', 'gray.600')
+                          } : {}}
+                          onClick={canManagePrimary ? () => handleEditDescription(selectedSingleService) : undefined}
+                          transition="all 0.2s"
+                        >
+                          {selectedSingleService.description ? (
+                            <Box
+                              dangerouslySetInnerHTML={{
+                                __html: renderMarkdown(selectedSingleService.description)
+                              }}
+                              sx={{
+                                '& h1, & h2, & h3': {
+                                  color: titleColor,
+                                },
+                                '& p': {
+                                  margin: '0.5rem 0',
+                                },
+                                '& li': {
+                                  color: textColor,
+                                },
+                                '& strong': {
+                                  fontWeight: '600',
+                                },
+                                '& em': {
+                                  fontStyle: 'italic',
+                                }
+                              }}
+                            />
+                          ) : (
+                            <Text color={mutedTextColor} fontStyle="italic">
+                              {canManagePrimary ? 'Click here to add a description...' : 'No description available'}
+                            </Text>
+                          )}
+                        </Box>
                       )}
                     </Box>
-                  )}
-                </Box>
-              )}
 
-              {/* Tab Navigation - only show for single service mode */}
-              {drawerMode === 'single' && selectedSingleService && (
-                <Box borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')} mt={6}>
-                  <HStack spacing={0} px={6}>
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      px={4}
-                      py={3}
-                      borderRadius={0}
-                      borderBottom="2px"
-                      borderColor={activeDrawerTab === 'songs' ? 'blue.500' : 'transparent'}
-                      color={activeDrawerTab === 'songs' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
-                      fontWeight={activeDrawerTab === 'songs' ? '600' : '400'}
-                      _hover={{ 
-                        bg: useColorModeValue('gray.50', 'gray.700'),
-                        color: activeDrawerTab === 'songs' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
-                      }}
-                      onClick={() => setActiveDrawerTab('songs')}
-                    >
-                      <HStack spacing={2}>
-                        <Text>Songs</Text>
-                        <Badge 
-                          colorScheme="blue" 
-                          variant="solid" 
-                          borderRadius="full"
-                          fontSize="xs"
-                          px={2}
-                          py={1}
+                    {/* Tab Navigation */}
+                    <Box borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')} mt={6}>
+                      <HStack spacing={0} px={6}>
+                        <Button
+                          variant="ghost"
+                          size="md"
+                          px={4}
+                          py={3}
+                          borderRadius={0}
+                          borderBottom="2px"
+                          borderColor={activeDrawerTab === 'songs' ? 'blue.500' : 'transparent'}
+                          color={activeDrawerTab === 'songs' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
+                          fontWeight={activeDrawerTab === 'songs' ? '600' : '400'}
+                          _hover={{ 
+                            bg: useColorModeValue('gray.50', 'gray.700'),
+                            color: activeDrawerTab === 'songs' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
+                          }}
+                          onClick={() => setActiveDrawerTab('songs')}
                         >
-                          {selectedSingleService ? (serviceIdToSongs[selectedSingleService.id] || []).length : 0}
-                        </Badge>
-                      </HStack>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      px={4}
-                      py={3}
-                      borderRadius={0}
-                      borderBottom="2px"
-                      borderColor={activeDrawerTab === 'volunteers' ? 'blue.500' : 'transparent'}
-                      color={activeDrawerTab === 'volunteers' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
-                      fontWeight={activeDrawerTab === 'volunteers' ? '600' : '400'}
-                      _hover={{ 
-                        bg: useColorModeValue('gray.50', 'gray.700'),
-                        color: activeDrawerTab === 'volunteers' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
-                      }}
-                      onClick={() => setActiveDrawerTab('volunteers')}
-                    >
-                      <HStack spacing={2}>
-                        <Text>Volunteers</Text>
-                        <Badge 
-                          colorScheme="blue" 
-                          variant="solid" 
-                          borderRadius="full"
-                          fontSize="xs"
-                          px={2}
-                          py={1}
+                          <HStack spacing={2}>
+                            <Text>Songs</Text>
+                            <Badge 
+                              colorScheme="blue" 
+                              variant="solid" 
+                              borderRadius="full"
+                              fontSize="xs"
+                              px={2}
+                              py={1}
+                            >
+                              {selectedSingleService ? (serviceIdToSongs[selectedSingleService.id] || []).length : 0}
+                            </Badge>
+                          </HStack>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="md"
+                          px={4}
+                          py={3}
+                          borderRadius={0}
+                          borderBottom="2px"
+                          borderColor={activeDrawerTab === 'volunteers' ? 'blue.500' : 'transparent'}
+                          color={activeDrawerTab === 'volunteers' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
+                          fontWeight={activeDrawerTab === 'volunteers' ? '600' : '400'}
+                          _hover={{ 
+                            bg: useColorModeValue('gray.50', 'gray.700'),
+                            color: activeDrawerTab === 'volunteers' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
+                          }}
+                          onClick={() => setActiveDrawerTab('volunteers')}
                         >
-                          {selectedSingleService ? (serviceIdToVolunteers[selectedSingleService.id] || []).length : 0}
-                        </Badge>
+                          <HStack spacing={2}>
+                            <Text>Volunteers</Text>
+                            <Badge 
+                              colorScheme="blue" 
+                              variant="solid" 
+                              borderRadius="full"
+                              fontSize="xs"
+                              px={2}
+                              py={1}
+                            >
+                              {selectedSingleService ? (serviceIdToVolunteers[selectedSingleService.id] || []).length : 0}
+                            </Badge>
+                          </HStack>
+                        </Button>
                       </HStack>
-                    </Button>
-                  </HStack>
-                </Box>
-              )}
-              
-              <DrawerBody pt={6}>
-                {drawerMode === 'single' && selectedSingleService ? (
-                  // Tab content only - description is now above tabs
-                  renderSingleServiceContent(selectedSingleService)
+                    </Box>
+
+                    {/* Tab Content */}
+                    <Box p={6}>
+                      {renderSingleServiceContent(selectedSingleService)}
+                    </Box>
+                  </VStack>
                 ) : selectedDate && !isAddingServiceMode && (
-                  <Box mb={4}>
+                  <Box p={6} mb={4}>
                     {loadingDayServices ? (
                       <HStack>
                         <Spinner size="sm" />
@@ -2968,16 +3013,16 @@ Please arrive **15 minutes early** for sound check.
                                       const formattedDate = selectedDate ? formatServiceDate(svc.service_time) : ''
                                       
                                       return (
-                                        <HStack spacing={3} align="center">
-                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                            {formattedDate}
-                                          </Text>
-                                          <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
-                                            {svc.title}
-                                          </Badge>
-                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                            {timePart}
-                                          </Text>
+                                          <HStack spacing={3} align="center">
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {formattedDate}
+                                            </Text>
+                                            <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
+                                              {svc.title}
+                                            </Badge>
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {timePart}
+                                            </Text>
                                         </HStack>
                                       )
                                     })()}
@@ -3429,16 +3474,16 @@ Please arrive **15 minutes early** for sound check.
                                       const formattedDate = selectedDate ? formatServiceDate(svc.service_time) : ''
                                       
                                       return (
-                                        <HStack spacing={3} align="center">
-                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                            {formattedDate}
-                                          </Text>
-                                          <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
-                                            {svc.title}
-                                          </Badge>
-                                          <Text fontSize="sm" fontWeight="500" color="gray.600">
-                                            {timePart}
-                                          </Text>
+                                          <HStack spacing={3} align="center">
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {formattedDate}
+                                            </Text>
+                                            <Badge bg="black" color="white" px={2} py={1} borderRadius="4px" fontSize="xs" fontWeight="600">
+                                              {svc.title}
+                                            </Badge>
+                                            <Text fontSize="sm" fontWeight="500" color="gray.600">
+                                              {timePart}
+                                            </Text>
                                         </HStack>
                                       )
                                     })()}
@@ -3913,14 +3958,36 @@ Please arrive **15 minutes early** for sound check.
                   </form>
                 )}
               </DrawerBody>
+              
+              {/* Scroll Indicator - Mobile Only */}
+              {showScrollIndicator && (
+                <Box
+                  position="absolute"
+                  bottom="20px"
+                  left="50%"
+                  transform="translateX(-50%)"
+                  zIndex={10}
+                  display={{ base: 'flex', md: 'none' }}
+                  alignItems="center"
+                  justifyContent="center"
+                  bg={useColorModeValue('white', 'gray.800')}
+                  borderRadius="full"
+                  boxShadow="lg"
+                  border="1px"
+                  borderColor={useColorModeValue('gray.200', 'gray.600')}
+                  p={2}
+                >
+                  <ChevronDownIcon 
+                    color={useColorModeValue('gray.500', 'gray.400')}
+                    boxSize="5"
+                    animation={`${chevronPulse} 1.5s ease-in-out infinite`}
+                  />
+                </Box>
+              )}
+              
               {drawerMode === 'single' ? (
-                <DrawerFooter>
-                  <HStack w="100%" justify="flex-end">
-                    <Button colorScheme="blue" onClick={createDrawer.onClose}>
-                      Close
-                    </Button>
-                  </HStack>
-                </DrawerFooter>
+                // Footer hidden for single service mode - X icon serves as close action
+                null
               ) : (isAddingServiceMode || !selectedDate || dayServices.length === 0) ? (
                 <DrawerFooter>
                   <HStack w="100%" justify="flex-end">
@@ -3938,18 +4005,8 @@ Please arrive **15 minutes early** for sound check.
                   </HStack>
                 </DrawerFooter>
               ) : (
-                <DrawerFooter>
-                  <HStack w="100%" justify="space-between">
-                    {canManagePrimary && (
-                      <Button display={{ base: 'none', md: 'inline-flex' }} variant="outline" onClick={() => setIsAddingServiceMode(true)}>
-                        Add Service
-                      </Button>
-                    )}
-                    <Button display={{ base: 'none', md: 'inline-flex' }} colorScheme="blue" onClick={createDrawer.onClose}>
-                      Close
-                    </Button>
-                  </HStack>
-                </DrawerFooter>
+                // Footer hidden for day view - X icon serves as close action, "Add Service" can be accessed via + button
+                null
               )}
             </DrawerContent>
           </Drawer>
@@ -3968,10 +4025,9 @@ Please arrive **15 minutes early** for sound check.
                     variant="solid"
                     colorScheme="gray"
                     size="md"
-                    borderRadius="md"
+                    borderRadius="full"
                     display={{ base: 'inline-flex', md: 'none' }}
                     onClick={addSongDrawer.onClose}
-                    h="auto"
                   />
                 </HStack>
               </DrawerHeader>
@@ -4185,8 +4241,8 @@ Please arrive **15 minutes early** for sound check.
                                   <Text fontSize="sm" color={mutedTextColor}>
                                     {song.artist}
                                   </Text>
-                                </VStack>
-                              </Box>
+        </VStack>
+      </Box>
                             ))}
                           </div>
                         )
