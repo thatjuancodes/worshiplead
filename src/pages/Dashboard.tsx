@@ -170,6 +170,14 @@ export function Dashboard() {
   // Drawer mode state
   const [drawerMode, setDrawerMode] = useState<'day' | 'single'>('day')
   const [selectedSingleService, setSelectedSingleService] = useState<WorshipService | null>(null)
+  
+  // Tab state for drawer
+  const [activeDrawerTab, setActiveDrawerTab] = useState<'songs' | 'volunteers'>('songs')
+  
+  // Description editing state
+  const [isEditingDescription, setIsEditingDescription] = useState(false)
+  const [editingDescription, setEditingDescription] = useState('')
+  const [savingDescription, setSavingDescription] = useState(false)
 
   // Song selection modal state
   const songSelectionModal = useDisclosure()
@@ -437,18 +445,21 @@ export function Dashboard() {
 
   // Function to render single service content (no accordion)
   function renderSingleServiceContent(service: WorshipService) {
+    // Show different content based on active tab
+    if (activeDrawerTab === 'songs') {
+      return renderSongsTab(service)
+    } else {
+      return renderVolunteersTab(service)
+    }
+  }
+
+  // Function to render the Songs tab content
+  function renderSongsTab(service: WorshipService) {
     return (
       <VStack align="stretch" spacing={4}>
-        {/* Service Description (if exists) */}
-        {service.description && (
-          <Box>
-            <Text color={mutedTextColor} whiteSpace="pre-wrap" fontSize="md">{service.description}</Text>
-          </Box>
-        )}
-
         {/* Songs Section */}
         <Box>
-          <HStack justify="space-between" align="center" mb={2}>
+          <HStack justify="space-between" align="center" mb={2} mt={4}>
             <Text fontWeight="700" fontSize="lg">Songs</Text>
             {canManagePrimary && (
               <Button
@@ -488,10 +499,17 @@ export function Dashboard() {
             </DndContext>
           )}
         </Box>
+      </VStack>
+    )
+  }
 
+  // Function to render the Volunteers tab content
+  function renderVolunteersTab(service: WorshipService) {
+    return (
+      <VStack align="stretch" spacing={4}>
         {/* Volunteers Section */}
         <Box>
-          <HStack justify="space-between" align="center" mb={2}>
+          <HStack justify="space-between" align="center" mb={2} mt={4}>
             <Text fontWeight="700" fontSize="lg">Volunteers</Text>
             {canManagePrimary && (
               <Button
@@ -504,7 +522,6 @@ export function Dashboard() {
               </Button>
             )}
           </HStack>
-
 
           {(serviceIdToVolunteers[service.id] || []).length === 0 ? (
             <Text color={mutedTextColor}>No volunteers assigned yet</Text>
@@ -574,7 +591,6 @@ export function Dashboard() {
             </VStack>
           )}
         </Box>
-
       </VStack>
     )
   }
@@ -1092,6 +1108,90 @@ export function Dashboard() {
       processPendingInstrumentChanges(volunteerId)
     }, 2000)
   }, [processPendingInstrumentChanges])
+
+  const handleEditDescription = (service: WorshipService) => {
+    console.log('Editing description for service:', service.id, 'Current description:', service.description)
+    setEditingDescription(service.description || '')
+    setIsEditingDescription(true)
+  }
+
+  const handleSaveDescription = async () => {
+    if (!selectedSingleService || !organization) return
+    
+    console.log('Saving description:', editingDescription, 'for service:', selectedSingleService.id)
+    
+    try {
+      setSavingDescription(true)
+      
+      const { error } = await supabase
+        .from('worship_services')
+        .update({ description: editingDescription })
+        .eq('id', selectedSingleService.id)
+      
+      if (error) {
+        console.error('Error updating service description:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to update service description',
+          status: 'error',
+          duration: 3000,
+          isClosable: true
+        })
+        return
+      }
+      
+      // Update the local state for selected service
+      setSelectedSingleService(prev => prev ? { ...prev, description: editingDescription } : null)
+      
+      // Also update the services array to maintain consistency
+      setServices(prev => prev.map(service => 
+        service.id === selectedSingleService.id 
+          ? { ...service, description: editingDescription }
+          : service
+      ))
+      
+      setIsEditingDescription(false)
+      
+      toast({
+        title: 'Success',
+        description: 'Service description updated',
+        status: 'success',
+        duration: 3000,
+        isClosable: true
+      })
+    } catch (error) {
+      console.error('Error updating service description:', error)
+    } finally {
+      setSavingDescription(false)
+    }
+  }
+
+  const handleCancelEditDescription = () => {
+    setIsEditingDescription(false)
+    setEditingDescription('')
+  }
+
+  // Simple markdown renderer for basic formatting
+  const renderMarkdown = (text: string) => {
+    if (!text) return ''
+    
+    return text
+      // Headers
+      .replace(/^### (.*$)/gim, '<h3 style="font-size: 1.125rem; font-weight: 600; margin: 0.5rem 0;">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 style="font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0;">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 style="font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0;">$1</h1>')
+      // Bold
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.*?)__/g, '<strong>$1</strong>')
+      // Italic
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/_(.*?)_/g, '<em>$1</em>')
+      // Line breaks
+      .replace(/\n/g, '<br>')
+      // Lists (basic)
+      .replace(/^\* (.*$)/gim, '<li style="margin-left: 1rem;">$1</li>')
+      .replace(/^- (.*$)/gim, '<li style="margin-left: 1rem;">$1</li>')
+  }
 
   const handleRemoveVolunteer = useCallback(async (volunteerId: string, serviceId: string) => {
     try {
@@ -1697,7 +1797,7 @@ export function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('worship_services')
-        .select('id, service_time, title, status')
+        .select('id, service_time, title, status, description, created_at, updated_at')
         .eq('organization_id', organization.organization_id)
 
       if (error) {
@@ -1751,6 +1851,14 @@ export function Dashboard() {
       loadVolunteersForServices([selectedSingleService.id])
     }
   }, [drawerMode, selectedSingleService, organization, loadSongsForServices, loadVolunteersForServices])
+
+  // Debug: Log selected service data
+  useEffect(() => {
+    if (selectedSingleService) {
+      console.log('Selected service:', selectedSingleService)
+      console.log('Service description:', selectedSingleService.description)
+    }
+  }, [selectedSingleService])
 
   // Cleanup debounce timeout on unmount
   useEffect(() => {
@@ -2606,9 +2714,169 @@ export function Dashboard() {
                   />
                 </HStack>
               </DrawerHeader>
-              <DrawerBody>
+              
+              {/* Service Description Section - above tab navigation */}
+              {drawerMode === 'single' && selectedSingleService && (
+                <Box px={6} py={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
+                  <HStack justify="space-between" align="center" mb={2}>
+                    <Text fontWeight="700" fontSize="lg" color={titleColor}>
+                      Description
+                    </Text>
+                    {canManagePrimary && !isEditingDescription && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        colorScheme="blue"
+                        onClick={() => handleEditDescription(selectedSingleService)}
+                        leftIcon={<EditIcon />}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </HStack>
+                  
+                  {isEditingDescription ? (
+                    <VStack align="stretch" spacing={3}>
+                      <Textarea
+                        value={editingDescription}
+                        onChange={(e) => setEditingDescription(e.target.value)}
+                        placeholder="Enter service description using markdown formatting:
+
+# Main Title
+## Section Heading
+### Subsection
+
+**Bold text** or __bold text__
+*Italic text* or _italic text_
+
+- Bullet list item
+- Another item
+
+Example:
+# Welcome to Sunday Service
+Please arrive **15 minutes early** for sound check.
+
+## What to bring:
+- Your music sheets
+- Water bottle
+- Positive attitude!"
+                        rows={6}
+                        resize="vertical"
+                      />
+                      <HStack spacing={2}>
+                        <Button
+                          size="sm"
+                          colorScheme="blue"
+                          onClick={handleSaveDescription}
+                          isLoading={savingDescription}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleCancelEditDescription}
+                        >
+                          Cancel
+                        </Button>
+                      </HStack>
+                    </VStack>
+                  ) : (
+                    <Box
+                      p={3}
+                      bg={useColorModeValue('gray.50', 'gray.700')}
+                      borderRadius="md"
+                      minH="60px"
+                      border="1px"
+                      borderColor={useColorModeValue('gray.200', 'gray.600')}
+                      cursor={canManagePrimary ? "pointer" : "default"}
+                      _hover={canManagePrimary ? {
+                        borderColor: useColorModeValue('blue.300', 'blue.500'),
+                        bg: useColorModeValue('blue.50', 'gray.600')
+                      } : {}}
+                      onClick={canManagePrimary ? () => handleEditDescription(selectedSingleService) : undefined}
+                      transition="all 0.2s"
+                    >
+                      {selectedSingleService.description ? (
+                        <Box
+                          dangerouslySetInnerHTML={{
+                            __html: renderMarkdown(selectedSingleService.description)
+                          }}
+                          sx={{
+                            '& h1, & h2, & h3': {
+                              color: titleColor,
+                            },
+                            '& p': {
+                              margin: '0.5rem 0',
+                            },
+                            '& li': {
+                              color: textColor,
+                            },
+                            '& strong': {
+                              fontWeight: '600',
+                            },
+                            '& em': {
+                              fontStyle: 'italic',
+                            }
+                          }}
+                        />
+                      ) : (
+                        <Text color={mutedTextColor} fontStyle="italic">
+                          {canManagePrimary ? 'Click here to add a description...' : 'No description available'}
+                        </Text>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Tab Navigation - only show for single service mode */}
+              {drawerMode === 'single' && selectedSingleService && (
+                <Box borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
+                  <HStack spacing={0} px={6}>
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      px={4}
+                      py={3}
+                      borderRadius={0}
+                      borderBottom="2px"
+                      borderColor={activeDrawerTab === 'songs' ? 'blue.500' : 'transparent'}
+                      color={activeDrawerTab === 'songs' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
+                      fontWeight={activeDrawerTab === 'songs' ? '600' : '400'}
+                      _hover={{ 
+                        bg: useColorModeValue('gray.50', 'gray.700'),
+                        color: activeDrawerTab === 'songs' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
+                      }}
+                      onClick={() => setActiveDrawerTab('songs')}
+                    >
+                      Songs
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      px={4}
+                      py={3}
+                      borderRadius={0}
+                      borderBottom="2px"
+                      borderColor={activeDrawerTab === 'volunteers' ? 'blue.500' : 'transparent'}
+                      color={activeDrawerTab === 'volunteers' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
+                      fontWeight={activeDrawerTab === 'volunteers' ? '600' : '400'}
+                      _hover={{ 
+                        bg: useColorModeValue('gray.50', 'gray.700'),
+                        color: activeDrawerTab === 'volunteers' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
+                      }}
+                      onClick={() => setActiveDrawerTab('volunteers')}
+                    >
+                      Volunteers
+                    </Button>
+                  </HStack>
+                </Box>
+              )}
+              
+              <DrawerBody pt={6}>
                 {drawerMode === 'single' && selectedSingleService ? (
-                  // Single service view - no accordion, direct content
+                  // Tab content only - description is now above tabs
                   renderSingleServiceContent(selectedSingleService)
                 ) : selectedDate && !isAddingServiceMode && (
                   <Box mb={4}>
