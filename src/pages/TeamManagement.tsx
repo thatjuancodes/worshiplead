@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
@@ -50,7 +50,10 @@ import {
   ModalCloseButton,
   Alert,
   AlertIcon,
+  InputGroup,
+  InputLeftElement,
 } from '@chakra-ui/react'
+import { ChevronUpIcon, ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 
 interface OrganizationData {
@@ -140,6 +143,17 @@ export function TeamManagement() {
   const [removeConfirmationEmail, setRemoveConfirmationEmail] = useState('')
   const [isRemovingMember, setIsRemovingMember] = useState(false)
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
+  // Sorting state
+  const [sortField, setSortField] = useState<'name' | 'email' | 'role' | 'joined_at'>('name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  // Filtering state
+  const [searchFilter, setSearchFilter] = useState('')
+
   // Drawer states
   const { isOpen: isInviteDrawerOpen, onOpen: onInviteDrawerOpen, onClose: onInviteDrawerClose } = useDisclosure()
   const { isOpen: isRoleDrawerOpen, onOpen: onRoleDrawerOpen, onClose: onRoleDrawerClose } = useDisclosure()
@@ -155,6 +169,86 @@ export function TeamManagement() {
   const tableHeaderBg = useColorModeValue('gray.50', 'gray.700')
   const tableHoverBg = useColorModeValue('gray.50', 'gray.700')
   const isOwner = organization?.role === 'owner'
+
+  // Data processing functions
+  const handleSort = (field: 'name' | 'email' | 'role' | 'joined_at') => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setCurrentPage(1) // Reset to first page when sorting
+  }
+
+  const getSortIcon = (field: 'name' | 'email' | 'role' | 'joined_at') => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />
+  }
+
+  // Process members data: filter, sort, and paginate
+  const processedMembers = React.useMemo(() => {
+    let filtered = [...members]
+
+    // Apply search filter
+    if (searchFilter.trim()) {
+      const searchTerm = searchFilter.toLowerCase().trim()
+      filtered = filtered.filter(member => {
+        const firstName = member.profiles?.first_name?.toLowerCase() || ''
+        const lastName = member.profiles?.last_name?.toLowerCase() || ''
+        const email = member.profiles?.email?.toLowerCase() || ''
+        const fullName = `${firstName} ${lastName}`.trim()
+        
+        return fullName.includes(searchTerm) || email.includes(searchTerm)
+      })
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: string | number
+      let bValue: string | number
+
+      switch (sortField) {
+        case 'name':
+          // Sort by last name, then first name
+          aValue = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim().toLowerCase()
+          bValue = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim().toLowerCase()
+          break
+        case 'email':
+          aValue = a.profiles?.email?.toLowerCase() || ''
+          bValue = b.profiles?.email?.toLowerCase() || ''
+          break
+        case 'role':
+          aValue = a.role
+          bValue = b.role
+          break
+        case 'joined_at':
+          aValue = new Date(a.joined_at).getTime()
+          bValue = new Date(b.joined_at).getTime()
+          break
+        default:
+          aValue = ''
+          bValue = ''
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return filtered
+  }, [members, searchFilter, sortField, sortDirection])
+
+  // Calculate pagination
+  const totalPages = Math.ceil(processedMembers.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentPageMembers = processedMembers.slice(startIndex, endIndex)
+
+  // Reset to first page when filter changes
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [searchFilter])
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -1037,7 +1131,7 @@ export function TeamManagement() {
         {/* Tabs */}
         <Tabs>
           <TabList>
-            <Tab>Team Members ({members.length})</Tab>
+            <Tab>Team Members ({processedMembers.length}{searchFilter ? ` of ${members.length}` : ''})</Tab>
             <Tab>Roles ({instruments.length})</Tab>
             <Tab>Invitations ({invites.length + joinRequests.length})</Tab>
           </TabList>
@@ -1045,47 +1139,83 @@ export function TeamManagement() {
           <TabPanels>
             {/* Team Members Tab */}
             <TabPanel px={0}>
+              {/* Search Filter */}
+              <Box mb={4}>
+                <InputGroup maxW="400px">
+                  <InputLeftElement pointerEvents="none">
+                    <SearchIcon color="gray.300" />
+                  </InputLeftElement>
+                  <Input
+                    placeholder="Search members by name or email..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    size="md"
+                  />
+                </InputGroup>
+              </Box>
               {loading ? (
-                <Box
-                  bg={cardBg}
-                  borderRadius="lg"
-                  boxShadow="sm"
-                  border="1px"
-                  borderColor={cardBorderColor}
-                  overflow="hidden"
-                >
-                  <Box overflowX="auto">
-                    <Table variant="simple" minW="600px">
-                      <Thead>
-                        <Tr>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Role</Th>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Joined</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {[...Array(5)].map((_, index) => (
-                          <Tr key={index}>
-                            <Td minW="200px">
-                              <Skeleton height="20px" />
-                            </Td>
-                            <Td minW="200px">
-                              <Skeleton height="20px" />
-                            </Td>
-                            <Td minW="100px">
-                              <Skeleton height="20px" borderRadius="md" />
-                            </Td>
-                            <Td minW="120px">
-                              <Skeleton height="20px" />
-                            </Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
+                <>
+                  {/* Search Skeleton */}
+                  <Box mb={4}>
+                    <Skeleton height="40px" maxW="400px" />
                   </Box>
-                </Box>
-              ) : members.length === 0 ? (
+                  
+                  <Box
+                    bg={cardBg}
+                    borderRadius="lg"
+                    boxShadow="sm"
+                    border="1px"
+                    borderColor={cardBorderColor}
+                    overflow="hidden"
+                  >
+                    <Box overflowX="auto">
+                      <Table variant="simple" minW="700px">
+                        <Thead>
+                          <Tr>
+                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
+                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
+                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Role</Th>
+                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Joined</Th>
+                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
+                          </Tr>
+                        </Thead>
+                        <Tbody>
+                          {[...Array(10)].map((_, index) => (
+                            <Tr key={index}>
+                              <Td minW="200px">
+                                <Skeleton height="20px" />
+                              </Td>
+                              <Td minW="200px">
+                                <Skeleton height="20px" />
+                              </Td>
+                              <Td minW="100px">
+                                <Skeleton height="20px" borderRadius="md" />
+                              </Td>
+                              <Td minW="120px">
+                                <Skeleton height="20px" />
+                              </Td>
+                              <Td minW="100px">
+                                <Skeleton height="24px" width="60px" borderRadius="md" />
+                              </Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                    </Box>
+                  </Box>
+                  
+                  {/* Pagination Skeleton */}
+                  <Box mt={4} display="flex" justifyContent="center">
+                    <HStack spacing={2}>
+                      <Skeleton height="32px" width="80px" />
+                      <Skeleton height="32px" width="32px" />
+                      <Skeleton height="32px" width="32px" />
+                      <Skeleton height="32px" width="32px" />
+                      <Skeleton height="32px" width="60px" />
+                    </HStack>
+                  </Box>
+                </>
+              ) : processedMembers.length === 0 ? (
                 <Box
                   bg={cardBg}
                   p={12}
@@ -1096,7 +1226,7 @@ export function TeamManagement() {
                   textAlign="center"
                 >
                   <Text color={mutedTextColor} fontSize="md">
-                    No team members found
+                    {searchFilter ? 'No members match your search criteria' : 'No team members found'}
                   </Text>
                 </Box>
               ) : (
@@ -1112,15 +1242,71 @@ export function TeamManagement() {
                     <Table variant="simple" minW="700px">
                       <Thead>
                         <Tr>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Role</Th>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Joined</Th>
+                          <Th 
+                            bg={tableHeaderBg} 
+                            color={textColor} 
+                            fontSize="sm" 
+                            fontWeight="600" 
+                            minW="200px"
+                            cursor="pointer"
+                            onClick={() => handleSort('name')}
+                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                          >
+                            <HStack spacing={2}>
+                              <Text>Name</Text>
+                              {getSortIcon('name')}
+                            </HStack>
+                          </Th>
+                          <Th 
+                            bg={tableHeaderBg} 
+                            color={textColor} 
+                            fontSize="sm" 
+                            fontWeight="600" 
+                            minW="200px"
+                            cursor="pointer"
+                            onClick={() => handleSort('email')}
+                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                          >
+                            <HStack spacing={2}>
+                              <Text>Email</Text>
+                              {getSortIcon('email')}
+                            </HStack>
+                          </Th>
+                          <Th 
+                            bg={tableHeaderBg} 
+                            color={textColor} 
+                            fontSize="sm" 
+                            fontWeight="600" 
+                            minW="100px"
+                            cursor="pointer"
+                            onClick={() => handleSort('role')}
+                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                          >
+                            <HStack spacing={2}>
+                              <Text>Role</Text>
+                              {getSortIcon('role')}
+                            </HStack>
+                          </Th>
+                          <Th 
+                            bg={tableHeaderBg} 
+                            color={textColor} 
+                            fontSize="sm" 
+                            fontWeight="600" 
+                            minW="120px"
+                            cursor="pointer"
+                            onClick={() => handleSort('joined_at')}
+                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                          >
+                            <HStack spacing={2}>
+                              <Text>Joined</Text>
+                              {getSortIcon('joined_at')}
+                            </HStack>
+                          </Th>
                           <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
-                        {members.map(member => (
+                        {currentPageMembers.map(member => (
                           <Tr key={member.id} _hover={{ bg: tableHoverBg }}>
                             <Td fontWeight="500" color={titleColor} minW="200px">
                               {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
@@ -1180,6 +1366,72 @@ export function TeamManagement() {
                       </Tbody>
                     </Table>
                   </Box>
+                </Box>
+              )}
+
+              {/* Pagination Controls */}
+              {processedMembers.length > itemsPerPage && (
+                <Box mt={4} display="flex" justifyContent="center" alignItems="center">
+                  <HStack spacing={2}>
+                    {/* Previous Button */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      isDisabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+
+                    {/* Page Numbers */}
+                    {[...Array(totalPages)].map((_, index) => {
+                      const pageNumber = index + 1
+                      const isCurrentPage = pageNumber === currentPage
+                      
+                      // Show first page, last page, current page, and pages around current
+                      const showPage = pageNumber === 1 || 
+                                     pageNumber === totalPages || 
+                                     Math.abs(pageNumber - currentPage) <= 1
+
+                      if (!showPage) {
+                        // Show ellipsis for gaps
+                        if (pageNumber === 2 && currentPage > 4) {
+                          return <Text key={pageNumber} color={mutedTextColor}>...</Text>
+                        }
+                        if (pageNumber === totalPages - 1 && currentPage < totalPages - 3) {
+                          return <Text key={pageNumber} color={mutedTextColor}>...</Text>
+                        }
+                        return null
+                      }
+
+                      return (
+                        <Button
+                          key={pageNumber}
+                          size="sm"
+                          variant={isCurrentPage ? "solid" : "outline"}
+                          colorScheme={isCurrentPage ? "blue" : "gray"}
+                          onClick={() => setCurrentPage(pageNumber)}
+                        >
+                          {pageNumber}
+                        </Button>
+                      )
+                    })}
+
+                    {/* Next Button */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      isDisabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </HStack>
+                  
+                  {/* Page Info */}
+                  <Text ml={4} fontSize="sm" color={mutedTextColor}>
+                    Page {currentPage} of {totalPages} ({processedMembers.length} total)
+                  </Text>
                 </Box>
               )}
             </TabPanel>
