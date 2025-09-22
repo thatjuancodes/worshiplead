@@ -460,7 +460,7 @@ export function Dashboard() {
         {/* Songs Section */}
         <Box>
           <HStack justify="space-between" align="center" mb={2} mt={4}>
-            <Text fontWeight="700" fontSize="lg">Songs</Text>
+            <Text fontWeight="700" fontSize="xl">Songs</Text>
             {canManagePrimary && (
               <Button
                 size="sm"
@@ -510,7 +510,7 @@ export function Dashboard() {
         {/* Volunteers Section */}
         <Box>
           <HStack justify="space-between" align="center" mb={2} mt={4}>
-            <Text fontWeight="700" fontSize="lg">Volunteers</Text>
+            <Text fontWeight="700" fontSize="xl">Volunteers</Text>
             {canManagePrimary && (
               <Button
                 size="sm"
@@ -2692,15 +2692,45 @@ export function Dashboard() {
               <DrawerCloseButton display={{ base: 'none', md: 'inline-flex' }} />
               <DrawerHeader>
                 <HStack justify="space-between" align="center">
-                  <Text m={0} fontWeight="800" fontSize={{ base: 'xl', md: 'lg' }}>
-                    {drawerMode === 'single' && selectedSingleService
-                      ? `${selectedSingleService.title} - ${formatServiceDate(selectedSingleService.service_time)} - ${getServiceTimeDisplay(selectedSingleService.service_time)}`
-                      : selectedDate && dayServices.length > 0
-                      ? `${new Date(selectedDate).toLocaleDateString('en-US', {
-                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                        })}`
-                      : 'Schedule New Service'}
-                  </Text>
+                  {drawerMode === 'single' && selectedSingleService ? (
+                    <Box>
+                      {/* Mobile: 2 lines, Desktop: 1 line */}
+                      <Text 
+                        m={0} 
+                        fontWeight="800" 
+                        fontSize={{ base: '4xl', md: '2xl' }}
+                        display={{ base: 'block', md: 'none' }}
+                      >
+                        {formatServiceDate(selectedSingleService.service_time)}
+                      </Text>
+                      <Text 
+                        m={0} 
+                        fontWeight="800" 
+                        fontSize={{ base: '4xl', md: '2xl' }}
+                        display={{ base: 'block', md: 'none' }}
+                      >
+                        {getServiceTimeDisplay(selectedSingleService.service_time)} - {selectedSingleService.title}
+                      </Text>
+                      
+                      {/* Desktop: Single line */}
+                      <Text 
+                        m={0} 
+                        fontWeight="800" 
+                        fontSize={{ base: '4xl', md: '2xl' }}
+                        display={{ base: 'none', md: 'block' }}
+                      >
+                        {selectedSingleService.title} - {formatServiceDate(selectedSingleService.service_time)} - {getServiceTimeDisplay(selectedSingleService.service_time)}
+                      </Text>
+                    </Box>
+                  ) : (
+                    <Text m={0} fontWeight="800" fontSize={{ base: '4xl', md: '2xl' }}>
+                      {selectedDate && dayServices.length > 0
+                        ? `${new Date(selectedDate).toLocaleDateString('en-US', {
+                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                          })}`
+                        : 'Schedule New Service'}
+                    </Text>
+                  )}
                   <IconButton
                     aria-label="Close drawer"
                     icon={<CloseIcon boxSize="4" />}
@@ -2719,7 +2749,7 @@ export function Dashboard() {
               {drawerMode === 'single' && selectedSingleService && (
                 <Box px={6} py={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
                   <HStack justify="space-between" align="center" mb={2}>
-                    <Text fontWeight="700" fontSize="lg" color={titleColor}>
+                    <Text fontWeight="700" fontSize="xl" color={titleColor}>
                       Description
                     </Text>
                     {canManagePrimary && !isEditingDescription && (
@@ -2832,7 +2862,7 @@ Please arrive **15 minutes early** for sound check.
 
               {/* Tab Navigation - only show for single service mode */}
               {drawerMode === 'single' && selectedSingleService && (
-                <Box borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
+                <Box borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')} mt={6}>
                   <HStack spacing={0} px={6}>
                     <Button
                       variant="ghost"
@@ -2850,7 +2880,19 @@ Please arrive **15 minutes early** for sound check.
                       }}
                       onClick={() => setActiveDrawerTab('songs')}
                     >
-                      Songs
+                      <HStack spacing={2}>
+                        <Text>Songs</Text>
+                        <Badge 
+                          colorScheme="blue" 
+                          variant="solid" 
+                          borderRadius="full"
+                          fontSize="xs"
+                          px={2}
+                          py={1}
+                        >
+                          {selectedSingleService ? (serviceIdToSongs[selectedSingleService.id] || []).length : 0}
+                        </Badge>
+                      </HStack>
                     </Button>
                     <Button
                       variant="ghost"
@@ -2868,7 +2910,19 @@ Please arrive **15 minutes early** for sound check.
                       }}
                       onClick={() => setActiveDrawerTab('volunteers')}
                     >
-                      Volunteers
+                      <HStack spacing={2}>
+                        <Text>Volunteers</Text>
+                        <Badge 
+                          colorScheme="blue" 
+                          variant="solid" 
+                          borderRadius="full"
+                          fontSize="xs"
+                          px={2}
+                          py={1}
+                        >
+                          {selectedSingleService ? (serviceIdToVolunteers[selectedSingleService.id] || []).length : 0}
+                        </Badge>
+                      </HStack>
                     </Button>
                   </HStack>
                 </Box>
