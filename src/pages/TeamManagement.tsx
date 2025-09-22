@@ -41,6 +41,15 @@ import {
   Badge,
   Flex,
   Select,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react'
 import type { User } from '@supabase/supabase-js'
 
@@ -126,9 +135,15 @@ export function TeamManagement() {
   // Role management state
   const [roleChangingMemberId, setRoleChangingMemberId] = useState<string | null>(null)
 
+  // Remove member state
+  const [memberToRemove, setMemberToRemove] = useState<OrganizationMember | null>(null)
+  const [removeConfirmationEmail, setRemoveConfirmationEmail] = useState('')
+  const [isRemovingMember, setIsRemovingMember] = useState(false)
+
   // Drawer states
   const { isOpen: isInviteDrawerOpen, onOpen: onInviteDrawerOpen, onClose: onInviteDrawerClose } = useDisclosure()
   const { isOpen: isRoleDrawerOpen, onOpen: onRoleDrawerOpen, onClose: onRoleDrawerClose } = useDisclosure()
+  const { isOpen: isRemoveMemberModalOpen, onOpen: onRemoveMemberModalOpen, onClose: onRemoveMemberModalClose } = useDisclosure()
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -419,6 +434,118 @@ export function TeamManagement() {
       })
     } finally {
       setRoleChangingMemberId(null)
+    }
+  }
+
+  const handleRemoveMember = async (member: OrganizationMember) => {
+    if (!organization || !user) return
+
+    // Check permissions - only owners can remove members
+    if (!isOwner) {
+      toast({
+        title: 'Access Denied',
+        description: 'Only organization owners can remove members',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    // Can't remove yourself
+    if (user.id === member.user_id) {
+      toast({
+        title: 'Error',
+        description: 'You cannot remove yourself from the organization',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    // Can't remove the last owner
+    if (member.role === 'owner') {
+      const ownerCount = members.filter(m => m.role === 'owner').length
+      if (ownerCount <= 1) {
+        toast({
+          title: 'Error',
+          description: 'Cannot remove the last owner. At least one owner is required.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+    }
+
+    setMemberToRemove(member)
+    setRemoveConfirmationEmail('')
+    onRemoveMemberModalOpen()
+  }
+
+  const confirmRemoveMember = async () => {
+    if (!memberToRemove || !organization) return
+
+    // Validate email confirmation
+    if (removeConfirmationEmail.trim().toLowerCase() !== memberToRemove.profiles?.email?.toLowerCase()) {
+      toast({
+        title: 'Email Mismatch',
+        description: 'The email address does not match. Please type the exact email address.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    setIsRemovingMember(true)
+
+    try {
+      const { error } = await supabase
+        .from('organization_memberships')
+        .delete()
+        .eq('id', memberToRemove.id)
+        .eq('organization_id', organization.organization_id)
+
+      if (error) {
+        console.error('Error removing member:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to remove member. Please try again.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        })
+        return
+      }
+
+      toast({
+        title: 'Success',
+        description: `${memberToRemove.profiles?.first_name} ${memberToRemove.profiles?.last_name} has been removed from the organization.`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+
+      // Close modal and reset state
+      onRemoveMemberModalClose()
+      setMemberToRemove(null)
+      setRemoveConfirmationEmail('')
+      
+      // Reload members
+      await loadMembers()
+    } catch (error) {
+      console.error('Error removing member:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to remove member. Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setIsRemovingMember(false)
     }
   }
 
@@ -982,13 +1109,14 @@ export function TeamManagement() {
                   overflow="hidden"
                 >
                   <Box overflowX="auto">
-                    <Table variant="simple" minW="600px">
+                    <Table variant="simple" minW="700px">
                       <Thead>
                         <Tr>
                           <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
                           <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
                           <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Role</Th>
                           <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Joined</Th>
+                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
                         </Tr>
                       </Thead>
                       <Tbody>
@@ -1034,6 +1162,18 @@ export function TeamManagement() {
                             </Td>
                             <Td minW="120px">
                               {new Date(member.joined_at).toLocaleDateString()}
+                            </Td>
+                            <Td minW="100px">
+                              {isOwner && user && user.id !== member.user_id && (
+                                <Button
+                                  size="xs"
+                                  colorScheme="red"
+                                  variant="outline"
+                                  onClick={() => handleRemoveMember(member)}
+                                >
+                                  Remove
+                                </Button>
+                              )}
                             </Td>
                           </Tr>
                         ))}
@@ -1571,6 +1711,90 @@ export function TeamManagement() {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
+
+      {/* Remove Member Confirmation Modal */}
+      <Modal 
+        isOpen={isRemoveMemberModalOpen} 
+        onClose={() => {
+          onRemoveMemberModalClose()
+          setMemberToRemove(null)
+          setRemoveConfirmationEmail('')
+        }}
+        size="md"
+      >
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            <Text color={titleColor} fontWeight="600">
+              Remove Team Member
+            </Text>
+          </ModalHeader>
+          <ModalCloseButton />
+          
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              <Alert status="warning">
+                <AlertIcon />
+                <Box>
+                  <Text fontWeight="bold">This action cannot be undone!</Text>
+                  <Text fontSize="sm">
+                    You are about to remove{' '}
+                    <Text as="span" fontWeight="bold">
+                      {memberToRemove?.profiles?.first_name} {memberToRemove?.profiles?.last_name}
+                    </Text>{' '}
+                    from your organization.
+                  </Text>
+                </Box>
+              </Alert>
+
+              <FormControl isRequired>
+                <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                  To confirm, type the member's email address:
+                </FormLabel>
+                <Text fontSize="sm" color={mutedTextColor} mb={2}>
+                  {memberToRemove?.profiles?.email}
+                </Text>
+                <Input
+                  value={removeConfirmationEmail}
+                  onChange={(e) => setRemoveConfirmationEmail(e.target.value)}
+                  placeholder="Type the email address to confirm"
+                  size="md"
+                  autoFocus
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+
+          <ModalFooter>
+            <HStack spacing={3}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onRemoveMemberModalClose()
+                  setMemberToRemove(null)
+                  setRemoveConfirmationEmail('')
+                }}
+                size="md"
+              >
+                Cancel
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={confirmRemoveMember}
+                isLoading={isRemovingMember}
+                loadingText="Removing..."
+                isDisabled={
+                  !removeConfirmationEmail.trim() || 
+                  removeConfirmationEmail.trim().toLowerCase() !== memberToRemove?.profiles?.email?.toLowerCase()
+                }
+                size="md"
+              >
+                Remove Member
+              </Button>
+            </HStack>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   )
 } 
