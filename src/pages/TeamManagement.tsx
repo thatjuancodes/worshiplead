@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
+import { getCurrentUser } from '../lib/auth'
 import { DashboardHeader } from '../components'
 import { supabase } from '../lib/supabase'
-import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { 
   Box, 
   VStack, 
@@ -124,8 +123,8 @@ interface CreateMemberForm {
 export function TeamManagement() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const toast = useToast()
-  const { canManagePrimary } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
@@ -186,6 +185,7 @@ export function TeamManagement() {
   const tableHeaderBg = useColorModeValue('gray.50', 'gray.700')
   const tableHoverBg = useColorModeValue('gray.50', 'gray.700')
   const isOwner = organization?.role === 'owner'
+  const canManageOrganization = organization ? ['owner', 'admin'].includes(organization.role) : false
 
   const resetCreateMemberForm = () => {
     setCreateMemberForm({
@@ -286,8 +286,51 @@ export function TeamManagement() {
       }
       setUser(currentUser)
 
-      const userOrg = await getUserPrimaryOrganization(currentUser.id)
-      console.log('User organization data:', userOrg) // Debug log
+      const requestedOrganizationId = searchParams.get('organizationId')?.trim()
+      let userOrg: OrganizationData | null = null
+
+      if (requestedOrganizationId) {
+        const { data, error } = await supabase
+          .from('organization_memberships')
+          .select(`
+            organization_id,
+            role,
+            organizations (name, slug)
+          `)
+          .eq('user_id', currentUser.id)
+          .eq('organization_id', requestedOrganizationId)
+          .eq('status', 'active')
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading requested organization:', error)
+        }
+
+        userOrg = (data as OrganizationData | null) || null
+      }
+
+      if (!userOrg) {
+        const { data, error } = await supabase
+          .from('organization_memberships')
+          .select(`
+            organization_id,
+            role,
+            organizations (name, slug)
+          `)
+          .eq('user_id', currentUser.id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading fallback organization:', error)
+        }
+
+        userOrg = (data as OrganizationData | null) || null
+      }
+
+      console.log('User organization data:', userOrg)
       
       if (!userOrg) {
         navigate('/organization-setup')
@@ -305,7 +348,7 @@ export function TeamManagement() {
       console.error('Error checking user and organization:', error)
       navigate('/login')
     }
-  }, [navigate])
+  }, [navigate, searchParams])
 
   const loadInvites = useCallback(async (organizationId?: string) => {
     const orgId = organizationId || organization?.organization_id
@@ -752,7 +795,7 @@ export function TeamManagement() {
     e.preventDefault()
     if (!organization) return
     
-    if (!canManagePrimary) {
+    if (!canManageOrganization) {
       toast({
         title: 'Access Denied',
         description: 'You do not have permission to manage roles. Only admins and owners can manage roles.',
@@ -864,7 +907,7 @@ export function TeamManagement() {
     if (!organization) return
     if (!confirm('Delete this role?')) return
 
-    if (!canManagePrimary) {
+    if (!canManageOrganization) {
       toast({
         title: 'Access Denied',
         description: 'You do not have permission to delete roles. Only admins and owners can delete roles.',
@@ -918,7 +961,7 @@ export function TeamManagement() {
     e.preventDefault()
     if (!organization || !inviteEmail.trim()) return
 
-    if (!canManagePrimary) {
+    if (!canManageOrganization) {
       toast({
         title: 'Access Denied',
         description: 'You do not have permission to invite users. Only admins and owners can invite users.',
@@ -1036,7 +1079,7 @@ export function TeamManagement() {
 
     if (!organization) return
 
-    if (!canManagePrimary) {
+    if (!canManageOrganization) {
       toast({
         title: 'Access Denied',
         description: 'You do not have permission to create members. Only admins and owners can create members.',
@@ -1089,9 +1132,16 @@ export function TeamManagement() {
     setCreatingMember(true)
 
     try {
+      const organizationName = organization?.organizations
+        ? (Array.isArray(organization.organizations)
+          ? organization.organizations[0]?.name
+          : organization.organizations.name) || 'Your Organization'
+        : 'Your Organization'
+
       const { data, error } = await supabase.functions.invoke('create-team-member', {
         body: {
           organizationId: organization.organization_id,
+          organizationName,
           firstName,
           lastName,
           email,
@@ -1107,13 +1157,27 @@ export function TeamManagement() {
         throw new Error(data.error)
       }
 
-      toast({
-        title: 'Member Created',
-        description: `${firstName} ${lastName} can now sign in with the credentials you provided.`,
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      })
+      if (data?.emailSent === false) {
+        toast({
+          title: 'Member Created',
+          description: data?.createdNewUser
+            ? `${firstName} ${lastName} was created, but the credential email was not sent. ${data?.emailError || ''}`.trim()
+            : `${firstName} ${lastName} was added to the team, but the notification email was not sent. ${data?.emailError || ''}`.trim(),
+          status: 'warning',
+          duration: 7000,
+          isClosable: true,
+        })
+      } else {
+        toast({
+          title: 'Member Created',
+          description: data?.createdNewUser
+            ? `${firstName} ${lastName} can now sign in. Their credentials were emailed automatically.`
+            : `${firstName} ${lastName} was added to the team and notified by email.`,
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        })
+      }
 
       resetCreateMemberForm()
       onCreateMemberDrawerClose()
@@ -1135,7 +1199,7 @@ export function TeamManagement() {
   const handleCancelInvite = async (inviteId: string) => {
     if (!confirm('Are you sure you want to cancel this invitation?')) return
 
-    if (!canManagePrimary) {
+    if (!canManageOrganization) {
       toast({
         title: 'Access Denied',
         description: 'You do not have permission to cancel invitations. Only admins and owners can cancel invitations.',
@@ -1227,7 +1291,7 @@ export function TeamManagement() {
               </Heading>
             </Box>
 
-            {canManagePrimary && (
+            {canManageOrganization && (
               <HStack spacing={3} flexWrap="wrap" justify={{ base: 'stretch', md: 'flex-end' }}>
                 <Button
                   colorScheme="green"
@@ -1251,7 +1315,7 @@ export function TeamManagement() {
         </Box>
 
         {/* Permission Info Alert */}
-        {!canManagePrimary && (
+        {!canManageOrganization && (
           <Box
             bg={useColorModeValue('blue.50', 'blue.900')}
             p={4}
@@ -1595,7 +1659,7 @@ export function TeamManagement() {
                     Manage Roles
                   </Heading>
 
-                  {canManagePrimary && (
+                  {canManageOrganization && (
                     <Button
                       colorScheme="green"
                       onClick={onRoleDrawerOpen}
@@ -1691,7 +1755,7 @@ export function TeamManagement() {
                             </Td>
                             <Td minW="100px">
                               <HStack spacing={2}>
-                                {canManagePrimary && (
+                                {canManageOrganization && (
                                   <>
                                     <Button
                                       size="xs"
@@ -1840,7 +1904,7 @@ export function TeamManagement() {
                                     >
                                       Copy Link
                                     </Button>
-                                    {canManagePrimary && (
+                                    {canManageOrganization && (
                                       <Button
                                         size="xs"
                                         colorScheme="red"

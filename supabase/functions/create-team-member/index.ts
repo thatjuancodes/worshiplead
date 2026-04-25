@@ -15,6 +15,182 @@ const jsonHeaders = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function buildCredentialsEmail({
+  createdNewUser,
+  email,
+  password,
+  firstName,
+  organizationName,
+  loginUrl,
+}: {
+  createdNewUser: boolean
+  email: string
+  password: string
+  firstName: string
+  organizationName: string
+  loginUrl: string
+}) {
+  const safeFirstName = escapeHtml(firstName || 'there')
+  const safeOrganizationName = escapeHtml(organizationName)
+  const safeLoginUrl = escapeHtml(loginUrl)
+  const safeEmail = escapeHtml(email)
+  const safePassword = escapeHtml(password)
+
+  if (createdNewUser) {
+    return {
+      subject: `Your Spirit Lead account for ${organizationName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+          <p>Hello ${safeFirstName},</p>
+          <p>Your Spirit Lead account for <strong>${safeOrganizationName}</strong> has been created.</p>
+          <p>Use these credentials to sign in:</p>
+          <ul>
+            <li><strong>Email:</strong> ${safeEmail}</li>
+            <li><strong>Temporary password:</strong> ${safePassword}</li>
+          </ul>
+          <p>
+            <a href="${safeLoginUrl}" style="display: inline-block; padding: 12px 18px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px;">
+              Log in to Spirit Lead
+            </a>
+          </p>
+          <p>After signing in, you should change your password.</p>
+        </div>
+      `,
+      text: `Hello ${firstName || 'there'},
+
+Your Spirit Lead account for ${organizationName} has been created.
+
+Email: ${email}
+Temporary password: ${password}
+
+Log in here: ${loginUrl}
+
+After signing in, you should change your password.`,
+    }
+  }
+
+  return {
+    subject: `You've been added to ${organizationName} on Spirit Lead`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+        <p>Hello ${safeFirstName},</p>
+        <p>You were added to <strong>${safeOrganizationName}</strong> on Spirit Lead.</p>
+        <p>Your account already existed, and your sign-in password has been updated by an administrator.</p>
+        <ul>
+          <li><strong>Email:</strong> ${safeEmail}</li>
+          <li><strong>Temporary password:</strong> ${safePassword}</li>
+        </ul>
+        <p>
+          <a href="${safeLoginUrl}" style="display: inline-block; padding: 12px 18px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px;">
+            Log in to Spirit Lead
+          </a>
+        </p>
+        <p>After signing in, you should change your password.</p>
+      </div>
+    `,
+    text: `Hello ${firstName || 'there'},
+
+You were added to ${organizationName} on Spirit Lead.
+
+Your account already existed, and your sign-in password has been updated by an administrator.
+
+Email: ${email}
+Temporary password: ${password}
+
+Log in here: ${loginUrl}
+
+After signing in, you should change your password.`,
+  }
+}
+
+async function sendCredentialsEmail({
+  to,
+  subject,
+  html,
+  text,
+}: {
+  to: string
+  subject: string
+  html: string
+  text: string
+}) {
+  const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY')
+  const sendGridFromEmail = Deno.env.get('SENDGRID_FROM_EMAIL')
+  const sendGridFromName = Deno.env.get('SENDGRID_FROM_NAME')
+  const sendGridReplyTo = Deno.env.get('SENDGRID_REPLY_TO')
+
+  if (!sendGridApiKey || !sendGridFromEmail) {
+    return {
+      sent: false,
+      error: 'Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL secret',
+    }
+  }
+
+  const payload: Record<string, unknown> = {
+    personalizations: [
+      {
+        to: [{ email: to }],
+        subject,
+      },
+    ],
+    from: sendGridFromName
+      ? {
+          email: sendGridFromEmail,
+          name: sendGridFromName,
+        }
+      : {
+          email: sendGridFromEmail,
+        },
+    content: [
+      {
+        type: 'text/plain',
+        value: text,
+      },
+      {
+        type: 'text/html',
+        value: html,
+      },
+    ],
+  }
+
+  if (sendGridReplyTo) {
+    payload.reply_to = {
+      email: sendGridReplyTo,
+    }
+  }
+
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sendGridApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (response.status !== 202) {
+    const errorText = await response.text()
+    return {
+      sent: false,
+      error: `SendGrid send failed: ${response.status} ${errorText}`,
+    }
+  }
+
+  return {
+    sent: true,
+    error: null,
+  }
+}
+
 async function findAuthUserByEmail(supabase: ReturnType<typeof createClient>, email: string) {
   let page = 1
   const perPage = 200
@@ -97,6 +273,9 @@ serve(async (req) => {
     const body = await req.json()
 
     const organizationId = typeof body.organizationId === 'string' ? body.organizationId.trim() : ''
+    const organizationName = typeof body.organizationName === 'string' && body.organizationName.trim()
+      ? body.organizationName.trim()
+      : 'your organization'
     const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : ''
     const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : ''
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
@@ -166,6 +345,27 @@ serve(async (req) => {
           }
 
           targetUserId = existingAuthUser.id
+
+          const { error: updateExistingUserError } = await supabase.auth.admin.updateUserById(
+            targetUserId,
+            {
+              password,
+              email_confirm: true,
+              user_metadata: {
+                ...(existingAuthUser.user_metadata || {}),
+                first_name: firstName,
+                last_name: lastName,
+              },
+            }
+          )
+
+          if (updateExistingUserError) {
+            console.error('Error updating existing auth user:', updateExistingUserError)
+            return new Response(JSON.stringify({ error: 'Failed to update existing auth user' }), {
+              status: 500,
+              headers: jsonHeaders,
+            })
+          }
         } else {
           console.error('Error creating auth user:', createUserError)
           return new Response(JSON.stringify({ error: 'Failed to create auth user' }), {
@@ -232,10 +432,27 @@ serve(async (req) => {
         throw new Error('Failed to add user to the organization')
       }
 
+      const siteUrl = (Deno.env.get('SITE_URL') || 'https://spiritlead.church').replace(/\/$/, '')
+      const loginUrl = `${siteUrl}/login`
+      const emailContent = buildCredentialsEmail({
+        createdNewUser,
+        email,
+        password,
+        firstName,
+        organizationName,
+        loginUrl,
+      })
+      const emailResult = await sendCredentialsEmail({
+        to: email,
+        ...emailContent,
+      })
+
       return new Response(JSON.stringify({
         success: true,
         userId: targetUserId,
         createdNewUser,
+        emailSent: emailResult.sent,
+        emailError: emailResult.error,
       }), {
         status: 200,
         headers: jsonHeaders,

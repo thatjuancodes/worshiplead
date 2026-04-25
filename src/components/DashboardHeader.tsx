@@ -157,8 +157,16 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
     }
   }
 
+  const buildPathWithOrganization = useCallback((path: string) => {
+    if (path === '/team' && organization?.organization_id) {
+      return `/team?organizationId=${encodeURIComponent(organization.organization_id)}`
+    }
+
+    return path
+  }, [organization])
+
   const handleNavigation = (path: string) => {
-    navigate(path)
+    navigate(buildPathWithOrganization(path))
     onClose()
   }
 
@@ -287,7 +295,7 @@ export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
                     </MenuItem>
                     {canManagePrimary && (
                       <MenuItem
-                        onClick={() => navigate('/team')}
+                        onClick={() => navigate(buildPathWithOrganization('/team'))}
                         _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
                       >
                         {translate('header.teamManagement', 'Team Management')}
