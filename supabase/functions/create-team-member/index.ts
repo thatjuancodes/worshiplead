@@ -15,6 +15,35 @@ const jsonHeaders = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+async function findAuthUserByEmail(supabase: ReturnType<typeof createClient>, email: string) {
+  let page = 1
+  const perPage = 200
+
+  while (true) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    const users = data?.users ?? []
+    const matchedUser = users.find(user => user.email?.toLowerCase() === email)
+
+    if (matchedUser) {
+      return matchedUser
+    }
+
+    if (users.length < perPage) {
+      return null
+    }
+
+    page += 1
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { status: 200, headers: corsHeaders })
@@ -109,7 +138,8 @@ serve(async (req) => {
       })
     }
 
-    let createdUserId: string | null = null
+    let targetUserId: string | null = null
+    let createdNewUser = false
 
     try {
       const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
@@ -124,27 +154,34 @@ serve(async (req) => {
 
       if (createUserError || !createdUser.user) {
         if (createUserError?.message?.toLowerCase().includes('already')) {
-          return new Response(JSON.stringify({
-            error: 'A user with this email already exists. Add them through an invitation or use a different email address.',
-          }), {
-            status: 409,
+          const existingAuthUser = await findAuthUserByEmail(supabase, email)
+
+          if (!existingAuthUser) {
+            return new Response(JSON.stringify({
+              error: 'A user with this email already exists, but no matching auth record could be loaded.',
+            }), {
+              status: 409,
+              headers: jsonHeaders,
+            })
+          }
+
+          targetUserId = existingAuthUser.id
+        } else {
+          console.error('Error creating auth user:', createUserError)
+          return new Response(JSON.stringify({ error: 'Failed to create auth user' }), {
+            status: 500,
             headers: jsonHeaders,
           })
         }
-
-        console.error('Error creating auth user:', createUserError)
-        return new Response(JSON.stringify({ error: 'Failed to create auth user' }), {
-          status: 500,
-          headers: jsonHeaders,
-        })
+      } else {
+        targetUserId = createdUser.user.id
+        createdNewUser = true
       }
-
-      createdUserId = createdUser.user.id
 
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
-          id: createdUserId,
+          id: targetUserId,
           email,
           first_name: firstName,
           last_name: lastName,
@@ -161,7 +198,7 @@ serve(async (req) => {
         .from('organization_memberships')
         .select('id')
         .eq('organization_id', organizationId)
-        .eq('user_id', createdUserId)
+        .eq('user_id', targetUserId)
         .eq('status', 'active')
         .maybeSingle()
 
@@ -171,14 +208,19 @@ serve(async (req) => {
       }
 
       if (existingOrgMembership) {
-        throw new Error('This user is already a member of the organization')
+        return new Response(JSON.stringify({
+          error: 'This user is already a member of the organization',
+        }), {
+          status: 409,
+          headers: jsonHeaders,
+        })
       }
 
       const { error: createMembershipError } = await supabase
         .from('organization_memberships')
         .insert({
           organization_id: organizationId,
-          user_id: createdUserId,
+          user_id: targetUserId,
           role: 'member',
           status: 'active',
           invited_by: caller.id,
@@ -192,14 +234,15 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         success: true,
-        userId: createdUserId,
+        userId: targetUserId,
+        createdNewUser,
       }), {
         status: 200,
         headers: jsonHeaders,
       })
     } catch (error) {
-      if (createdUserId) {
-        const { error: cleanupError } = await supabase.auth.admin.deleteUser(createdUserId)
+      if (createdNewUser && targetUserId) {
+        const { error: cleanupError } = await supabase.auth.admin.deleteUser(targetUserId)
         if (cleanupError) {
           console.error('Error cleaning up created user:', cleanupError)
         }
