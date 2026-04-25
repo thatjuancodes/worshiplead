@@ -2067,18 +2067,11 @@ export function Dashboard() {
                               {(() => {
                                 const serviceDate = new Date(service.service_time)
                                 const dateStr = formatServiceDate(service.service_time)
-                                
-                                // Get ordinal for the Sunday of the month
-                                const firstDayOfMonth = new Date(serviceDate.getFullYear(), serviceDate.getMonth(), 1)
-                                const firstSunday = new Date(firstDayOfMonth)
-                                while (firstSunday.getDay() !== 0) {
-                                  firstSunday.setDate(firstSunday.getDate() + 1)
-                                }
-                                
-                                const weekNumber = Math.ceil((serviceDate.getDate() - firstSunday.getDate() + 1) / 7)
+
+                                const weekday = serviceDate.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+                                const occurrenceOfWeekdayInMonth = Math.floor((serviceDate.getDate() - 1) / 7) + 1
                                 const ordinals = ['', '1st', '2nd', '3rd', '4th', '5th']
-                                const ordinal = ordinals[weekNumber] || `${weekNumber}th`
-                                
+                                const ordinal = ordinals[occurrenceOfWeekdayInMonth] || `${occurrenceOfWeekdayInMonth}th`
                                 const timePart = getServiceTimeDisplay(service.service_time).toLowerCase().replace(' ', '')
                                 
                                 
@@ -2099,7 +2092,7 @@ export function Dashboard() {
                                         }
                                       }}
                                     >
-                                      {/* Date | Ordinal SUN | Time */}
+                                      {/* Date | Ordinal Weekday | Time */}
                                       <HStack spacing={3} align="center" flex="1">
                                         <Box minW="90px">
                                           <Text fontWeight="600" color={textColor} fontSize="sm" textAlign="left">
@@ -2111,7 +2104,7 @@ export function Dashboard() {
                                         </Text>
                                         <Box minW="65px">
                                           <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
-                                            {ordinal} SUN
+                                            {ordinal} {weekday}
                                           </Text>
                                         </Box>
                                         <Text color={mutedTextColor} fontSize="sm">
@@ -2218,7 +2211,7 @@ export function Dashboard() {
                                         </Text>
                                         <Box minW="65px">
                                           <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
-                                            {ordinal} SUN
+                                            {ordinal} {weekday}
                                           </Text>
                                         </Box>
                                         <Text color={mutedTextColor} fontSize="sm">
@@ -2321,7 +2314,7 @@ export function Dashboard() {
                                         </Text>
                                         <Box minW="55px">
                                           <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
-                                            {ordinal} SUN
+                                            {ordinal} {weekday}
                                           </Text>
                                         </Box>
                                         <Text color={mutedTextColor} fontSize="sm">
