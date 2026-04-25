@@ -113,6 +113,14 @@ interface Instrument {
   updated_at?: string
 }
 
+interface CreateMemberForm {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  confirmPassword: string
+}
+
 export function TeamManagement() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -125,6 +133,14 @@ export function TeamManagement() {
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [createMemberForm, setCreateMemberForm] = useState<CreateMemberForm>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  })
+  const [creatingMember, setCreatingMember] = useState(false)
 
   // Instruments state
   const [instruments, setInstruments] = useState<Instrument[]>([])
@@ -155,6 +171,7 @@ export function TeamManagement() {
   const [searchFilter, setSearchFilter] = useState('')
 
   // Drawer states
+  const { isOpen: isCreateMemberDrawerOpen, onOpen: onCreateMemberDrawerOpen, onClose: onCreateMemberDrawerClose } = useDisclosure()
   const { isOpen: isInviteDrawerOpen, onOpen: onInviteDrawerOpen, onClose: onInviteDrawerClose } = useDisclosure()
   const { isOpen: isRoleDrawerOpen, onOpen: onRoleDrawerOpen, onClose: onRoleDrawerClose } = useDisclosure()
   const { isOpen: isRemoveMemberModalOpen, onOpen: onRemoveMemberModalOpen, onClose: onRemoveMemberModalClose } = useDisclosure()
@@ -169,6 +186,16 @@ export function TeamManagement() {
   const tableHeaderBg = useColorModeValue('gray.50', 'gray.700')
   const tableHoverBg = useColorModeValue('gray.50', 'gray.700')
   const isOwner = organization?.role === 'owner'
+
+  const resetCreateMemberForm = () => {
+    setCreateMemberForm({
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    })
+  }
 
   // Data processing functions
   const handleSort = (field: 'name' | 'email' | 'role' | 'joined_at') => {
@@ -1004,6 +1031,107 @@ export function TeamManagement() {
     }
   }
 
+  const handleCreateMember = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!organization) return
+
+    if (!canManagePrimary) {
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to create members. Only admins and owners can create members.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+      return
+    }
+
+    const firstName = createMemberForm.firstName.trim()
+    const lastName = createMemberForm.lastName.trim()
+    const email = createMemberForm.email.trim().toLowerCase()
+    const password = createMemberForm.password
+    const confirmPassword = createMemberForm.confirmPassword
+
+    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please complete all required fields.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: 'Password Mismatch',
+        description: 'Passwords do not match.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    if (password.length < 8) {
+      toast({
+        title: 'Weak Password',
+        description: 'Temporary password must be at least 8 characters long.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    setCreatingMember(true)
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-team-member', {
+        body: {
+          organizationId: organization.organization_id,
+          firstName,
+          lastName,
+          email,
+          password
+        }
+      })
+
+      if (error) {
+        throw error
+      }
+
+      if (data?.error) {
+        throw new Error(data.error)
+      }
+
+      toast({
+        title: 'Member Created',
+        description: `${firstName} ${lastName} can now sign in with the credentials you provided.`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      })
+
+      resetCreateMemberForm()
+      onCreateMemberDrawerClose()
+      await loadMembers()
+    } catch (error) {
+      console.error('Error creating member:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create member. Please try again.',
+        status: 'error',
+        duration: 4000,
+        isClosable: true,
+      })
+    } finally {
+      setCreatingMember(false)
+    }
+  }
+
   const handleCancelInvite = async (inviteId: string) => {
     if (!confirm('Are you sure you want to cancel this invitation?')) return
 
@@ -1100,14 +1228,24 @@ export function TeamManagement() {
             </Box>
 
             {canManagePrimary && (
-              <Button
-                colorScheme="blue"
-                onClick={onInviteDrawerOpen}
-                size="md"
-                isDisabled={loading}
-              >
-                + Invite Member
-              </Button>
+              <HStack spacing={3} flexWrap="wrap" justify={{ base: 'stretch', md: 'flex-end' }}>
+                <Button
+                  colorScheme="green"
+                  onClick={onCreateMemberDrawerOpen}
+                  size="md"
+                  isDisabled={loading}
+                >
+                  + Create Member
+                </Button>
+                <Button
+                  colorScheme="blue"
+                  onClick={onInviteDrawerOpen}
+                  size="md"
+                  isDisabled={loading}
+                >
+                  + Invite Member
+                </Button>
+              </HStack>
             )}
           </Flex>
         </Box>
@@ -1835,6 +1973,124 @@ export function TeamManagement() {
           </TabPanels>
         </Tabs>
       </Box>
+
+      {/* Create Member Drawer */}
+      <Drawer
+        isOpen={isCreateMemberDrawerOpen}
+        placement="right"
+        onClose={() => {
+          onCreateMemberDrawerClose()
+          resetCreateMemberForm()
+        }}
+        size={{ base: 'full', md: 'md' }}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+            <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
+              Create Team Member
+            </Heading>
+          </DrawerHeader>
+
+          <DrawerBody bg={bgColor} p={6}>
+            <Box as="form" onSubmit={handleCreateMember}>
+              <VStack spacing={6} align="stretch">
+                <Alert status="info" borderRadius="md">
+                  <AlertIcon />
+                  <Text fontSize="sm">
+                    This creates a live account, profile, and team membership immediately. New users are added as members by default.
+                  </Text>
+                </Alert>
+
+                <HStack spacing={4} align="start">
+                  <FormControl isRequired>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">First Name</FormLabel>
+                    <Input
+                      value={createMemberForm.firstName}
+                      onChange={(e) => setCreateMemberForm(v => ({ ...v, firstName: e.target.value }))}
+                      placeholder="First name"
+                      size="md"
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">Last Name</FormLabel>
+                    <Input
+                      value={createMemberForm.lastName}
+                      onChange={(e) => setCreateMemberForm(v => ({ ...v, lastName: e.target.value }))}
+                      placeholder="Last name"
+                      size="md"
+                    />
+                  </FormControl>
+                </HStack>
+
+                <FormControl isRequired>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Email Address</FormLabel>
+                  <Input
+                    type="email"
+                    value={createMemberForm.email}
+                    onChange={(e) => setCreateMemberForm(v => ({ ...v, email: e.target.value }))}
+                    placeholder="name@example.com"
+                    size="md"
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Temporary Password</FormLabel>
+                  <Input
+                    type="password"
+                    value={createMemberForm.password}
+                    onChange={(e) => setCreateMemberForm(v => ({ ...v, password: e.target.value }))}
+                    placeholder="At least 8 characters"
+                    size="md"
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">Confirm Password</FormLabel>
+                  <Input
+                    type="password"
+                    value={createMemberForm.confirmPassword}
+                    onChange={(e) => setCreateMemberForm(v => ({ ...v, confirmPassword: e.target.value }))}
+                    placeholder="Re-enter password"
+                    size="md"
+                  />
+                </FormControl>
+
+                <Flex gap={4} justify="flex-end" pt={4}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onCreateMemberDrawerClose()
+                      resetCreateMemberForm()
+                    }}
+                    size="md"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    colorScheme="green"
+                    size="md"
+                    isLoading={creatingMember}
+                    loadingText="Creating..."
+                    isDisabled={
+                      !createMemberForm.firstName.trim() ||
+                      !createMemberForm.lastName.trim() ||
+                      !createMemberForm.email.trim() ||
+                      !createMemberForm.password ||
+                      !createMemberForm.confirmPassword
+                    }
+                  >
+                    Create Member
+                  </Button>
+                </Flex>
+              </VStack>
+            </Box>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
 
       {/* Invite Member Drawer */}
       <Drawer
