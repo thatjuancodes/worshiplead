@@ -757,7 +757,7 @@ export function Dashboard() {
           title: formTitle.trim(),
           service_time: new Date(formDateTime).toISOString(),
           description: formDescription.trim() || null,
-          status: 'draft',
+          status: 'published',
           created_by: user.id
         })
         .select()

@@ -95,7 +95,7 @@ export function ScheduleService() {
     title: '',
     service_time: '',
     description: '',
-    status: 'draft' as 'draft' | 'published' | 'completed'
+    status: 'published' as 'draft' | 'published' | 'completed'
   })
 
   // Color mode values
@@ -281,7 +281,7 @@ export function ScheduleService() {
         title: '',
         service_time: '',
         description: '',
-        status: 'draft'
+        status: 'published'
       })
       onAddDrawerClose()
       await loadServices(organization.organization_id)
@@ -348,7 +348,7 @@ export function ScheduleService() {
         title: '',
         service_time: '',
         description: '',
-        status: 'draft'
+        status: 'published'
       })
       onEditDrawerClose()
       setEditingService(null)
