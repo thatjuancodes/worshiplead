@@ -761,9 +761,9 @@ export function ServiceDetail() {
 
   if (loading) {
     return (
-      <Box minH="100vh" bg={bgColor}>
+      <Box className="sl-dashboard-page" minH="100vh" bg={bgColor}>
         <DashboardHeader user={user} organization={organization} />
-        <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+        <Box as="main" maxW="1200px" mx="auto" px={{ base: 6, md: 8 }} pt={{ base: 2, md: 3 }} pb={{ base: 6, md: 8 }}>
           <Center h="50vh">
             <VStack spacing={4}>
               <Spinner size="xl" color="blue.500" />
@@ -777,9 +777,9 @@ export function ServiceDetail() {
 
   if (!service) {
     return (
-      <Box minH="100vh" bg={bgColor}>
+      <Box className="sl-dashboard-page" minH="100vh" bg={bgColor}>
         <DashboardHeader user={user} organization={organization} />
-        <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+        <Box as="main" maxW="1200px" mx="auto" px={{ base: 6, md: 8 }} pt={{ base: 2, md: 3 }} pb={{ base: 6, md: 8 }}>
           <Center h="50vh">
             <VStack spacing={4}>
               <Text color={textColor}>Service not found</Text>
@@ -798,10 +798,10 @@ export function ServiceDetail() {
   }
 
   return (
-    <Box minH="100vh" bg={bgColor}>
+    <Box className="sl-dashboard-page" minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
+      <Box as="main" maxW="1200px" mx="auto" px={{ base: 6, md: 8 }} pt={{ base: 2, md: 3 }} pb={{ base: 6, md: 8 }}>
         {/* Back Button */}
         <Box mb={4}>
           <Button

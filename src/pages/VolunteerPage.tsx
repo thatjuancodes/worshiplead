@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Box,
   VStack,
-  HStack,
-  Heading,
   Text,
   Button,
   Spinner,
@@ -27,9 +25,8 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
-  Badge
 } from '@chakra-ui/react'
-import { CheckIcon, ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
+import { CalendarIcon, CheckIcon, ChevronDownIcon, SearchIcon, TimeIcon } from '@chakra-ui/icons'
 import { keyframes } from '@emotion/react'
 import { useTranslation } from 'react-i18next'
 import { useLanguage } from '../hooks/useLanguage'
@@ -89,6 +86,31 @@ interface Volunteer {
   instruments?: string[]
 }
 
+function formatDay(dateStr: string) {
+  return new Date(dateStr).getDate().toString()
+}
+
+function formatMonth(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
+}
+
+function daysUntil(dateStr: string) {
+  const serviceDate = new Date(dateStr)
+  const now = new Date()
+  const diffMs = serviceDate.getTime() - now.getTime()
+  const diffDays = Math.ceil(diffMs / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Tomorrow'
+  if (diffDays < 7) return `In ${diffDays} days`
+  return `In ${Math.ceil(diffDays / 7)} weeks`
+}
+
+function getVolunteerInitials(firstName?: string, lastName?: string, email?: string) {
+  const initials = `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.trim()
+  if (initials) return initials.toUpperCase()
+  return (email || 'U').slice(0, 2).toUpperCase()
+}
+
 export function VolunteerPage() {
   const { publicUrl } = useParams<{ publicUrl: string }>()
   const navigate = useNavigate()
@@ -112,6 +134,10 @@ export function VolunteerPage() {
   const [organizationLoaded, setOrganizationLoaded] = useState(cached?.loaded.organization || false)
   const [servicesLoaded, setServicesLoaded] = useState(cached?.loaded.services || false)
   const [assignmentsLoaded, setAssignmentsLoaded] = useState(cached?.loaded.assignments || false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week'>('all')
+  const [expandedService, setExpandedService] = useState<string | null>(null)
 
   // Instrument selection modal state
   const { isOpen: isInstrumentModalOpen, onOpen: onInstrumentModalOpen, onClose: onInstrumentModalClose } = useDisclosure()
@@ -122,17 +148,8 @@ export function VolunteerPage() {
   const [isReloading, setIsReloading] = useState(false)
 
   const bgColor = useColorModeValue('gray.50', 'gray.900')
-  const cardBg = useColorModeValue('white', 'gray.800')
-  const titleColor = useColorModeValue('gray.800', 'white')
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
   const textColor = useColorModeValue('gray.700', 'gray.200')
-  const greenBg = useColorModeValue('green.50', 'green.900')
-  const greenBorder = useColorModeValue('green.300', 'green.600')
-  const grayBorder = useColorModeValue('gray.200', 'gray.600')
-  const greenHover = useColorModeValue('green.400', 'green.500')
-  const blueHover = useColorModeValue('blue.300', 'blue.400')
-  const grayCheckBorder = useColorModeValue('gray.300', 'gray.600')
-  const grayBorderTop = useColorModeValue('gray.200', 'gray.700')
 
   const loadOrganization = useCallback(async () => {
     if (!publicUrl) return
@@ -745,24 +762,37 @@ export function VolunteerPage() {
     )
   }
 
+  const filteredServices = availableServices.filter((service) => {
+    const serviceLabel = `${service.title} ${formatServiceDate(service.service_time)} ${getServiceTimeDisplay(service.service_time)}`.toLowerCase()
+    const matchesSearch = serviceLabel.includes(searchQuery.toLowerCase())
+
+    if (!matchesSearch) return false
+
+    if (timeFilter === 'today') return daysUntil(service.service_time) === 'Today'
+    if (timeFilter === 'week') {
+      const diffMs = new Date(service.service_time).getTime() - new Date().getTime()
+      const diffDays = Math.ceil(diffMs / 86400000)
+      return diffDays >= 0 && diffDays <= 7
+    }
+
+    return true
+  })
+
   return (
     <Box minH="100vh" bg={bgColor}>
-      <Box as="main" maxW="800px" mx="auto" p={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
-        {/* Header */}
-        {user && (
-          <HStack justify="space-between" align="flex-start" mb={{ base: 6, md: 8 }} mt={{ base: 4, md: 8 }}>
-            <VStack spacing={2} align="flex-start" flex="1">
-              <Heading as="h1" size={{ base: "lg", md: "xl" }} color={titleColor} fontWeight="600" textAlign="left">
-                {t('volunteerPage.title', { organizationName: organization.name })}
-              </Heading>
-              <Text color={subtitleColor} fontSize={{ base: "md", md: "lg" }} textAlign="left">
-                {t('volunteerPage.subtitle')}
-              </Text>
-            </VStack>
-            
-            {/* Language Dropdown - Moved to header */}
+      <Box as="main" maxW="980px" mx="auto" px={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
+        <div className="space-y-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
+                Volunteer Signup
+              </h1>
+              <p className="mt-1 text-sm text-text-muted">
+                Sign up to serve at upcoming services for {organization.name}
+              </p>
+            </div>
             <Menu>
-              <MenuButton as={Button} variant="outline" size="sm" rightIcon={<ChevronDownIcon />}>
+              <MenuButton as={Button} className="btn-secondary" rightIcon={<ChevronDownIcon />} size="sm" variant="outline">
                 <Text fontSize="sm">{availableLanguages.find(lang => lang.code === currentLanguage)?.name || 'EN'}</Text>
               </MenuButton>
               <MenuList>
@@ -777,278 +807,309 @@ export function VolunteerPage() {
                 ))}
               </MenuList>
             </Menu>
-          </HStack>
-        )}
+          </div>
 
-        {/* Header for non-logged in users */}
-        {!user && (
-          <HStack justify="space-between" align="flex-start" mb={{ base: 6, md: 8 }} mt={{ base: 4, md: 8 }}>
-            <VStack spacing={2} align="flex-start" flex="1">
-              <Heading as="h1" size={{ base: "lg", md: "xl" }} color={titleColor} fontWeight="600" textAlign="left">
-                {t('volunteerPage.title', { organizationName: organization.name })}
-              </Heading>
-            </VStack>
-            
-            {/* Language Dropdown - For non-logged in users */}
-            <Menu>
-              <MenuButton as={Button} variant="outline" size="sm" rightIcon={<ChevronDownIcon />}>
-                <Text fontSize="sm">{availableLanguages.find(lang => lang.code === currentLanguage)?.name || 'EN'}</Text>
-              </MenuButton>
-              <MenuList>
-                {availableLanguages.map((language) => (
-                  <MenuItem
-                    key={language.code}
-                    onClick={() => changeLanguage(language.code)}
-                    bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
-                  >
-                    {language.name}
-                  </MenuItem>
-                ))}
-              </MenuList>
-            </Menu>
-          </HStack>
-        )}
-
-        {/* Login Section */}
-        {!user && (
-          <Box bg={cardBg} mb={6} p={{ base: 4, md: 6 }} borderRadius="lg">
-            <VStack spacing={4}>
-              <Text color={textColor} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
-                {t('volunteerPage.signInPrompt')}
-              </Text>
-              
-              <Button
-                onClick={handleGoogleSignIn}
-                isLoading={googleLoading}
-                loadingText={t('volunteerPage.signingIn')}
-                size={{ base: "md", md: "lg" }}
-                w="full"
-                colorScheme="blue"
-                leftIcon={
-                  <Box as="svg" viewBox="0 0 24 24" w={5} h={5}>
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    />
-                  </Box>
-                }
-              >
-                {t('volunteerPage.continueWithGoogle')}
-              </Button>
-            </VStack>
-          </Box>
-        )}
-
-        {/* Services Section */}
-        {user && (
-          <VStack spacing={6} align="stretch" pb={{ base: 24, md: 8 }}>
-            {loadingServices ? (
-              <Center py={8}>
-                <VStack spacing={3}>
-                  <Spinner size="lg" />
-                  <Text color={subtitleColor}>{t('volunteerPage.loadingServices')}</Text>
-                </VStack>
-              </Center>
-            ) : availableServices.length === 0 ? (
-              <Box bg={cardBg} p={{ base: 4, md: 6 }} borderRadius="lg">
-                <Text color={subtitleColor} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
-                  {t('volunteerPage.noServicesAvailable')}
-                </Text>
-              </Box>
-            ) : (
-              <VStack spacing={4} align="stretch">
-                {availableServices.map((service, index) => {
-                const isAssigned = userVolunteerAssignments.some(
-                  assignment => assignment.worship_service_id === service.id
-                )
-                const volunteers = serviceIdToVolunteers[service.id] || []
-                const isNextService = index < 2 // First 2 services are "Next Service"
-                
-                return (
-                  <Box
-                    key={service.id}
-                    bg={isAssigned ? greenBg : cardBg}
-                    border="2px"
-                    borderColor={isAssigned ? greenBorder : grayBorder}
-                    borderRadius="lg"
-                    py={{ base: 6, md: 7 }}
-                    px={{ base: 4, md: 5 }}
-                    cursor={assigningService === service.id || isReloading ? 'not-allowed' : 'pointer'}
-                    opacity={assigningService === service.id || isReloading ? 0.6 : 1}
-                    onClick={() => !assigningService && !isReloading && handleVolunteerClick(service.id, isAssigned)}
-                    _hover={assigningService !== service.id ? {
-                      transform: 'translateY(-2px)',
-                      boxShadow: 'lg',
-                      borderColor: isAssigned ? greenHover : blueHover
-                    } : {}}
-                    transition="all 0.2s ease-in-out"
-                    position="relative"
-                  >
-                    
-                    <VStack spacing={3} align="stretch" w="100%">
-                      <HStack justify="space-between" align="center" w="100%">
-                        <VStack spacing={2} align="flex-start" flex={1}>
-                          <HStack spacing={2} align="center">
-                            <Text color={titleColor} fontWeight="700" fontSize={{ base: "lg", md: "xl" }}>
-                              {formatServiceDate(service.service_time)} {getServiceTimeDisplay(service.service_time)} - {service.title}
-                            </Text>
-                            {isNextService && (
-                              <Badge
-                                colorScheme="orange"
-                                variant="solid"
-                                fontSize="xs"
-                                px={2}
-                                py={1}
-                                borderRadius="md"
-                                ml={3}
-                              >
-                                Next Service
-                              </Badge>
-                            )}
-                          </HStack>
-                        </VStack>
-                        
-                        {/* Check Circle */}
-                        <Box
-                          w="28px"
-                          h="28px"
-                          borderRadius="full"
-                          bg={isAssigned ? "green.500" : "transparent"}
-                          border={isAssigned ? "none" : "2px"}
-                          borderColor={grayCheckBorder}
-                          display="flex"
-                          alignItems="center"
-                          justifyContent="center"
-                          flexShrink={0}
-                        >
-                          {isAssigned && (
-                            <CheckIcon color="white" w={4} h={4} />
-                          )}
-                        </Box>
-                      </HStack>
-
-                      {/* Volunteer Badges */}
-                      {volunteers.length > 0 && (
-                        <HStack spacing={2} align="flex-start" flexWrap="wrap">
-                          {volunteers
-                            .sort((a, b) => {
-                              const aInstruments = a.instruments || []
-                              const bInstruments = b.instruments || []
-                              
-                              // Check if volunteer has Mic 1
-                              const aHasMic1 = aInstruments.some(instrument => 
-                                instrument.toLowerCase().includes('mic 1') || 
-                                instrument.toLowerCase() === 'mic1'
-                              )
-                              const bHasMic1 = bInstruments.some(instrument => 
-                                instrument.toLowerCase().includes('mic 1') || 
-                                instrument.toLowerCase() === 'mic1'
-                              )
-                              
-                              // Mic 1 volunteers come first
-                              if (aHasMic1 && !bHasMic1) return -1
-                              if (!aHasMic1 && bHasMic1) return 1
-                              
-                              // For non-Mic 1 volunteers, sort alphabetically by first name
-                              const aFirstName = a.profiles.first_name || 'Unknown'
-                              const bFirstName = b.profiles.first_name || 'Unknown'
-                              return aFirstName.localeCompare(bFirstName)
-                            })
-                            .map((volunteer) => {
-                              const firstName = volunteer.profiles.first_name || 'Unknown'
-                              const lastName = volunteer.profiles.last_name || ''
-                              const fullName = `${firstName} ${lastName}`.trim()
-                              const instruments = volunteer.instruments || []
-                              const role = instruments.length > 0 ? instruments.join(', ') : 'Volunteer'
-                              
-                              // Check if this is the current user
-                              const isCurrentUser = user && volunteer.user_id === user.id
-                              
-                              // Check if volunteer has Mic 1 or Spirit Leader role
-                              const hasMic1OrSpiritLeader = instruments.some(instrument => {
-                                const lowerInstrument = instrument.toLowerCase()
-                                return lowerInstrument.includes('mic 1') || 
-                                       lowerInstrument === 'mic1' ||
-                                       lowerInstrument.includes('spirit leader') ||
-                                       lowerInstrument === 'spirit leader'
-                              })
-                              
-                              // Use darker blue for current user or Mic 1/Spirit Leader, lighter blue for others
-                              const shouldUseDarkBlue = isCurrentUser || hasMic1OrSpiritLeader
-                              
-                              return (
-                                <Box
-                                  key={volunteer.id}
-                                  bg={shouldUseDarkBlue ? "blue.500" : useColorModeValue("blue.100", "blue.300")}
-                                  color={shouldUseDarkBlue ? "white" : useColorModeValue("blue.800", "blue.900")}
-                                  px={3}
-                                  py={2}
-                                  borderRadius="lg"
-                                  textAlign="center"
-                                  minW="fit-content"
-                                >
-                                  <VStack spacing={0}>
-                                    <Text fontSize="xs" fontWeight="600" lineHeight="1.2">
-                                      {fullName}
-                                    </Text>
-                                    <Text 
-                                      fontSize="2xs" 
-                                      fontWeight="400" 
-                                      opacity={shouldUseDarkBlue ? 0.9 : 0.8} 
-                                      lineHeight="1.1"
-                                    >
-                                      {role}
-                                    </Text>
-                                  </VStack>
-                                </Box>
-                              )
-                            })}
-                        </HStack>
-                      )}
-                    </VStack>
-                  </Box>
-                )
-                })}
-              </VStack>
-            )}
-
-            <Box
-              position={{ base: "fixed", md: "static" }}
-              bottom={{ base: 0, md: "auto" }}
-              left={{ base: 0, md: "auto" }}
-              right={{ base: 0, md: "auto" }}
-              zIndex={10}
-              bg={{ base: "white", md: "transparent" }}
-              borderTop={{ base: "1px", md: "none" }}
-              borderColor={{ base: grayBorderTop, md: "transparent" }}
-            >
-              <Box px={{ base: 4, md: 0 }} pt={{ base: 4, md: 0 }} pb={{ base: 4, md: 0 }}>
+          {!user ? (
+            <div className="rounded-xl border border-border bg-white p-5">
+              <div className="space-y-4">
+                <p className="text-sm text-text-muted">
+                  {t('volunteerPage.signInPrompt')}
+                </p>
                 <Button
-                  size="lg"
-                  colorScheme="blue"
-                  onClick={() => navigate('/dashboard')}
-                  w="full"
-                  fontSize={{ base: "lg", md: "xl" }}
-                  py={{ base: 6, md: 6 }}
+                  onClick={handleGoogleSignIn}
+                  isLoading={googleLoading}
+                  loadingText={t('volunteerPage.signingIn')}
+                  className="btn-primary"
+                  size="sm"
                 >
-                  {t('volunteerPage.viewDashboard', { organizationName: organization.name })}
+                  {t('volunteerPage.continueWithGoogle')}
                 </Button>
-              </Box>
-            </Box>
-          </VStack>
-        )}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:max-w-xs">
+              <InputGroup>
+                <InputLeftElement color="gray.400" pointerEvents="none">
+                  <SearchIcon />
+                </InputLeftElement>
+                <Input
+                  type="text"
+                  placeholder="Search services..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input-field pl-9"
+                />
+              </InputGroup>
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="btn-secondary"
+              type="button"
+            >
+              <span>Filters</span>
+              <span aria-hidden="true" className={`transition-transform ${showFilters ? 'rotate-90' : ''}`}>›</span>
+            </button>
+          </div>
+
+          {showFilters ? (
+            <div className="sl-chip-row">
+              {[
+                { label: 'All Services', value: 'all' as const },
+                { label: 'Today', value: 'today' as const },
+                { label: 'This Week', value: 'week' as const },
+              ].map((filter) => (
+                <button
+                  key={filter.value}
+                  onClick={() => setTimeFilter(filter.value)}
+                  className={`sl-chip ${timeFilter === filter.value ? 'sl-chip-active' : ''}`}
+                  type="button"
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {loadingServices ? (
+            <Center py={8}>
+              <VStack spacing={3}>
+                <Spinner size="lg" />
+                <Text color={subtitleColor}>{t('volunteerPage.loadingServices')}</Text>
+              </VStack>
+            </Center>
+          ) : filteredServices.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+                <CalendarIcon className="w-8 h-8 text-text-muted" />
+              </div>
+              <h3 className="mb-1 text-lg font-semibold text-text-primary">
+                No services found
+              </h3>
+              <p className="mb-4 text-sm text-text-muted">
+                {availableServices.length === 0 ? t('volunteerPage.noServicesAvailable') : 'Try adjusting your search or filters'}
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery('')
+                  setTimeFilter('all')
+                }}
+                className="btn-primary"
+                type="button"
+              >
+                Clear Filters
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredServices.map((service) => {
+                const isAssigned = !!user && userVolunteerAssignments.some(
+                  (assignment) => assignment.worship_service_id === service.id
+                )
+                const isExpanded = expandedService === service.id
+                const volunteers = serviceIdToVolunteers[service.id] || []
+                const uniqueRoles = [...new Set(volunteers.flatMap((volunteer) => volunteer.instruments || []))].slice(0, 4)
+
+                return (
+                  <div
+                    key={service.id}
+                    className="overflow-hidden rounded-xl border border-border bg-white"
+                  >
+                    <div className="flex items-start gap-4 p-4 md:p-5">
+                      <div className="flex w-14 flex-shrink-0 flex-col items-center">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-primary-600">
+                          {formatMonth(service.service_time)}
+                        </span>
+                        <span className="text-2xl font-bold text-text-primary">
+                          {formatDay(service.service_time)}
+                        </span>
+                        <span className="text-xs text-text-muted">
+                          {daysUntil(service.service_time)}
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-base font-semibold text-text-primary">
+                              {service.title}
+                            </h3>
+                            <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-text-muted">
+                              <span className="flex items-center gap-1">
+                                <TimeIcon className="w-3.5 h-3.5" />
+                                {getServiceTimeDisplay(service.service_time)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <CalendarIcon className="w-3.5 h-3.5" />
+                                {formatServiceDate(service.service_time)}
+                              </span>
+                            </div>
+                            {isAssigned ? (
+                              <div className="mt-2">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-1 text-xs font-medium text-success-700">
+                                  <CheckIcon className="w-3.5 h-3.5" />
+                                  Signed Up
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="flex-shrink-0">
+                            {isAssigned ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-1 text-xs font-medium text-success-700">
+                                <CheckIcon className="w-3.5 h-3.5" />
+                                Signed Up
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
+                                {volunteers.length} volunteer{volunteers.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {volunteers.length > 0 ? (
+                          <div className="mt-3 flex items-center gap-2">
+                            <div className="flex items-center">
+                              {volunteers.slice(0, 4).map((volunteer, index) => {
+                                const fullName = `${volunteer.profiles.first_name || ''} ${volunteer.profiles.last_name || ''}`.trim() || volunteer.profiles.email
+                                const isCurrentUser = !!user && volunteer.user_id === user.id
+                                return (
+                                  <div
+                                    key={volunteer.id}
+                                    className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white"
+                                    style={{
+                                      zIndex: 4 - index,
+                                      marginLeft: index > 0 ? '-8px' : 0,
+                                      backgroundColor: isCurrentUser ? '#2563EB' : '#94A3B8',
+                                    }}
+                                    title={fullName}
+                                  >
+                                    {getVolunteerInitials(volunteer.profiles.first_name, volunteer.profiles.last_name, volunteer.profiles.email)}
+                                  </div>
+                                )
+                              })}
+                              {volunteers.length > 4 ? (
+                                <div className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-xs font-medium text-text-muted" style={{ marginLeft: '-8px', zIndex: 0 }}>
+                                  +{volunteers.length - 4}
+                                </div>
+                              ) : null}
+                            </div>
+                            <span className="text-xs text-text-muted">
+                              {volunteers.length} volunteers
+                            </span>
+                          </div>
+                        ) : null}
+
+                        {uniqueRoles.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {uniqueRoles.map((role) => (
+                              <span
+                                key={role}
+                                className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-xs text-text-muted"
+                              >
+                                {role}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {isExpanded ? (
+                      <div className="border-t border-border px-4 pb-4 md:px-5">
+                        <div className="space-y-4 pt-4">
+                          {service.description ? (
+                            <div>
+                              <h4 className="text-sm font-semibold text-text-primary">Description</h4>
+                              <p className="mt-1 text-sm text-text-muted">{service.description}</p>
+                            </div>
+                          ) : null}
+
+                          <div>
+                            <h4 className="text-sm font-semibold text-text-primary">Current Volunteers</h4>
+                            {volunteers.length === 0 ? (
+                              <p className="mt-1 text-sm text-text-muted">No volunteers assigned yet.</p>
+                            ) : (
+                              <div className="mt-3 space-y-2">
+                                {volunteers.map((volunteer) => {
+                                  const fullName = `${volunteer.profiles.first_name || ''} ${volunteer.profiles.last_name || ''}`.trim() || volunteer.profiles.email
+                                  const role = volunteer.instruments?.length ? volunteer.instruments.join(', ') : 'Volunteer'
+                                  return (
+                                    <div key={volunteer.id} className="flex items-center gap-3 rounded-lg bg-gray-50 p-2.5">
+                                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">
+                                        {getVolunteerInitials(volunteer.profiles.first_name, volunteer.profiles.last_name, volunteer.profiles.email)}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-text-primary">{fullName}</p>
+                                        <p className="text-xs text-text-muted">{role}</p>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-center gap-2 border-t border-border bg-gray-50/50 px-4 py-3 md:px-5">
+                      <button
+                        onClick={() => setExpandedService(isExpanded ? null : service.id)}
+                        className="btn-ghost flex-1 text-sm"
+                        type="button"
+                      >
+                        {isExpanded ? 'Hide Details' : 'View Details'}
+                        <span className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>›</span>
+                      </button>
+                      {user ? (
+                        isAssigned ? (
+                          <button
+                            onClick={() => handleVolunteerClick(service.id, true)}
+                            className="btn-secondary text-sm"
+                            disabled={assigningService === service.id || isReloading}
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleVolunteerClick(service.id, false)}
+                            className="btn-primary flex-1 text-sm"
+                            disabled={assigningService === service.id || isReloading}
+                            type="button"
+                          >
+                            Sign Up
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          onClick={handleGoogleSignIn}
+                          className="btn-primary flex-1 text-sm"
+                          disabled={googleLoading}
+                          type="button"
+                        >
+                          Sign In to Serve
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="flex justify-center pt-6">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="btn-primary w-full justify-center"
+              type="button"
+            >
+              {t('volunteerPage.viewDashboard')}
+            </button>
+          </div>
+        </div>
 
 
         {/* Instrument Selection Modal */}

@@ -1,952 +1,322 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  Box, 
-  Container, 
-  Heading, 
-  Text, 
-  Button, 
-  VStack,
-  HStack,
-  SimpleGrid,
-  Flex,
-  Image,
-  Badge,
-  Collapse,
-  IconButton,
-  useColorModeValue,
-  useDisclosure
-} from '@chakra-ui/react'
-import { ChevronDownIcon, ChevronUpIcon, HamburgerIcon, CloseIcon } from '@chakra-ui/icons'
-import { useTranslation } from 'react-i18next'
-import logoImage from '../assets/images/logo.png'
+import { Button } from '@chakra-ui/react'
+import { Header } from '../components'
+import homeDashboardPreview from '../assets/images/home-dashboard-preview.png'
 
 export function HomePage() {
-  const { t } = useTranslation()
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
-  const { isOpen: isMenuOpen, onToggle: onMenuToggle } = useDisclosure()
+  const [openFaq, setOpenFaq] = useState<number | null>(0)
+  const [heroParallaxOffset, setHeroParallaxOffset] = useState(0)
 
-  // Smooth scroll to section
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId)
-    if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-    }
-    // Close mobile menu if open
-    if (isMenuOpen) {
-      onMenuToggle()
-    }
-  }
+  useEffect(() => {
+    let ticking = false
 
-  // Scroll to top (hero section)
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
-    // Close mobile menu if open
-    if (isMenuOpen) {
-      onMenuToggle()
+    const updateParallax = () => {
+      const nextOffset = Math.min(window.scrollY * 0.12, 54)
+      setHeroParallaxOffset(nextOffset)
+      ticking = false
     }
-  }
 
-  // Color mode values
-  const bgColor = useColorModeValue('white', 'gray.900')
-  const borderColor = useColorModeValue('gray.200', 'gray.700')
-  const textColor = useColorModeValue('gray.700', 'gray.200')
-  const mutedTextColor = useColorModeValue('gray.600', 'gray.400')
-  const headingColor = useColorModeValue('gray.900', 'white')
-  const cardBg = useColorModeValue('gray.50', 'gray.800')
-  const featureBg = useColorModeValue('white', 'gray.800')
-  const heroGradient = useColorModeValue(
-    'linear(to-br, blue.50, white, purple.50)',
-    'linear(to-br, gray.900, gray.800, gray.900)'
-  )
+    const handleScroll = () => {
+      if (ticking) return
+      ticking = true
+      window.requestAnimationFrame(updateParallax)
+    }
+
+    updateParallax()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
 
   const features = [
     {
       icon: '📅',
-      title: t('homePage.features.scheduling.title', 'Service Scheduling'),
-      description: t('homePage.features.scheduling.description', 'Plan services, assign roles, keep everyone organized.')
+      title: 'Service Scheduling',
+      description: 'Prepare each gathering with clarity so your team can focus less on scrambling and more on serving God with peace.',
     },
     {
       icon: '🎵',
-      title: t('homePage.features.songbank.title', 'Song Library'),
-      description: t('homePage.features.songbank.description', 'Store and share your church songs instantly.')
+      title: 'Song Library',
+      description: 'Keep lyrics, arrangements, and setlists in one place so every rehearsal supports an offering that honors Jesus.',
     },
     {
       icon: '👥',
-      title: t('homePage.features.team.title', 'Team Management'),
-      description: t('homePage.features.team.description', 'Track availability, send reminders, stay coordinated.')
-    }
+      title: 'Volunteer Coordination',
+      description: 'Know who is serving, what is still uncovered, and where to care for the team before Sunday arrives.',
+    },
   ]
 
+  const plans = [
+    {
+      name: 'Starter',
+      price: '$0',
+      summary: 'For new church plants and lean teams.',
+      perks: ['1 organization', 'Published service scheduling', 'Volunteer signups'],
+    },
+    {
+      name: 'Team',
+      price: '$29',
+      summary: 'For growing worship teams that need structure.',
+      perks: ['Unlimited services', 'Songbank workflows', 'Team management'],
+      highlight: true,
+    },
+    {
+      name: 'Scale',
+      price: 'Custom',
+      summary: 'For larger ministries and multi-campus operations.',
+      perks: ['Custom onboarding', 'Priority support', 'Advanced rollout help'],
+    },
+  ]
 
   const faqs = [
     {
-      question: t('homePage.faq.quickStart.question', 'How quickly can we start?'),
-      answer: t('homePage.faq.quickStart.answer', 'Set up your church and start planning in 15 minutes.')
+      question: 'How quickly can we start?',
+      answer: 'Most teams can create their first organization, publish a service, and invite volunteers within the first 15 minutes.',
     },
     {
-      question: t('homePage.faq.importSongs.question', 'Can we import our songs?'),
-      answer: t('homePage.faq.importSongs.answer', 'Yes! Import from SongSelect, Planning Center, or spreadsheets.')
+      question: 'Can volunteers use this on mobile?',
+      answer: 'Yes. Published services and volunteer actions are designed to work well on mobile browsers, and the Android app can be used for a simplified serving flow.',
     },
     {
-      question: t('homePage.faq.scheduling.question', 'How does scheduling work?'),
-      answer: t('homePage.faq.scheduling.answer', 'Team sets availability, you assign roles, everyone gets notified.')
+      question: 'Do we need to migrate everything at once?',
+      answer: 'No. Many churches begin with upcoming services and volunteer assignments first, then move songs and historical plans over gradually.',
     },
     {
-      question: t('homePage.faq.mobile.question', 'Is there a mobile version?'),
-      answer: t('homePage.faq.mobile.answer', 'Works perfectly on any mobile browser.')
+      question: 'Can admins keep control over who edits schedules?',
+      answer: 'Yes. Role-based organization access lets owners and admins manage schedules while members and volunteers serve within their assigned scope.',
     },
-    {
-      question: t('homePage.faq.support.question', 'Need help setting up?'),
-      answer: t('homePage.faq.support.answer', 'We provide tutorials, chat support, and setup calls.')
-    }
   ]
 
   return (
-    <Box minH="100vh" bg={bgColor}>
-      {/* Navigation */}
-      <Box
-        as="nav"
-        bg={bgColor}
-        borderBottom="1px"
-        borderColor={borderColor}
-        position="sticky"
-        top={0}
-        zIndex={50}
-      >
-        <Container maxW="7xl" px={{ base: 4, sm: 6, lg: 8 }}>
-          <Flex justify="space-between" align="center" h={16}>
-            {/* Logo */}
-            <Flex align="center">
-              <HStack 
-                spacing={3} 
-                align="center" 
-                cursor="pointer"
-                onClick={scrollToTop}
-                _hover={{ opacity: 0.8 }}
-                transition="opacity 0.2s"
-              >
-                <Image
-                  src={logoImage}
-                  alt="Spirit Lead Logo"
-                  h="32px"
-                  w="auto"
-                  objectFit="contain"
-                />
-                <Heading
-                  as="h1"
-                  size="lg"
-                  color="blue.600"
-                  fontWeight="bold"
-                  m={0}
-                >
-                  Spirit Lead
-                </Heading>
-              </HStack>
-            </Flex>
-            
-            {/* Desktop Navigation & CTA */}
-            <HStack spacing={6} display={{ base: 'none', md: 'flex' }}>
-              <Text
-                color={textColor}
-                _hover={{ color: 'blue.600' }}
-                px={3}
-                py={2}
-                fontSize="sm"
-                fontWeight="medium"
-                transition="colors 0.2s"
-                cursor="pointer"
-                onClick={() => scrollToSection('features')}
-              >
-                Features
-              </Text>
-              <Text
-                color={textColor}
-                _hover={{ color: 'blue.600' }}
-                px={3}
-                py={2}
-                fontSize="sm"
-                fontWeight="medium"
-                transition="colors 0.2s"
-                cursor="pointer"
-                onClick={() => scrollToSection('pricing')}
-              >
-                Pricing
-              </Text>
-              <Text
-                color={textColor}
-                _hover={{ color: 'blue.600' }}
-                px={3}
-                py={2}
-                fontSize="sm"
-                fontWeight="medium"
-                transition="colors 0.2s"
-                cursor="pointer"
-                onClick={() => scrollToSection('faq')}
-              >
-                FAQ
-              </Text>
-              <Button
-                as={Link}
-                to="/login"
-                variant="outline"
-                px={6}
-                py={2}
-                fontWeight="medium"
-                _hover={{ bg: 'gray.50' }}
-                transition="colors 0.2s"
-              >
-                Login
-              </Button>
-              <Button
-                as={Link}
-                to="/signup"
-                colorScheme="blue"
-                px={6}
-                py={2}
-                fontWeight="medium"
-                _hover={{ bg: 'blue.700' }}
-                transition="colors 0.2s"
-              >
-                Start Free Trial
-              </Button>
-            </HStack>
+    <div className="min-h-screen bg-background">
+      <Header />
 
-            {/* Mobile menu button */}
-            <IconButton
-              display={{ base: 'block', md: 'none' }}
-              aria-label="Toggle menu"
-              icon={isMenuOpen ? <CloseIcon /> : <HamburgerIcon />}
-              variant="ghost"
-              onClick={onMenuToggle}
-            />
-          </Flex>
-        </Container>
+      <main>
+        <section className="relative overflow-hidden" id="hero">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-white to-secondary-50" />
+          <div className="absolute left-[-8%] top-14 h-56 w-56 rounded-full bg-primary-100/60 blur-3xl" />
+          <div className="absolute bottom-0 right-[-6%] h-64 w-64 rounded-full bg-secondary-100/60 blur-3xl" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 hidden lg:block">
+            <div
+              className="absolute left-0 top-1/2 w-[74vw] max-w-[1120px] will-change-transform"
+              style={{
+                transform: `translate3d(0, calc(-50% + ${heroParallaxOffset}px), 0)`,
+              }}
+            >
+              <div
+                className="rounded-r-[36px] border border-white/70 bg-white/55 p-3 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur-[2px]"
+                style={{
+                  WebkitMaskImage: 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.98) 36%, rgba(0,0,0,0.78) 52%, rgba(0,0,0,0.34) 66%, rgba(0,0,0,0.08) 74%, rgba(0,0,0,0) 82%)',
+                  maskImage: 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.98) 36%, rgba(0,0,0,0.78) 52%, rgba(0,0,0,0.34) 66%, rgba(0,0,0,0.08) 74%, rgba(0,0,0,0) 82%)',
+                }}
+              >
+                <div className="rounded-r-[28px] border border-primary-200/70 bg-white/80 p-1.5 shadow-inner shadow-primary-950/10">
+                  <img
+                    alt="Spirit Lead dashboard preview"
+                    className="w-full rounded-r-[22px] border border-primary-300/35 object-cover"
+                    src={homeDashboardPreview}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
 
-        {/* Mobile menu */}
-        <Collapse in={isMenuOpen} animateOpacity>
-          <Box
-            display={{ base: 'block', md: 'none' }}
-            bg={bgColor}
-            borderTop="1px"
-            borderColor={borderColor}
-          >
-            <Container maxW="7xl" px={4}>
-              <VStack spacing={1} py={4} align="stretch">
-                <Text
-                  color={textColor}
-                  _hover={{ color: 'blue.600' }}
-                  px={3}
-                  py={2}
-                  fontSize="base"
-                  fontWeight="medium"
-                  cursor="pointer"
-                  onClick={() => scrollToSection('features')}
-                >
-                  Features
-                </Text>
-                <Text
-                  color={textColor}
-                  _hover={{ color: 'blue.600' }}
-                  px={3}
-                  py={2}
-                  fontSize="base"
-                  fontWeight="medium"
-                  cursor="pointer"
-                  onClick={() => scrollToSection('pricing')}
-                >
-                  Pricing
-                </Text>
-                <Text
-                  color={textColor}
-                  _hover={{ color: 'blue.600' }}
-                  px={3}
-                  py={2}
-                  fontSize="base"
-                  fontWeight="medium"
-                  cursor="pointer"
-                  onClick={() => scrollToSection('faq')}
-                >
-                  FAQ
-                </Text>
-                <Button
-                  as={Link}
-                  to="/login"
-                  variant="outline"
-                  mt={4}
-                  w="full"
-                  fontWeight="medium"
-                  _hover={{ bg: 'gray.50' }}
-                >
-                  Login
-                </Button>
-                <Button
-                  as={Link}
-                  to="/signup"
-                  colorScheme="blue"
-                  mt={2}
-                  w="full"
-                  fontWeight="medium"
-                >
+          <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center lg:gap-12 lg:px-8 lg:py-24">
+            <div className="relative block lg:hidden">
+              <div className="rounded-[30px] border border-white/80 bg-white/90 p-3 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur">
+                <div className="mb-3 flex items-center justify-between rounded-[20px] border border-border bg-white px-4 py-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-600">Inside Spirit Lead</p>
+                    <p className="mt-1 text-sm text-text-muted">
+                      See services, coverage, and songs in one calm planning view.
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-[24px] border border-primary-200/70 bg-white/80 p-1.5 shadow-inner shadow-primary-950/10">
+                  <img
+                    alt="Spirit Lead dashboard preview"
+                    className="w-full rounded-[18px] border border-primary-300/35 object-cover"
+                    src={homeDashboardPreview}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="max-w-2xl lg:col-start-2 lg:pl-8">
+              <h1 className="text-balance text-4xl font-extrabold tracking-tight text-text-primary sm:text-5xl lg:text-6xl">
+                Prepare every service with peace and purpose.
+              </h1>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-text-muted sm:text-xl">
+                Keep schedules, songs, and volunteers aligned so your team can focus on worship instead of chasing details.
+              </p>
+
+              <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+                <Button as={Link} size="lg" to="/signup">
                   Start Free Trial
                 </Button>
-              </VStack>
-            </Container>
-          </Box>
-        </Collapse>
-      </Box>
-
-      {/* Hero Section */}
-      <Box
-        as="section"
-        position="relative"
-        bgGradient={heroGradient}
-        py={{ base: 20, lg: 32 }}
-        overflow="hidden"
-      >
-        {/* Hero Background Image */}
-        <Box
-          position="absolute"
-          inset={0}
-          bgImage="url('https://readdy.ai/api/search-image?query=Modern%20contemporary%20church%20sanctuary%20with%20worship%20team%20on%20stage%2C%20soft%20warm%20lighting%2C%20people%20raising%20hands%20in%20worship%2C%20guitars%20and%20keyboards%20visible%2C%20peaceful%20atmosphere%2C%20architectural%20details%20like%20wooden%20beams%20or%20modern%20design%20elements%2C%20inspiring%20and%20uplifting%20scene%20with%20warm%20golden%20hour%20lighting%20filtering%20through%20windows&width=1920&height=1080&seq=hero1&orientation=landscape')"
-          bgSize="cover"
-          bgPosition="center"
-          bgRepeat="no-repeat"
-          opacity={0.1}
-        />
-        <Container maxW="7xl" px={{ base: 4, sm: 6, lg: 8 }}>
-          <VStack spacing={8} textAlign="center">
-            <Heading
-              as="h1"
-              fontSize={{ base: '4xl', md: '6xl' }}
-              fontWeight="bold"
-              color={headingColor}
-              lineHeight="0.9"
-              mb={6}
-            >
-              Simplify Worship &<br />
-              <Text as="span" color="blue.600">
-                Team Management
-              </Text>
-            </Heading>
-            
-            <Text
-              fontSize={{ base: 'xl', md: '2xl' }}
-              color={mutedTextColor}
-              maxW="3xl"
-              mb={8}
-            >
-              Schedule services, manage your songbank, coordinate volunteers. 
-              All in one simple dashboard.
-            </Text>
-            
-            <Flex
-              direction={{ base: 'column', sm: 'row' }}
-              gap={4}
-              justify="center"
-              align="center"
-              mb={12}
-            >
-              <Button
-                as={Link}
-                to="/signup"
-                colorScheme="blue"
-                size="lg"
-                px={8}
-                py={4}
-                fontSize="lg"
-                fontWeight="semibold"
-                _hover={{ bg: 'blue.700' }}
-                transition="colors 0.2s"
-                boxShadow="lg"
-              >
-                Start Free Trial
-              </Button>
-              <Button
-                as="a"
-                href="https://calendly.com/thejuan-codes/30min"
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="outline"
-                size="lg"
-                px={8}
-                py={4}
-                fontSize="lg"
-                fontWeight="semibold"
-                borderWidth="2px"
-                borderColor="gray.300"
-                color={textColor}
-                _hover={{ borderColor: 'blue.600', color: 'blue.600' }}
-                transition="all 0.2s"
-              >
-                Schedule Demo
-              </Button>
-            </Flex>
-            
-            <Text color={mutedTextColor} fontSize="sm">
-              ✓ 14-day free trial ✓ No credit card required
-            </Text>
-          </VStack>
-        </Container>
-      </Box>
-
-      {/* Features Section */}
-      <Box id="features" as="section" py={20} bg={bgColor}>
-        <Container maxW="7xl" px={{ base: 4, sm: 6, lg: 8 }}>
-          <VStack spacing={16} textAlign="center">
-            <Box>
-              <Heading
-                as="h2"
-                fontSize={{ base: '3xl', md: '4xl' }}
-                fontWeight="bold"
-                color={headingColor}
-                mb={4}
-              >
-                Everything You Need
-              </Heading>
-            </Box>
-            
-            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8} w="full">
-              {features.map((feature, index) => (
-                <Box
-                  key={index}
-                  bg={featureBg}
-                  borderRadius="xl"
-                  p={8}
-                  _hover={{ boxShadow: 'lg' }}
-                  transition="box-shadow 0.2s"
-                  border="1px"
-                  borderColor={borderColor}
-                >
-                  <VStack spacing={6}>
-                    <Box
-                      w={16}
-                      h={16}
-                      bg="blue.100"
-                      borderRadius="lg"
-      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                    >
-                      <Text fontSize="2xl">{feature.icon}</Text>
-                    </Box>
-                    <Heading
-                      as="h3"
-                      size="lg"
-                      fontWeight="semibold"
-                      color={headingColor}
-                    >
-                      {feature.title}
-                    </Heading>
-                    <Text color={mutedTextColor} textAlign="center">
-                      {feature.description}
-                    </Text>
-                  </VStack>
-                </Box>
-              ))}
-            </SimpleGrid>
-          </VStack>
-        </Container>
-      </Box>
-
-      {/* Dashboard Preview Section */}
-      <Box as="section" py={20} bgGradient="linear(to-r, blue.50, purple.50)">
-        <Container maxW="7xl" px={{ base: 4, sm: 6, lg: 8 }}>
-          <VStack spacing={16} textAlign="center">
-            <Box>
-              <Heading
-                as="h2"
-                fontSize={{ base: '3xl', md: '4xl' }}
-                fontWeight="bold"
-                color={headingColor}
-                mb={4}
-              >
-                See It In Action
-              </Heading>
-            </Box>
-            
-            <Box
-              bg="white"
-              borderRadius="2xl"
-              boxShadow="2xl"
-              overflow="hidden"
-              w="full"
-            >
-              <Image
-                src="https://readdy.ai/api/search-image?query=Modern%20clean%20web%20application%20dashboard%20interface%20for%20church%20management%2C%20showing%20worship%20service%20scheduling%20calendar%2C%20song%20library%20grid%2C%20team%20member%20profiles%2C%20clean%20white%20background%20with%20blue%20and%20purple%20accent%20colors%2C%20professional%20SaaS%20design%2C%20multiple%20sections%20visible%20including%20upcoming%20services%2C%20team%20availability%2C%20and%20song%20search%20functionality&width=1200&height=800&seq=dashboard1&orientation=landscape"
-                alt="Spirit Lead Dashboard"
-                w="full"
-                h="auto"
-                objectFit="cover"
-                objectPosition="top"
-              />
-            </Box>
-          </VStack>
-        </Container>
-      </Box>
-
-      {/* Pricing Section */}
-      <Box id="pricing" as="section" py={20} bg={bgColor}>
-        <Container maxW="7xl" px={{ base: 4, sm: 6, lg: 8 }}>
-          <VStack spacing={16} textAlign="center">
-            <Box>
-              <Heading
-                as="h2"
-                fontSize={{ base: '3xl', md: '4xl' }}
-                fontWeight="bold"
-                color={headingColor}
-                mb={4}
-              >
-                Simple Pricing
-              </Heading>
-            </Box>
-            
-            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8} maxW="5xl" w="full">
-              {/* Starter Plan */}
-              <Box
-                bg={featureBg}
-                borderRadius="xl"
-                p={8}
-                boxShadow="lg"
-                border="1px"
-                borderColor={borderColor}
-              >
-                <VStack spacing={6}>
-                  <Box textAlign="center">
-                    <Text fontSize="xl" fontWeight="semibold" color={headingColor} mb={2}>
-                      Starter
-                    </Text>
-                    <Text color={mutedTextColor} mb={6}>
-                      Small churches
-                    </Text>
-                    <Box mb={6}>
-                      <Text fontSize="4xl" fontWeight="bold" color={headingColor}>
-                        $29
-                      </Text>
-                      <Text color={mutedTextColor}>/month</Text>
-                    </Box>
-                  </Box>
-                  <VStack spacing={3} w="full">
-                    <HStack>
-                      <Text color="green.500">✓</Text>
-                      <Text color={textColor}>25 team members</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.500">✓</Text>
-                      <Text color={textColor}>Unlimited songs</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.500">✓</Text>
-                      <Text color={textColor}>Basic scheduling</Text>
-                    </HStack>
-                  </VStack>
-                  <Button
-                    as={Link}
-                    to="/signup"
-                    w="full"
-                    variant="outline"
-                    colorScheme="gray"
-                    py={3}
-                    fontWeight="semibold"
-                    _hover={{ bg: 'gray.200' }}
-                    transition="colors 0.2s"
-                  >
-                    Start Free Trial
-                  </Button>
-                </VStack>
-              </Box>
-
-              {/* Growth Plan - Featured */}
-              <Box
-                bg="blue.600"
-                borderRadius="xl"
-                p={8}
-                boxShadow="xl"
-                color="white"
-                position="relative"
-              >
-                <Badge
-                  position="absolute"
-                  top="-4"
-                  left="50%"
-                  transform="translateX(-50%)"
-                  bg="yellow.400"
-                  color="yellow.900"
-                  px={4}
-                  py={1}
-                  borderRadius="full"
-                  fontSize="sm"
-                  fontWeight="semibold"
-                >
-                  Popular
-                </Badge>
-                <VStack spacing={6}>
-                  <Box textAlign="center">
-                    <Text fontSize="xl" fontWeight="semibold" mb={2}>
-                      Growth
-                    </Text>
-                    <Text color="blue.100" mb={6}>
-                      Growing churches
-                    </Text>
-                    <Box mb={6}>
-                      <Text fontSize="4xl" fontWeight="bold">
-                        $59
-                      </Text>
-                      <Text color="blue.100">/month</Text>
-                    </Box>
-                  </Box>
-                  <VStack spacing={3} w="full">
-                    <HStack>
-                      <Text color="green.400">✓</Text>
-                      <Text>100 team members</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.400">✓</Text>
-                      <Text>Advanced scheduling</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.400">✓</Text>
-                      <Text>Song arrangements</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.400">✓</Text>
-                      <Text>Priority support</Text>
-                    </HStack>
-                  </VStack>
-                  <Button
-                    as={Link}
-                    to="/signup"
-                    w="full"
-                    bg="white"
-                    color="blue.600"
-                    py={3}
-                    fontWeight="semibold"
-                    _hover={{ bg: 'gray.50' }}
-                    transition="colors 0.2s"
-                  >
-                    Start Free Trial
-                  </Button>
-                </VStack>
-              </Box>
-
-              {/* Enterprise Plan */}
-              <Box
-                bg={featureBg}
-                borderRadius="xl"
-                p={8}
-                boxShadow="lg"
-                border="1px"
-                borderColor={borderColor}
-              >
-                <VStack spacing={6}>
-                  <Box textAlign="center">
-                    <Text fontSize="xl" fontWeight="semibold" color={headingColor} mb={2}>
-                      Enterprise
-                    </Text>
-                    <Text color={mutedTextColor} mb={6}>
-                      Large churches
-                    </Text>
-                    <Box mb={6}>
-                      <Text fontSize="4xl" fontWeight="bold" color={headingColor}>
-                        $149
-                      </Text>
-                      <Text color={mutedTextColor}>/month</Text>
-                    </Box>
-                  </Box>
-                  <VStack spacing={3} w="full">
-                    <HStack>
-                      <Text color="green.500">✓</Text>
-                      <Text color={textColor}>Unlimited members</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.500">✓</Text>
-                      <Text color={textColor}>Multi-campus</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.500">✓</Text>
-                      <Text color={textColor}>Advanced analytics</Text>
-                    </HStack>
-                    <HStack>
-                      <Text color="green.500">✓</Text>
-                      <Text color={textColor}>Dedicated support</Text>
-                    </HStack>
-                  </VStack>
-                  <Button
-                    w="full"
-                    variant="outline"
-                    colorScheme="gray"
-                    py={3}
-                    fontWeight="semibold"
-                    _hover={{ bg: 'gray.200' }}
-                    transition="colors 0.2s"
-                  >
-                    Contact Sales
-                  </Button>
-                </VStack>
-              </Box>
-            </SimpleGrid>
-          </VStack>
-        </Container>
-      </Box>
-
-      {/* FAQ Section */}
-      <Box id="faq" as="section" py={20} bg={cardBg}>
-        <Container maxW="4xl" px={{ base: 4, sm: 6, lg: 8 }}>
-          <VStack spacing={16}>
-            <Box textAlign="center">
-              <Heading
-                as="h2"
-                fontSize={{ base: '3xl', md: '4xl' }}
-                fontWeight="bold"
-                color={headingColor}
-                mb={4}
-              >
-                FAQ
-              </Heading>
-            </Box>
-            
-            <VStack spacing={4} w="full">
-              {faqs.map((faq, index) => (
-                <Box
-                  key={index}
-                  border="1px"
-                  borderColor={borderColor}
-                  borderRadius="lg"
-                  w="full"
-                >
-                  <Button
-                    w="full"
-                    px={6}
-                    py={4}
-                    textAlign="left"
-                    variant="ghost"
-                    justifyContent="space-between"
-                    rightIcon={
-                      openFaq === index ? <ChevronUpIcon /> : <ChevronDownIcon />
-                    }
-                    _hover={{ bg: cardBg }}
-                    transition="colors 0.2s"
-                    onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                    borderRadius="lg"
-                  >
-                    <Text fontWeight="semibold" color={headingColor}>
-                      {faq.question}
-                    </Text>
-                  </Button>
-                  <Collapse in={openFaq === index} animateOpacity>
-                    <Box px={6} pb={4}>
-                      <Text color={mutedTextColor}>{faq.answer}</Text>
-                    </Box>
-                  </Collapse>
-                </Box>
-              ))}
-            </VStack>
-          </VStack>
-        </Container>
-      </Box>
-
-      {/* CTA Section */}
-      <Box as="section" py={20} bg="blue.600">
-        <Container maxW="4xl" px={{ base: 4, sm: 6, lg: 8 }} textAlign="center">
-          <VStack spacing={8}>
-            <Heading
-              as="h2"
-              fontSize={{ base: '3xl', md: '4xl' }}
-              fontWeight="bold"
-              color="white"
-              mb={4}
-            >
-              Ready to Get Started?
-            </Heading>
-            <Text
-              fontSize="xl"
-              color="blue.100"
-              mb={8}
-              maxW="2xl"
-            >
-              Join thousands of churches using Spirit Lead. Start your free trial today.
-            </Text>
-            <Flex
-              direction={{ base: 'column', sm: 'row' }}
-              gap={4}
-              justify="center"
-            >
-              <Button
-                as={Link}
-                to="/signup"
-                bg="white"
-                color="blue.600"
-                size="lg"
-                px={8}
-                py={4}
-                fontSize="lg"
-                fontWeight="semibold"
-                _hover={{ bg: 'gray.50' }}
-                transition="colors 0.2s"
-                boxShadow="lg"
-              >
-                Start Free Trial
-              </Button>
-              <Button
-                as="a"
-                href="https://calendly.com/thejuan-codes/30min"
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="outline"
-                size="lg"
-                px={8}
-                py={4}
-                fontSize="lg"
-                fontWeight="semibold"
-                borderWidth="2px"
-                borderColor="white"
-                color="white"
-                _hover={{ bg: 'white', color: 'blue.600' }}
-                transition="all 0.2s"
-              >
-                Schedule Demo
-              </Button>
-            </Flex>
-            <Text color="blue.200" fontSize="sm" mt={6}>
-              No credit card required • Cancel anytime
-            </Text>
-          </VStack>
-        </Container>
-      </Box>
-
-      {/* Footer */}
-      <Box as="footer" bg={useColorModeValue('gray.900', 'gray.950')} color="white" py={16}>
-        <Container maxW="7xl" px={{ base: 4, sm: 6, lg: 8 }}>
-          <SimpleGrid columns={{ base: 1, md: 4 }} spacing={8}>
-            <Box>
-              <HStack 
-                spacing={3} 
-                align="center" 
-                mb={4}
-                cursor="pointer"
-                onClick={scrollToTop}
-                _hover={{ opacity: 0.8 }}
-                transition="opacity 0.2s"
-              >
-                <Image
-                  src={logoImage}
-                  alt="Spirit Lead Logo"
-                  h="24px"
-                  w="auto"
-                  objectFit="contain"
-                  filter="brightness(0) invert(1)"
-                />
-                <Heading
-                  as="h3"
-                  size="lg"
-                  color="white"
-                  fontWeight="bold"
-                  m={0}
-                >
-                  Spirit Lead
-                </Heading>
-              </HStack>
-              <Text color="gray.400" mb={6}>
-                Simplifying worship for churches everywhere.
-              </Text>
-            </Box>
-            
-            <Box>
-              <Text fontWeight="semibold" mb={4}>Product</Text>
-              <VStack spacing={2} align="start">
-                <Text 
-                  color="gray.400" 
-                  _hover={{ color: 'white' }} 
-                  cursor="pointer"
-                  onClick={() => scrollToSection('features')}
-                >
-                  Features
-                </Text>
-                <Text 
-                  color="gray.400" 
-                  _hover={{ color: 'white' }} 
-                  cursor="pointer"
-                  onClick={() => scrollToSection('pricing')}
-                >
-                  Pricing
-                </Text>
-              </VStack>
-            </Box>
-            
-            <Box>
-              <Text fontWeight="semibold" mb={4}>Support</Text>
-              <VStack spacing={2} align="start">
-                <Text 
-                  as="a"
-                  href="https://docs.google.com/forms/d/e/1FAIpQLScWrA1M10R2R8wbco9BtCbWhQHNlsxRQOJzUTDjv0wx8LkoPA/viewform?usp=header"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  color="gray.400" 
-                  _hover={{ color: 'white' }} 
-                  cursor="pointer"
-                >
-                  Waitlist
-                </Text>
-                <Text 
+                <Button
                   as="a"
                   href="https://calendly.com/thejuan-codes/30min"
-                  target="_blank"
                   rel="noopener noreferrer"
-                  color="gray.400" 
-                  _hover={{ color: 'white' }} 
-                  cursor="pointer"
+                  size="lg"
+                  target="_blank"
+                  variant="outline"
                 >
                   Schedule Demo
-                </Text>
-              </VStack>
-            </Box>
-            
-            <Box>
-              <Text fontWeight="semibold" mb={4}>Company</Text>
-              <VStack spacing={2} align="start">
-                <Link to="/about">
-                  <Text color="gray.400" _hover={{ color: 'white' }} cursor="pointer">
-                    About
-                  </Text>
-                </Link>
-                <Link to="/privacy">
-                  <Text color="gray.400" _hover={{ color: 'white' }} cursor="pointer">
-                    Privacy
-                  </Text>
-                </Link>
-                <Link to="/terms">
-                  <Text color="gray.400" _hover={{ color: 'white' }} cursor="pointer">
-                    Terms
-                  </Text>
-                </Link>
-              </VStack>
-            </Box>
-          </SimpleGrid>
-          
-          <Flex
-            direction={{ base: 'column', md: 'row' }}
-            justify="space-between"
-            align="center"
-            borderTop="1px"
-            borderColor="gray.800"
-            mt={12}
-            pt={8}
-          >
-            <Text color="gray.400" fontSize="sm">
-              © 2024 Spirit Lead. All rights reserved.
-            </Text>
-            <Text color="gray.400" fontSize="sm" mt={{ base: 4, md: 0 }}>
-              Made with ❤️ for churches
-            </Text>
-          </Flex>
-        </Container>
-      </Box>
-    </Box>
+                </Button>
+              </div>
+
+              <p className="mt-5 text-sm text-text-muted">
+                14-day free trial. No credit card required.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8" id="features">
+          <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-primary-600">Core Workflow</p>
+              <h2 className="mt-2 text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">A practical rhythm for serving with excellence and peace.</h2>
+            </div>
+            <p className="max-w-xl text-sm leading-7 text-text-muted">
+              When schedules, songs, and volunteers stay aligned, your team can prepare prayerfully, communicate clearly, and give a more faithful offering to the Lord.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {features.map((feature) => (
+              <div className="card-shadow card-hover rounded-2xl border border-border bg-white p-8" key={feature.title}>
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-2xl">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-text-primary">{feature.title}</h3>
+                <p className="mt-3 text-sm leading-7 text-text-muted">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-white py-16" id="pricing">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-primary-600">Pricing</p>
+              <h2 className="mt-2 text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">Simple plans for ministries that want to stay prepared.</h2>
+            </div>
+
+            <div className="mt-10 grid gap-6 lg:grid-cols-3">
+              {plans.map((plan) => (
+                <div
+                  className={`rounded-2xl border p-8 ${plan.highlight ? 'border-primary-200 bg-primary-50/40 shadow-card' : 'border-border bg-card shadow-soft'}`}
+                  key={plan.name}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-text-primary">{plan.name}</h3>
+                      <p className="mt-2 text-sm text-text-muted">{plan.summary}</p>
+                    </div>
+                    {plan.highlight ? <span className="badge-primary">Popular</span> : null}
+                  </div>
+
+                  <div className="mt-6 text-4xl font-bold tracking-tight text-text-primary">{plan.price}</div>
+                  {plan.price !== 'Custom' ? <p className="mt-1 text-sm text-text-muted">per month</p> : null}
+
+                  <ul className="mt-6 space-y-3 text-sm text-text-muted">
+                    {plan.perks.map((perk) => (
+                      <li className="flex items-start gap-3" key={perk}>
+                        <span className="mt-1 h-2 w-2 rounded-full bg-primary-600" />
+                        <span>{perk}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button as={Link} className="mt-8" size="lg" to="/signup" variant={plan.highlight ? 'solid' : 'outline'} width="full">
+                    Get Started
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8" id="faq">
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-primary-600">FAQ</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">Questions ministry teams ask before switching.</h2>
+          </div>
+
+          <div className="mt-10 space-y-4">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaq === index
+
+              return (
+                <div className="rounded-2xl border border-border bg-white shadow-soft" key={faq.question}>
+                  <button
+                    className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    type="button"
+                  >
+                    <span className="text-base font-semibold text-text-primary">{faq.question}</span>
+                    <span className="text-xl text-text-muted">{isOpen ? '−' : '+'}</span>
+                  </button>
+                  {isOpen ? (
+                    <div className="border-t border-border px-6 py-5 text-sm leading-7 text-text-muted">
+                      {faq.answer}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="pb-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="overflow-hidden rounded-[28px] bg-gradient-to-r from-primary-600 to-secondary-600 px-8 py-12 text-center text-white shadow-card sm:px-12">
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-white/80">Next Step</p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+                Lead the next service with more peace and less scramble.
+              </h2>
+              <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-blue-50">
+                Give your team a shared place to prepare faithfully, communicate clearly, and offer their best to Jesus week after week.
+              </p>
+              <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <Button as={Link} bg="white" color="blue.700" size="lg" to="/signup" _hover={{ bg: 'gray.100' }}>
+                  Start Free Trial
+                </Button>
+                <Button
+                  as={Link}
+                  borderColor="whiteAlpha.600"
+                  color="white"
+                  fontWeight="600"
+                  size="lg"
+                  to="/about"
+                  variant="outline"
+                  bg="whiteAlpha.120"
+                  _hover={{ bg: 'whiteAlpha.220', color: 'white' }}
+                  _active={{ bg: 'whiteAlpha.260', color: 'white' }}
+                >
+                  Learn More
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer className="border-t border-border bg-white">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-8 text-sm text-text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+            <p>&copy; {new Date().getFullYear()} Spirit Lead. All rights reserved.</p>
+            <div className="flex flex-wrap gap-4">
+              <Link className="transition-colors hover:text-text-primary" to="/about">About</Link>
+              <Link className="transition-colors hover:text-text-primary" to="/privacy">Privacy</Link>
+              <Link className="transition-colors hover:text-text-primary" to="/terms">Terms</Link>
+            </div>
+          </div>
+        </footer>
+      </main>
+    </div>
   )
-} 
+}

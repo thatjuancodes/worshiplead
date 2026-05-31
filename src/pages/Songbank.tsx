@@ -24,13 +24,6 @@ import {
   Select,
   Badge,
   Flex,
-  IconButton,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
   useDisclosure,
   Drawer,
   DrawerBody,
@@ -45,9 +38,13 @@ import {
   ModalCloseButton,
   ModalBody,
   ModalFooter,
+  InputGroup,
+  InputLeftElement,
 } from '@chakra-ui/react'
+import { SearchIcon } from '@chakra-ui/icons'
 import { DashboardHeader } from '../components'
 import type { User } from '@supabase/supabase-js'
+import { EmptyState } from '../components'
 
 interface Song {
   id: string
@@ -61,6 +58,11 @@ interface Song {
   tags: string[]
   lyrics?: string
   created_at: string
+}
+
+interface SongUsageStats {
+  usageCount: number
+  lastUsed: string | null
 }
 
 interface OrganizationData {
@@ -84,13 +86,16 @@ export function Songbank() {
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [songs, setSongs] = useState<Song[]>([])
+  const [songUsageById, setSongUsageById] = useState<Record<string, SongUsageStats>>({})
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedKey, setSelectedKey] = useState('')
   const [selectedTag, setSelectedTag] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const [sortBy, setSortBy] = useState<'popular' | 'recent' | 'title'>('popular')
   const { isOpen: isAddDrawerOpen, onOpen: onAddDrawerOpen, onClose: onAddDrawerClose } = useDisclosure()
   const { isOpen: isEditDrawerOpen, onOpen: onEditDrawerOpen, onClose: onEditDrawerClose } = useDisclosure()
   const [editingSong, setEditingSong] = useState<Song | null>(null)
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [deleteSong, setDeleteSong] = useState<Song | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
@@ -147,9 +152,76 @@ export function Songbank() {
         return
       }
 
-      setSongs(data || [])
+      const loadedSongs = data || []
+      setSongs(loadedSongs)
+      await loadSongUsageStats(organizationId, loadedSongs)
     } catch (error) {
       console.error('Error loading songs:', error)
+    }
+  }
+
+  async function loadSongUsageStats(organizationId: string, loadedSongs: Song[]) {
+    try {
+      if (loadedSongs.length === 0) {
+        setSongUsageById({})
+        return
+      }
+
+      const { data: servicesData, error: servicesError } = await supabase
+        .from('worship_services')
+        .select('id, service_time')
+        .eq('organization_id', organizationId)
+
+      if (servicesError) {
+        console.error('Error loading services for song usage:', servicesError)
+        setSongUsageById({})
+        return
+      }
+
+      const serviceIds = (servicesData || []).map((service) => service.id)
+      if (serviceIds.length === 0) {
+        setSongUsageById({})
+        return
+      }
+
+      const serviceIdToDate = new Map<string, string>()
+      ;(servicesData || []).forEach((service) => {
+        serviceIdToDate.set(service.id, service.service_time)
+      })
+
+      const { data: serviceSongsData, error: serviceSongsError } = await supabase
+        .from('service_songs')
+        .select('song_id, service_id')
+        .in('service_id', serviceIds)
+
+      if (serviceSongsError) {
+        console.error('Error loading song usage:', serviceSongsError)
+        setSongUsageById({})
+        return
+      }
+
+      const nextUsageById: Record<string, SongUsageStats> = {}
+
+      loadedSongs.forEach((song) => {
+        nextUsageById[song.id] = { usageCount: 0, lastUsed: null }
+      })
+
+      ;(serviceSongsData || []).forEach((row) => {
+        const songId = row.song_id
+        const serviceDate = serviceIdToDate.get(row.service_id) || null
+        const previous = nextUsageById[songId] || { usageCount: 0, lastUsed: null }
+        nextUsageById[songId] = {
+          usageCount: previous.usageCount + 1,
+          lastUsed: previous.lastUsed && serviceDate
+            ? (previous.lastUsed > serviceDate ? previous.lastUsed : serviceDate)
+            : (previous.lastUsed || serviceDate)
+        }
+      })
+
+      setSongUsageById(nextUsageById)
+    } catch (error) {
+      console.error('Error loading song usage stats:', error)
+      setSongUsageById({})
     }
   }
 
@@ -445,307 +517,266 @@ export function Songbank() {
     onEditDrawerOpen()
   }
 
+  const toggleFavorite = (songId: string) => {
+    setFavorites((previous) => {
+      const next = new Set(previous)
+      if (next.has(songId)) next.delete(songId)
+      else next.add(songId)
+      return next
+    })
+  }
+
+  const getSongUsage = (songId: string) => songUsageById[songId] || { usageCount: 0, lastUsed: null }
+
+  const timeAgo = (dateString: string | null) => {
+    if (!dateString) return 'Never'
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffDays <= 0) return 'Today'
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
   const filteredSongs = songs.filter(song => {
     const matchesSearch = song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         song.artist.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesKey = !selectedKey || song.key === selectedKey
-    const matchesTag = !selectedTag || song.tags.includes(selectedTag)
+                         song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (song.key || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesTag = !selectedTag || (
+      selectedTag === 'favorites'
+        ? favorites.has(song.id)
+        : song.tags.includes(selectedTag)
+    )
     
-    return matchesSearch && matchesKey && matchesTag
+    return matchesSearch && matchesTag
   })
 
-  const uniqueKeys = [...new Set(songs.map(song => song.key).filter(Boolean))]
   const uniqueTags = [...new Set(songs.flatMap(song => song.tags))]
+  const sortedSongs = [...filteredSongs].sort((a, b) => {
+    if (sortBy === 'title') return a.title.localeCompare(b.title)
+    if (sortBy === 'recent') {
+      const aTime = getSongUsage(a.id).lastUsed ? new Date(getSongUsage(a.id).lastUsed!).getTime() : 0
+      const bTime = getSongUsage(b.id).lastUsed ? new Date(getSongUsage(b.id).lastUsed!).getTime() : 0
+      return bTime - aTime
+    }
+
+    const aUsage = getSongUsage(a.id).usageCount
+    const bUsage = getSongUsage(b.id).usageCount
+    if (bUsage !== aUsage) return bUsage - aUsage
+
+    const aTime = getSongUsage(a.id).lastUsed ? new Date(getSongUsage(a.id).lastUsed!).getTime() : 0
+    const bTime = getSongUsage(b.id).lastUsed ? new Date(getSongUsage(b.id).lastUsed!).getTime() : 0
+    return bTime - aTime
+  })
+  const favoriteSongs = songs.filter((song) => favorites.has(song.id))
+  const recentlyUsedSongs = [...songs]
+    .filter((song) => getSongUsage(song.id).lastUsed)
+    .sort((a, b) => {
+      const aTime = new Date(getSongUsage(a.id).lastUsed || 0).getTime()
+      const bTime = new Date(getSongUsage(b.id).lastUsed || 0).getTime()
+      return bTime - aTime
+    })
+    .slice(0, 3)
+  const popularSongs = [...songs]
+    .sort((a, b) => getSongUsage(b.id).usageCount - getSongUsage(a.id).usageCount)
+    .slice(0, 6)
+
+  const renderSongCard = (song: Song) => {
+    const usage = getSongUsage(song.id)
+    const isFavorite = favorites.has(song.id)
+
+    return (
+      <Box
+        key={song.id}
+        bg={cardBg}
+        border="1px"
+        borderColor={cardBorderColor}
+        borderRadius="xl"
+        className="card-shadow card-hover group"
+        p={4}
+      >
+        <VStack align="stretch" spacing={3}>
+          <HStack align="start" justify="space-between" spacing={2}>
+            <Box flex="1" minW={0}>
+              <HStack spacing={2}>
+                <Heading as="h3" color={titleColor} fontSize="sm" fontWeight="600" noOfLines={1} size="sm">
+                  {song.title}
+                </Heading>
+                {isFavorite ? <Text color="red.500" fontSize="xs">♥</Text> : null}
+              </HStack>
+              <Text color={subtitleColor} fontSize="xs" mt={0.5} noOfLines={1}>
+                {song.artist}
+              </Text>
+            </Box>
+            <button
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted opacity-0 transition hover:bg-gray-100 group-hover:opacity-100"
+              onClick={(event) => {
+                event.stopPropagation()
+                toggleFavorite(song.id)
+              }}
+              type="button"
+            >
+              <Text color={isFavorite ? 'red.500' : mutedTextColor} fontSize="sm">♥</Text>
+            </button>
+          </HStack>
+
+          <HStack spacing={2}>
+            {song.key ? (
+              <Badge colorScheme="gray" variant="subtle" fontSize="xs">
+                {song.key}
+              </Badge>
+            ) : null}
+            {song.bpm ? (
+              <Badge colorScheme="gray" variant="subtle" fontSize="xs">
+                {song.bpm} BPM
+              </Badge>
+            ) : null}
+          </HStack>
+
+          <HStack justify="space-between" borderTop="1px" borderColor={cardBorderColor} pt={3} spacing={3}>
+            <HStack spacing={3}>
+              <Text color={mutedTextColor} fontSize="xs">
+                {usage.usageCount} uses
+              </Text>
+              <Text color={mutedTextColor} fontSize="xs">
+                {timeAgo(usage.lastUsed)}
+              </Text>
+            </HStack>
+            <HStack spacing={1} flexWrap="wrap" justify="flex-end">
+              {song.tags.slice(0, 2).map((tag) => (
+                <Badge key={tag} colorScheme="blue" fontSize="10px" variant="subtle">
+                  {tag}
+                </Badge>
+              ))}
+            </HStack>
+          </HStack>
+
+          {(song.youtube_url || song.spotify_url || canManagePrimary) ? (
+            <HStack justify="space-between" pt={1}>
+              <HStack spacing={2}>
+                {song.youtube_url ? (
+                  <Button as="a" href={song.youtube_url} target="_blank" rel="noopener noreferrer" size="xs" colorScheme="red" variant="outline">
+                    YouTube
+                  </Button>
+                ) : null}
+                {song.spotify_url ? (
+                  <Button as="a" href={song.spotify_url} target="_blank" rel="noopener noreferrer" size="xs" colorScheme="green" variant="outline">
+                    Spotify
+                  </Button>
+                ) : null}
+              </HStack>
+              {canManagePrimary ? (
+                <HStack spacing={2}>
+                  <Button size="xs" variant="outline" onClick={() => openEditForm(song)}>
+                    Edit
+                  </Button>
+                  <Button size="xs" colorScheme="red" variant="outline" onClick={() => openDeleteModal(song)}>
+                    Delete
+                  </Button>
+                </HStack>
+              ) : null}
+            </HStack>
+          ) : null}
+        </VStack>
+      </Box>
+    )
+  }
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
   const cardBg = useColorModeValue('white', 'gray.800')
   const cardBorderColor = useColorModeValue('gray.200', 'gray.600')
-  const cardHoverShadow = useColorModeValue(
-    '0 4px 6px rgba(0, 0, 0, 0.1)',
-    '0 4px 6px rgba(0, 0, 0, 0.3)'
-  )
   const titleColor = useColorModeValue('gray.800', 'white')
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
-  const textColor = useColorModeValue('gray.700', 'gray.200')
   const mutedTextColor = useColorModeValue('gray.500', 'gray.400')
-  const tableHeaderBg = useColorModeValue('gray.50', 'gray.700')
-  const tableHoverBg = useColorModeValue('gray.50', 'gray.700')
+  const textColor = useColorModeValue('gray.700', 'gray.200')
 
   if (loading) {
     return (
-      <Box minH="100vh" bg={bgColor}>
+      <Box className="sl-dashboard-page" minH="100vh" bg={bgColor}>
         <DashboardHeader user={user} organization={organization} />
 
-        <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
-          {/* Back Button */}
-          <Box mb={4}>
-            <Button
-              variant="ghost"
-              colorScheme="gray"
-              onClick={() => navigate('/dashboard')}
-              leftIcon={<Text>←</Text>}
-              size="sm"
-            >
-              {t('songbank.backToDashboard')}
-            </Button>
-          </Box>
+        <Box as="main" maxW="1200px" mx="auto" px={{ base: 6, md: 8 }} pt={{ base: 2, md: 3 }} pb={{ base: 6, md: 8 }}>
+          <div className="space-y-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
+                  Song Library
+                </h1>
+                <p className="mt-1 text-sm text-text-muted">
+                  Browse and manage your worship catalog
+                </p>
+              </div>
+              <Skeleton h="36px" w="112px" borderRadius="12px" />
+            </div>
 
-          {/* Header Section */}
-          <Box
-            bg={cardBg}
-            p={4}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            mb={3}
-          >
-            <Flex
-              direction={{ base: 'column', md: 'row' }}
-              justify="space-between"
-              align={{ base: 'stretch', md: 'center' }}
-              gap={4}
-            >
-              <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
-                🎵 Songbank
-              </Heading>
-              <Button
-                colorScheme="green"
-                onClick={onAddDrawerOpen}
-                size="md"
-                isDisabled={true}
-              >
-                + Add Song
-              </Button>
-            </Flex>
-          </Box>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Skeleton h="40px" w={{ base: '100%', sm: '320px' }} borderRadius="12px" />
+              <div className="flex items-center gap-2">
+                <Skeleton h="36px" w="96px" borderRadius="10px" />
+                <Skeleton h="36px" w="136px" borderRadius="10px" />
+                <Skeleton h="36px" w="80px" borderRadius="10px" />
+              </div>
+            </div>
 
-          {/* Search, Filters, and View Toggle - Always Visible */}
-          <Box
-            bg={cardBg}
-            p={4}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            mb={4}
-          >
-            <Flex
-              direction={{ base: 'column', lg: 'row' }}
-              gap={4}
-              align={{ base: 'stretch', lg: 'center' }}
-              w="full"
-              flexWrap="wrap"
-              justify="space-between"
-            >
-              {/* Search */}
-              <Box flex="6" minW="200px">
-                <Input
-                  placeholder="Loading songs..."
-                  value=""
-                  size="md"
-                  w="full"
-                  isDisabled={true}
-                />
-              </Box>
-
-              {/* Key Filter */}
-              <Box flex="3" minW="120px" maxW="200px">
-                <Select
-                  value=""
-                  size="md"
-                  minW="100px"
-                  w="full"
-                  isDisabled={true}
+            <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={3}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Box
+                  key={index}
+                  bg={cardBg}
+                  border="1px"
+                  borderColor={cardBorderColor}
+                  borderRadius="xl"
+                  className="card-shadow"
+                  p={4}
                 >
-                  <option value="">Loading...</option>
-                </Select>
-              </Box>
-
-              {/* Tag Filter */}
-              <Box flex="3" minW="120px" maxW="200px">
-                <Select
-                  value=""
-                  size="md"
-                  minW="100px"
-                  w="full"
-                  isDisabled={true}
-                >
-                  <option value="">Loading...</option>
-                </Select>
-              </Box>
-
-              {/* View Toggle */}
-              <Box flex="0 0 auto" minW="80px">
-                <HStack spacing={1} bg="gray.100" p="1" borderRadius="md">
-                  <IconButton
-                    aria-label="Card View"
-                    icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="14" width="7" height="7"></rect>
-                      <rect x="3" y="14" width="7" height="7"></rect>
-                    </Box>}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="gray"
-                    isDisabled={true}
-                  />
-                  <IconButton
-                    aria-label="Table View"
-                    icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 3h18v18H3zM21 9H3M21 15H3M9 3v18"></path>
-                    </Box>}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="gray"
-                    isDisabled={true}
-                  />
-                </HStack>
-              </Box>
-            </Flex>
-          </Box>
-
-          {/* Songs Table Skeleton - Only the data content */}
-          <Box
-            bg={cardBg}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            overflow="hidden"
-          >
-            <Box overflowX="auto">
-              <Table variant="simple" minW="800px">
-                <Thead>
-                  <Tr>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px" maxW="250px">Title</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Artist</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="80px">Key</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="80px">BPM</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Tags</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Links</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {[1, 2, 3, 4, 5].map((index) => (
-                    <Tr key={index}>
-                      <Td minW="200px" maxW="250px">
-                        <Skeleton height="16px" width="80%" />
-                      </Td>
-                      <Td minW="150px">
-                        <Skeleton height="16px" width="70%" />
-                      </Td>
-                      <Td minW="80px">
-                        <Skeleton height="16px" width="40px" />
-                      </Td>
-                      <Td minW="80px">
-                        <Skeleton height="16px" width="30px" />
-                      </Td>
-                      <Td minW="120px">
-                        <HStack spacing={1}>
-                          <Skeleton height="16px" width="50px" />
-                          <Skeleton height="16px" width="60px" />
-                        </HStack>
-                      </Td>
-                      <Td minW="120px">
-                        <HStack spacing={2}>
-                          <Skeleton height="24px" width="24px" />
-                          <Skeleton height="24px" width="24px" />
-                        </HStack>
-                      </Td>
-                      <Td minW="120px">
-                        <HStack spacing={2}>
-                          <Skeleton height="24px" width="40px" />
-                          <Skeleton height="24px" width="50px" />
-                        </HStack>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </Box>
-          </Box>
+                  <VStack align="stretch" spacing={3}>
+                    <HStack justify="space-between" align="start">
+                      <Box flex="1">
+                        <Skeleton h="16px" w="70%" mb={2} />
+                        <Skeleton h="12px" w="45%" />
+                      </Box>
+                      <Skeleton h="28px" w="28px" borderRadius="8px" />
+                    </HStack>
+                    <HStack spacing={2}>
+                      <Skeleton h="20px" w="44px" borderRadius="999px" />
+                      <Skeleton h="20px" w="64px" borderRadius="999px" />
+                    </HStack>
+                    <HStack justify="space-between" pt={3}>
+                      <Skeleton h="12px" w="56px" />
+                      <Skeleton h="12px" w="72px" />
+                    </HStack>
+                    <HStack justify="space-between" pt={1}>
+                      <HStack spacing={2}>
+                        <Skeleton h="24px" w="68px" borderRadius="8px" />
+                        <Skeleton h="24px" w="64px" borderRadius="8px" />
+                      </HStack>
+                      <HStack spacing={2}>
+                        <Skeleton h="24px" w="44px" borderRadius="8px" />
+                        <Skeleton h="24px" w="54px" borderRadius="8px" />
+                      </HStack>
+                    </HStack>
+                  </VStack>
+                </Box>
+              ))}
+            </SimpleGrid>
+          </div>
         </Box>
       </Box>
     )
   }
 
   return (
-    <Box minH="100vh" bg={bgColor}>
+    <Box className="sl-dashboard-page" minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
-        {/* Back Button - Top Left */}
-        <Box mb={4}>
-          <Button
-            variant="ghost"
-            colorScheme="gray"
-            onClick={() => navigate('/dashboard')}
-            leftIcon={<Text>←</Text>}
-            size="sm"
-          >
-            Back to Dashboard
-          </Button>
-        </Box>
-
-        {/* Compact Header Section */}
-        <Box
-          bg={cardBg}
-          p={4}
-          borderRadius="lg"
-          boxShadow="sm"
-          border="1px"
-          borderColor={cardBorderColor}
-          mb={3}
-        >
-          <Flex
-            direction={{ base: 'column', md: 'row' }}
-            justify="space-between"
-            align={{ base: 'stretch', md: 'center' }}
-            gap={4}
-          >
-            {/* Title - Compact */}
-            <Box>
-              <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
-                🎵 {t('songbank.title')}
-              </Heading>
-            </Box>
-
-            {/* Add Song Button - Green */}
-            {canManagePrimary && (
-              <Button
-                colorScheme="green"
-                onClick={onAddDrawerOpen}
-                size="md"
-                position="relative"
-                overflow="hidden"
-                _before={{
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: '-100%',
-                  width: '100%',
-                  height: '100%',
-                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
-                  animation: 'shimmer 4.5s infinite',
-                }}
-                sx={{
-                  '@keyframes shimmer': {
-                    '0%': { left: '-100%' },
-                    '33.33%': { left: '100%' },
-                    '100%': { left: '100%' },
-                  },
-                }}
-              >
-                + {t('songbank.addSong')}
-              </Button>
-            )}
-          </Flex>
-        </Box>
-
+      <Box as="main" maxW="1200px" mx="auto" px={{ base: 6, md: 8 }} pt={{ base: 2, md: 3 }} pb={{ base: 6, md: 8 }}>
+        <VStack align="stretch" spacing={4}>
         {/* Add Song Drawer */}
         <Drawer
           isOpen={isAddDrawerOpen}
@@ -874,9 +905,9 @@ export function Songbank() {
                       Cancel
                     </Button>
                     <Button
+                      className="btn-primary-size"
                       type="submit"
                       colorScheme="green"
-                      size="md"
                       isLoading={loading}
                     >
                       Add Song
@@ -1019,9 +1050,9 @@ export function Songbank() {
                       Cancel
                     </Button>
                     <Button
+                      className="btn-primary-size"
                       type="submit"
                       colorScheme="blue"
-                      size="md"
                       isLoading={loading}
                     >
                       Update Song
@@ -1106,416 +1137,273 @@ export function Songbank() {
           </ModalContent>
         </Modal>
 
-        {/* Search, Filters, and View Toggle - All in One Line */}
-        <Box
-          bg={cardBg}
-          p={4}
-          borderRadius="lg"
-          boxShadow="sm"
-          border="1px"
-          borderColor={cardBorderColor}
-          mb={2}
-        >
-          <Flex
-            direction={{ base: 'column', lg: 'row' }}
-            gap={4}
-            align={{ base: 'stretch', lg: 'center' }}
-            w="full"
-            flexWrap="wrap"
-            justify="space-between"
-          >
-            {/* Search */}
-            <Box flex="6" minW="200px">
-              <Input
-                placeholder={loading ? "Loading songs..." : "Search songs..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="md"
-                w="full"
-                isDisabled={loading}
-              />
-            </Box>
+        <div className="space-y-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
+                Song Library
+              </h1>
+              <p className="mt-1 text-sm text-text-muted">
+                Browse and manage your worship catalog
+              </p>
+            </div>
+            {canManagePrimary ? (
+              <Button className="btn-primary" onClick={onAddDrawerOpen} size="sm" type="button">
+                <span aria-hidden="true">＋</span>
+                <span className="hidden sm:inline">{t('songbank.addSong')}</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
+            ) : null}
+          </div>
 
-            {/* Key Filter */}
-            <Box flex="3" minW="120px" maxW="200px">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <Box flex="1" w="100%" maxW={{ base: 'full', sm: '320px' }}>
+              <InputGroup>
+                <InputLeftElement color="gray.400" pointerEvents="none">
+                  <SearchIcon />
+                </InputLeftElement>
+                <Input
+                  className="input-field"
+                  placeholder="Search songs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  w="full"
+                  pl="40px"
+                  isDisabled={loading}
+                />
+              </InputGroup>
+            </Box>
+            <div className="flex items-center gap-2">
+              <button className="btn-secondary" onClick={() => setShowFilters((value) => !value)} type="button">
+                <span>Filters</span>
+                <span aria-hidden="true" className={`transition-transform ${showFilters ? 'rotate-180' : ''}`}>⌄</span>
+              </button>
               <Select
-                value={selectedKey}
-                onChange={(e) => setSelectedKey(e.target.value)}
-                size="md"
-                minW="100px"
-                w="full"
-                isDisabled={loading}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'popular' | 'recent' | 'title')}
+                size="sm"
+                maxW="160px"
+                bg="white"
               >
-                <option value="">{loading ? 'Loading...' : 'All Keys'}</option>
-                {!loading && uniqueKeys.map(key => (
-                  <option key={key} value={key}>{key}</option>
-                ))}
+                <option value="popular">Most Popular</option>
+                <option value="recent">Recently Used</option>
+                <option value="title">A-Z</option>
               </Select>
-            </Box>
-
-            {/* Tag Filter */}
-            <Box flex="3" minW="120px" maxW="200px">
-              <Select
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-                size="md"
-                minW="100px"
-                w="full"
-                isDisabled={loading}
-              >
-                <option value="">{loading ? 'Loading...' : 'All Tags'}</option>
-                {!loading && uniqueTags.map(tag => (
-                  <option key={tag} value={tag}>{tag}</option>
-                ))}
-              </Select>
-            </Box>
-
-            {/* View Toggle */}
-            <Box flex="0 0 auto" minW="80px">
-              <HStack spacing={1} bg="gray.100" p="1" borderRadius="md">
-                <IconButton
-                  aria-label="Card View"
-                  icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="flex items-center rounded-lg bg-gray-100 p-1">
+                <button
+                  className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted'}`}
+                  onClick={() => setViewMode('grid')}
+                  title="Grid view"
+                  type="button"
+                >
+                  <Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="3" width="7" height="7"></rect>
                     <rect x="14" y="3" width="7" height="7"></rect>
                     <rect x="14" y="14" width="7" height="7"></rect>
                     <rect x="3" y="14" width="7" height="7"></rect>
-                  </Box>}
-                  size="sm"
-                  variant={viewMode === 'cards' ? 'solid' : 'ghost'}
-                  colorScheme={viewMode === 'cards' ? 'blue' : 'gray'}
-                  onClick={() => setViewMode('cards')}
-                />
-                <IconButton
-                  aria-label="Table View"
-                  icon={<Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 3h18v18H3zM21 9H3M21 15H3M9 3v18"></path>
-                  </Box>}
-                  size="sm"
-                  variant={viewMode === 'table' ? 'solid' : 'ghost'}
-                  colorScheme={viewMode === 'table' ? 'blue' : 'gray'}
+                  </Box>
+                </button>
+                <button
+                  className={`rounded-md p-1.5 transition-colors ${viewMode === 'table' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted'}`}
                   onClick={() => setViewMode('table')}
-                />
-              </HStack>
-            </Box>
-          </Flex>
-        </Box>
+                  title="Table view"
+                  type="button"
+                >
+                  <Box as="svg" w="4" h="4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 3h18v18H3zM21 9H3M21 15H3M9 3v18"></path>
+                  </Box>
+                </button>
+              </div>
+            </div>
+          </div>
 
-        {/* Songs List */}
-        {filteredSongs.length === 0 ? (
-          <Box
-            bg={cardBg}
-            p={12}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            textAlign="center"
-          >
-            <Text color={mutedTextColor} fontSize="md">
-              {songs.length === 0 ? t('songbank.noSongsYet') : t('songbank.noSongsFound')}
-            </Text>
-          </Box>
-        ) : viewMode === 'cards' ? (
-          // Card View
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-            {filteredSongs.map(song => (
-              <Box
-                key={song.id}
-                bg={cardBg}
-                p={3}
-                borderRadius="lg"
-                boxShadow="sm"
-                border="1px"
-                borderColor={cardBorderColor}
-                transition="all 0.2s ease"
-                _hover={{
-                  transform: 'translateY(-1px)',
-                  boxShadow: cardHoverShadow
-                }}
+          {showFilters ? (
+            <div className="sl-chip-row">
+              <button
+                className={`sl-chip ${selectedTag === '' ? 'sl-chip-active' : ''}`}
+                onClick={() => setSelectedTag('')}
+                type="button"
               >
-                <VStack spacing={2} align="stretch">
-                  <Box>
-                    <Heading as="h3" size="md" color={titleColor} mb={1} fontWeight="600">
-                      {song.title}
-                    </Heading>
-                    <Text color={subtitleColor} fontSize="md" mb={2}>
-                      {song.artist}
-                    </Text>
-                    
-                    {(song.key || song.bpm || song.ccli_number) && (
-                      <HStack spacing={2} mb={2} flexWrap="wrap">
-                        {song.key && (
-                          <Badge colorScheme="gray" variant="subtle" fontSize="xs">
-                            Key: {song.key}
-                          </Badge>
-                        )}
-                        {song.bpm && (
-                          <Badge colorScheme="gray" variant="subtle" fontSize="xs">
-                            BPM: {song.bpm}
-                          </Badge>
-                        )}
-                        {song.ccli_number && (
-                          <Badge colorScheme="gray" variant="subtle" fontSize="xs">
-                            CCLI: {song.ccli_number}
-                          </Badge>
-                        )}
-                      </HStack>
-                    )}
+                All Tags
+              </button>
+              {uniqueTags.map((tag) => (
+                <button
+                  className={`sl-chip ${selectedTag === tag ? 'sl-chip-active' : ''}`}
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  type="button"
+                >
+                  {tag}
+                </button>
+              ))}
+              {favorites.size > 0 ? (
+                <button
+                  className={`sl-chip ${selectedTag === 'favorites' ? 'sl-chip-active' : ''}`}
+                  onClick={() => setSelectedTag('favorites')}
+                  type="button"
+                >
+                  Favorites
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
-                    {song.tags.length > 0 && (
-                      <HStack spacing={2} mb={2} flexWrap="wrap">
-                        {song.tags.map(tag => (
-                          <Badge key={tag} colorScheme="blue" fontSize="xs">
+          {sortedSongs.length === 0 ? (
+            <EmptyState
+              description={songs.length === 0 ? 'Add your first song to start building the library.' : 'Try adjusting your search or filters.'}
+              icon={<span className="text-2xl">🎵</span>}
+              title={songs.length === 0 ? 'No songs yet' : 'No songs found'}
+              action={
+                searchTerm || selectedTag ? (
+                  <Button
+                    className="btn-primary"
+                    onClick={() => {
+                      setSearchTerm('')
+                      setSelectedTag('')
+                    }}
+                    size="sm"
+                    type="button"
+                  >
+                    Clear Filters
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : viewMode === 'grid' ? (
+            sortBy === 'popular' && searchTerm === '' && selectedTag === '' ? (
+              <div className="space-y-6">
+                {favoriteSongs.length > 0 ? (
+                  <div>
+                    <div className="mb-4 flex items-center gap-2">
+                      <span className="text-danger-500">♥</span>
+                      <h2 className="section-title">Favorites</h2>
+                      <span className="text-sm text-text-muted">({favoriteSongs.length})</span>
+                    </div>
+                    <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={3}>
+                      {favoriteSongs.map(renderSongCard)}
+                    </SimpleGrid>
+                  </div>
+                ) : null}
+
+                <div>
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className="text-primary-600">◷</span>
+                    <h2 className="section-title">Recently Used</h2>
+                  </div>
+                  <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={3}>
+                    {recentlyUsedSongs.map(renderSongCard)}
+                  </SimpleGrid>
+                </div>
+
+                <div>
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className="text-success-600">↗</span>
+                    <h2 className="section-title">Most Used</h2>
+                  </div>
+                  <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={3}>
+                    {popularSongs.map(renderSongCard)}
+                  </SimpleGrid>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="section-title">
+                    {searchTerm ? `Results for "${searchTerm}"` : 'All Songs'}
+                    <span className="ml-2 text-sm text-text-muted">({sortedSongs.length})</span>
+                  </h2>
+                  {searchTerm || selectedTag ? (
+                    <button
+                      className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                      onClick={() => {
+                        setSearchTerm('')
+                        setSelectedTag('')
+                      }}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={3}>
+                  {sortedSongs.map(renderSongCard)}
+                </SimpleGrid>
+              </div>
+            )
+          ) : (
+            <div className="sl-compact-table">
+              <div className="hidden grid-cols-[1fr_80px_80px_120px_100px_80px_48px] gap-3 border-b border-border bg-gray-50/50 px-4 py-2.5 sm:grid">
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Song</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Key</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">BPM</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Tags</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Uses</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Last</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-center text-text-muted">Fav</span>
+              </div>
+              <div className="divide-y divide-border">
+                {sortedSongs.map((song) => {
+                  const usage = getSongUsage(song.id)
+                  const isFavorite = favorites.has(song.id)
+
+                  return (
+                    <div
+                      key={song.id}
+                      className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50/50"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate text-sm font-medium text-text-primary">{song.title}</h3>
+                          {isFavorite ? <Text color="red.500" fontSize="xs">♥</Text> : null}
+                        </div>
+                        <p className="mt-0.5 text-xs text-text-muted">{song.artist}</p>
+                        <div className="mt-1 flex items-center gap-2 flex-wrap sm:hidden">
+                          {song.key ? <Badge colorScheme="gray" variant="subtle" fontSize="10px">{song.key}</Badge> : null}
+                          {song.bpm ? <Badge colorScheme="gray" variant="subtle" fontSize="10px">{song.bpm} BPM</Badge> : null}
+                          <span className="text-xs text-text-muted">{usage.usageCount} uses</span>
+                        </div>
+                      </div>
+                      <div className="hidden w-[80px] flex-shrink-0 sm:flex">
+                        <span className="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-text-muted">
+                          {song.key || '-'}
+                        </span>
+                      </div>
+                      <div className="hidden w-[80px] flex-shrink-0 sm:flex">
+                        <span className="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-text-muted">
+                          {song.bpm || '-'}
+                        </span>
+                      </div>
+                      <div className="hidden w-[120px] flex-shrink-0 flex-wrap items-center gap-1 sm:flex">
+                        {song.tags.slice(0, 2).map((tag) => (
+                          <Badge key={tag} colorScheme="blue" fontSize="10px" variant="subtle">
                             {tag}
                           </Badge>
                         ))}
-                      </HStack>
-                    )}
-
-                    {(song.youtube_url || song.spotify_url) && (
-                      <HStack spacing={2} mb={3}>
-                        {song.youtube_url && (
-                          <Button
-                            as="a"
-                            href={song.youtube_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            size="sm"
-                            colorScheme="red"
-                            leftIcon={<Text>🎬</Text>}
-                          />
-                        )}
-                        {song.spotify_url && (
-                          <Button
-                            as="a"
-                            href={song.spotify_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            size="sm"
-                            colorScheme="green"
-                            leftIcon={<Text>🎵</Text>}
-                          />
-                        )}
-                      </HStack>
-                    )}
-                  </Box>
-
-                  <HStack spacing={1} justify="flex-end">
-                    {canManagePrimary && (
-                      <>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          colorScheme="gray"
-                          onClick={() => openEditForm(song)}
+                        {song.tags.length > 2 ? <span className="text-[10px] text-text-muted">+{song.tags.length - 2}</span> : null}
+                      </div>
+                      <div className="hidden w-[100px] flex-shrink-0 text-xs font-medium text-text-muted sm:block">
+                        {usage.usageCount}
+                      </div>
+                      <div className="hidden w-[80px] flex-shrink-0 text-xs text-text-muted sm:block">
+                        {timeAgo(usage.lastUsed)}
+                      </div>
+                      <div className="flex w-[48px] flex-shrink-0 items-center justify-center">
+                        <button
+                          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100"
+                          onClick={() => toggleFavorite(song.id)}
+                          type="button"
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          size="xs"
-                          colorScheme="red"
-                          onClick={() => openDeleteModal(song)}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                  </HStack>
-                </VStack>
-              </Box>
-            ))}
-          </SimpleGrid>
-        ) : (
-          // Table View
-          <Box
-            bg={cardBg}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            overflow="hidden"
-          >
-            {/* Mobile Responsive Table Container */}
-            <Box
-              overflowX="auto"
-              css={{
-                '&::-webkit-scrollbar': {
-                  height: '8px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: 'transparent',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: useColorModeValue('gray.300', 'gray.600'),
-                  borderRadius: '4px',
-                },
-                '&::-webkit-scrollbar-thumb:hover': {
-                  background: useColorModeValue('gray.400', 'gray.500'),
-                },
-              }}
-            >
-              <Table variant="simple" minW="800px">
-                <Thead>
-                  <Tr>
-                    <Th 
-                      bg={tableHeaderBg} 
-                      color={textColor} 
-                      fontSize="sm" 
-                      fontWeight="600"
-                      position="sticky"
-                      left="0"
-                      zIndex="1"
-                      minW="200px"
-                      maxW="250px"
-                    >
-                      Title
-                    </Th>
-                    <Th 
-                      bg={tableHeaderBg} 
-                      color={textColor} 
-                      fontSize="sm" 
-                      fontWeight="600"
-                      minW="150px"
-                    >
-                      Artist
-                    </Th>
-                    <Th 
-                      bg={tableHeaderBg} 
-                      color={textColor} 
-                      fontSize="sm" 
-                      fontWeight="600"
-                      minW="80px"
-                    >
-                      Key
-                    </Th>
-                    <Th 
-                      bg={tableHeaderBg} 
-                      color={textColor} 
-                      fontSize="sm" 
-                      fontWeight="600"
-                      minW="80px"
-                    >
-                      BPM
-                    </Th>
-                    <Th 
-                      bg={tableHeaderBg} 
-                      color={textColor} 
-                      fontSize="sm" 
-                      fontWeight="600"
-                      minW="120px"
-                    >
-                      Tags
-                    </Th>
-                    <Th 
-                      bg={tableHeaderBg} 
-                      color={textColor} 
-                      fontSize="sm" 
-                      fontWeight="600"
-                      minW="120px"
-                    >
-                      Links
-                    </Th>
-                    <Th 
-                      bg={tableHeaderBg} 
-                      color={textColor} 
-                      fontSize="sm" 
-                      fontWeight="600"
-                      minW="120px"
-                    >
-                      Actions
-                    </Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {filteredSongs.map(song => (
-                    <Tr key={song.id} _hover={{ bg: tableHoverBg }}>
-                      <Td 
-                        fontWeight="500" 
-                        color={titleColor}
-                        position="sticky"
-                        left="0"
-                        bg={cardBg}
-                        zIndex="1"
-                        minW="200px"
-                        maxW="250px"
-                        borderRight="1px"
-                        borderColor={cardBorderColor}
-                      >
-                        {song.title}
-                      </Td>
-                      <Td minW="150px">{song.artist}</Td>
-                      <Td minW="80px">{song.key || '-'}</Td>
-                      <Td minW="80px">{song.bpm || '-'}</Td>
-                      <Td minW="120px">
-                        {song.tags.length > 0 ? (
-                          <HStack spacing={1} flexWrap="wrap">
-                            {song.tags.map(tag => (
-                              <Badge key={tag} colorScheme="blue" fontSize="xs" size="sm">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </HStack>
-                        ) : '-'}
-                      </Td>
-                      <Td minW="120px">
-                        {(song.youtube_url || song.spotify_url) && (
-                          <HStack spacing={2}>
-                            {song.youtube_url && (
-                              <Button
-                                as="a"
-                                href={song.youtube_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                size="xs"
-                                colorScheme="red"
-                                leftIcon={<Text fontSize="xs">🎬</Text>}
-                              />
-                            )}
-                            {song.spotify_url && (
-                              <Button
-                                as="a"
-                                href={song.spotify_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                size="xs"
-                                colorScheme="green"
-                                leftIcon={<Text fontSize="xs">🎵</Text>}
-                              />
-                            )}
-                          </HStack>
-                        )}
-                      </Td>
-                      <Td minW="120px">
-                        <HStack spacing={2}>
-                          {canManagePrimary && (
-                            <>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                colorScheme="gray"
-                                onClick={() => openEditForm(song)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="xs"
-                                colorScheme="red"
-                                onClick={() => openDeleteModal(song)}
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          )}
-                        </HStack>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </Box>
-          </Box>
-        )}
+                          <Text color={isFavorite ? 'red.500' : mutedTextColor} fontSize="sm">♥</Text>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+        </VStack>
       </Box>
     </Box>
   )

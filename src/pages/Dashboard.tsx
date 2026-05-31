@@ -19,7 +19,6 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerBody,
-  DrawerFooter,
   DrawerCloseButton,
   Badge,
   FormControl,
@@ -49,7 +48,7 @@ import {
   InputLeftElement
 } from '@chakra-ui/react'
 import { CloseButton } from '@chakra-ui/react'
-import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CloseIcon, EditIcon, SearchIcon, CheckIcon } from '@chakra-ui/icons'
+import { AddIcon, ArrowForwardIcon, AtSignIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CloseIcon, EditIcon, SearchIcon, CheckIcon, TimeIcon } from '@chakra-ui/icons'
 import {
   DndContext,
   closestCenter,
@@ -140,6 +139,22 @@ interface Instrument {
   updated_at?: string
 }
 
+const dashboardAvatarColors = ['#2563EB', '#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444']
+
+function getNameInitials(firstName?: string, lastName?: string, email?: string) {
+  const initials = `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.trim()
+  if (initials) return initials.toUpperCase()
+  return (email || 'U').slice(0, 2).toUpperCase()
+}
+
+function getAvatarColor(seed: string) {
+  let hash = 0
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = seed.charCodeAt(index) + ((hash << 5) - hash)
+  }
+  return dashboardAvatarColors[Math.abs(hash) % dashboardAvatarColors.length]
+}
+
 export function Dashboard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -170,9 +185,6 @@ export function Dashboard() {
   // Drawer mode state
   const [drawerMode, setDrawerMode] = useState<'day' | 'single'>('day')
   const [selectedSingleService, setSelectedSingleService] = useState<WorshipService | null>(null)
-  
-  // Tab state for drawer
-  const [activeDrawerTab, setActiveDrawerTab] = useState<'songs' | 'volunteers'>('songs')
   
   // Scroll indicator state
   const [showScrollIndicator, setShowScrollIndicator] = useState(false)
@@ -270,15 +282,11 @@ export function Dashboard() {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [usersLoaded, setUsersLoaded] = useState(false)
 
-  // Volunteer link state
-  const [volunteerLink, setVolunteerLink] = useState<string>('')
-  const [loadingVolunteerLink, setLoadingVolunteerLink] = useState(false)
-  const [copyingLink, setCopyingLink] = useState(false)
   const [servicesLoaded, setServicesLoaded] = useState(false)
   const [recentSongsLoaded, setRecentSongsLoaded] = useState(false)
-  const [volunteerLinkLoaded, setVolunteerLinkLoaded] = useState(false)
   const [userVolunteerDatesLoaded, setUserVolunteerDatesLoaded] = useState(false)
   const [instrumentsLoaded, setInstrumentsLoaded] = useState(false)
+  const [openingVolunteerPage, setOpeningVolunteerPage] = useState(false)
   const toast = useToast()
 
   const monthNames = [
@@ -297,7 +305,7 @@ export function Dashboard() {
   ]
 
   function handlePrevMonth() {
-    if (!displayMonth || !displayYear) return
+    if (displayMonth === null || displayYear === null) return
     if (displayMonth === 0) {
       setDisplayMonth(11)
       setDisplayYear(displayYear - 1)
@@ -307,19 +315,13 @@ export function Dashboard() {
   }
 
   function handleNextMonth() {
-    if (!displayMonth || !displayYear) return
+    if (displayMonth === null || displayYear === null) return
     if (displayMonth === 11) {
       setDisplayMonth(0)
       setDisplayYear(displayYear + 1)
       return
     }
     setDisplayMonth(displayMonth + 1)
-  }
-
-  function handleSelectMonth(e: React.ChangeEvent<HTMLSelectElement>) {
-    const next = Number(e.target.value)
-    if (Number.isNaN(next)) return
-    setDisplayMonth(next)
   }
 
   const loadAvailableSongs = useCallback(async () => {
@@ -471,155 +473,267 @@ export function Dashboard() {
     }
   }, [createDrawer.isOpen, services, selectedSingleService, checkScrollIndicator])
 
-  // Function to render single service content (no accordion)
-  function renderSingleServiceContent(service: WorshipService) {
-    // Show different content based on active tab
-    if (activeDrawerTab === 'songs') {
-      return renderSongsTab(service)
-    } else {
-      return renderVolunteersTab(service)
-    }
+  const getSingleServiceStatusColorScheme = (status: WorshipService['status']) => {
+    if (status === 'published') return 'green'
+    if (status === 'completed') return 'blue'
+    return 'yellow'
   }
 
-  // Function to render the Songs tab content
-  function renderSongsTab(service: WorshipService) {
-    return (
-      <VStack align="stretch" spacing={4}>
-        {/* Songs Section */}
-        <Box>
-          <HStack justify="space-between" align="center" mb={2}>
-            <Text fontWeight="700" fontSize="xl">Songs</Text>
-            {canManagePrimary && (
-              <Button
-                size="sm"
-                variant="outline"
-                colorScheme="blue"
-                onClick={() => openSongSelectionModal(service.id)}
-              >
-                + Add Song
-              </Button>
-            )}
-          </HStack>
+  function renderSingleServiceContent(service: WorshipService) {
+    const serviceSongs = serviceIdToSongs[service.id] || []
+    const serviceVolunteers = serviceIdToVolunteers[service.id] || []
 
-          {(serviceIdToSongs[service.id] || []).length === 0 ? (
-            <Text color={mutedTextColor}>No songs added yet</Text>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(event) => handleReorderServiceSongs(service.id, event)}
+    return (
+      <VStack align="stretch" spacing={6}>
+        <Box>
+          <HStack align="center" gap={2} mb={1} flexWrap="wrap">
+            <Text color={titleColor} fontSize="xl" fontWeight="700" m={0}>
+              {service.title}
+            </Text>
+            <Badge
+              colorScheme={getSingleServiceStatusColorScheme(service.status)}
+              textTransform="capitalize"
+              variant="subtle"
             >
-              <SortableContext
-                items={(serviceIdToSongs[service.id] || []).map(row => row.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <VStack spacing={2} align="stretch">
-                  {(serviceIdToSongs[service.id] || []).map((serviceSong) => (
-                    <SortableServiceSongItem
-                      key={serviceSong.id}
-                      serviceSong={serviceSong}
-                      canManage={canManagePrimary}
-                      onRemove={() => handleRemoveServiceSong(serviceSong.id, service.id)}
-                    />
-                  ))}
-                </VStack>
-              </SortableContext>
-            </DndContext>
-          )}
+              {service.status}
+            </Badge>
+          </HStack>
+          <HStack color={mutedTextColor} fontSize="sm" spacing={3} flexWrap="wrap">
+            <HStack spacing={1}>
+              <CalendarIcon boxSize={4} />
+              <Text m={0}>
+                {new Date(service.service_time).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </Text>
+            </HStack>
+            <HStack spacing={1}>
+              <TimeIcon boxSize={4} />
+              <Text m={0}>{getServiceTimeDisplay(service.service_time)}</Text>
+            </HStack>
+          </HStack>
         </Box>
+
+        {(service.description || canManagePrimary) ? (
+          <Box
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            border="1px"
+            borderColor={cardBorderColor}
+            borderRadius="xl"
+            p={4}
+          >
+            <HStack justify="space-between" align="center" mb={service.description || isEditingDescription ? 3 : 0}>
+              <Text color={titleColor} fontSize="sm" fontWeight="600" m={0}>
+                Description
+              </Text>
+              {canManagePrimary ? (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  colorScheme="blue"
+                  leftIcon={<EditIcon boxSize={3} />}
+                  onClick={() => handleEditDescription(service)}
+                >
+                  {isEditingDescription ? 'Editing' : 'Edit'}
+                </Button>
+              ) : null}
+            </HStack>
+
+            {isEditingDescription ? (
+              <VStack align="stretch" spacing={3}>
+                <Textarea
+                  value={editingDescription}
+                  onChange={(e) => setEditingDescription(e.target.value)}
+                  placeholder="Add service notes or preparation details..."
+                  rows={5}
+                  resize="vertical"
+                />
+                <HStack spacing={2}>
+                  <Button
+                    size="sm"
+                    colorScheme="blue"
+                    onClick={handleSaveDescription}
+                    isLoading={savingDescription}
+                  >
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleCancelEditDescription}>
+                    Cancel
+                  </Button>
+                </HStack>
+              </VStack>
+            ) : service.description ? (
+              <Box
+                color={textColor}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(service.description) }}
+                sx={{
+                  '& p': { margin: '0.5rem 0' },
+                  '& li': { color: textColor },
+                  '& strong': { fontWeight: '600' },
+                  '& em': { fontStyle: 'italic' },
+                }}
+              />
+            ) : (
+              <Text color={mutedTextColor} fontSize="sm" fontStyle="italic" m={0}>
+                No description available.
+              </Text>
+            )}
+          </Box>
+        ) : null}
+
+        {renderSongsTab(service, serviceSongs)}
+        {renderVolunteersTab(service, serviceVolunteers)}
+
+        <Button
+          className="btn-primary"
+          onClick={() => {
+            createDrawer.onClose()
+            navigate(`/service/${service.id}`)
+          }}
+          size="sm"
+          w="100%"
+        >
+          Open Full Page
+        </Button>
       </VStack>
     )
   }
 
-  // Function to render the Volunteers tab content
-  function renderVolunteersTab(service: WorshipService) {
+  function renderSongsTab(service: WorshipService, serviceSongs: ServiceSong[]) {
     return (
-      <VStack align="stretch" spacing={4}>
-        {/* Volunteers Section */}
-        <Box>
-          <HStack justify="space-between" align="center" mb={2}>
-            <Text fontWeight="700" fontSize="xl">Volunteers</Text>
-            {canManagePrimary && (
-              <Button
-                size="sm"
-                variant="outline"
-                colorScheme="blue"
-                onClick={() => openVolunteerSelectionModal(service.id)}
-              >
-                + Add Volunteer
-              </Button>
-            )}
+      <Box>
+        <HStack justify="space-between" align="center" mb={3}>
+          <HStack spacing={2}>
+            <Text color={titleColor} fontSize="sm" fontWeight="600">Setlist</Text>
+            <Text color={mutedTextColor} fontSize="xs">({serviceSongs.length} songs)</Text>
           </HStack>
+          {canManagePrimary ? (
+            <Button
+              size="xs"
+              variant="outline"
+              colorScheme="blue"
+              onClick={() => openSongSelectionModal(service.id)}
+            >
+              Add Song
+            </Button>
+          ) : null}
+        </HStack>
 
-          {(serviceIdToVolunteers[service.id] || []).length === 0 ? (
-            <Text color={mutedTextColor}>No volunteers assigned yet</Text>
-          ) : (
-            <VStack spacing={2} align="stretch">
-              {(serviceIdToVolunteers[service.id] || []).map((volunteer) => (
+        {serviceSongs.length === 0 ? (
+          <Text color={mutedTextColor} fontSize="sm">No songs added yet.</Text>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(event) => handleReorderServiceSongs(service.id, event)}
+          >
+            <SortableContext
+              items={serviceSongs.map((row) => row.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <VStack spacing={2} align="stretch">
+                {serviceSongs.map((serviceSong) => (
+                  <SortableServiceSongItem
+                    key={serviceSong.id}
+                    serviceSong={serviceSong}
+                    canManage={canManagePrimary}
+                    onRemove={() => handleRemoveServiceSong(serviceSong.id, service.id)}
+                  />
+                ))}
+              </VStack>
+            </SortableContext>
+          </DndContext>
+        )}
+      </Box>
+    )
+  }
+
+  function renderVolunteersTab(service: WorshipService, serviceVolunteers: Volunteer[]) {
+    return (
+      <Box>
+        <HStack justify="space-between" align="center" mb={3}>
+          <HStack spacing={2}>
+            <Text color={titleColor} fontSize="sm" fontWeight="600">Volunteers</Text>
+            <Text color={mutedTextColor} fontSize="xs">({serviceVolunteers.length})</Text>
+          </HStack>
+          {canManagePrimary ? (
+            <Button
+              size="xs"
+              variant="outline"
+              colorScheme="blue"
+              onClick={() => openVolunteerSelectionModal(service.id)}
+            >
+              Add Volunteer
+            </Button>
+          ) : null}
+        </HStack>
+
+        {serviceVolunteers.length === 0 ? (
+          <Text color={mutedTextColor} fontSize="sm">No volunteers assigned yet.</Text>
+        ) : (
+          <VStack spacing={2} align="stretch">
+            {serviceVolunteers.map((volunteer) => (
+              <Box
+                key={volunteer.id}
+                bg={useColorModeValue('gray.50', 'gray.700')}
+                borderRadius="lg"
+                p={3}
+                display="flex"
+                alignItems="center"
+                gap={3}
+                cursor="pointer"
+                _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                onClick={() => openInstrumentSelectionModal(volunteer.id)}
+                transition="background-color 0.2s"
+              >
                 <Box
-                  key={volunteer.id}
-                  bg="#f9f9f9"
-                  borderRadius="20px"
-                  p={4}
+                  bg="blue.100"
+                  color="blue.700"
+                  borderRadius="full"
+                  w="28px"
+                  h="28px"
                   display="flex"
                   alignItems="center"
-                  gap={3}
-                  cursor="pointer"
-                  _hover={{ bg: "#f0f0f0" }}
-                  onClick={() => openInstrumentSelectionModal(volunteer.id)}
-                  transition="background-color 0.2s"
+                  justifyContent="center"
+                  fontSize="xs"
+                  fontWeight="700"
+                  flexShrink={0}
                 >
-                  <Box
-                    bg="blue.500"
-                    color="white"
-                    borderRadius="full"
-                    w="32px"
-                    h="32px"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    fontSize="xs"
-                    fontWeight="600"
-                  >
-                    {(() => {
-                      const firstName = volunteer.profiles?.first_name || ''
-                      const lastName = volunteer.profiles?.last_name || ''
-                      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
-                    })()}
-                  </Box>
-                  <VStack align="start" spacing={0} flex={1}>
-                    <Text fontWeight="600" fontSize="sm">
-                      {volunteer.profiles?.first_name} {volunteer.profiles?.last_name}
-                    </Text>
-                    {(volunteerToInstrumentIds[volunteer.id] || []).length > 0 && (
-                      <Text fontSize="xs" color="gray.600">
-                        {(volunteerToInstrumentIds[volunteer.id] || [])
-                          .map(instId => instruments.find(i => i.id === instId)?.name)
-                          .filter(Boolean)
-                          .join(', ')}
-                      </Text>
-                    )}
-                  </VStack>
-                  {canManagePrimary && (
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      colorScheme="red"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRemoveVolunteer(volunteer.id, service.id)
-                      }}
-                      isLoading={removingVolunteerById[volunteer.id]}
-                    >
-                      Remove
-                    </Button>
-                  )}
+                  {getNameInitials(volunteer.profiles?.first_name, volunteer.profiles?.last_name, volunteer.profiles?.email)}
                 </Box>
-              ))}
-            </VStack>
-          )}
-        </Box>
-      </VStack>
+                <Box flex="1" minW={0}>
+                  <Text color={textColor} fontWeight="600" fontSize="sm" m={0} noOfLines={1}>
+                    {`${volunteer.profiles?.first_name || ''} ${volunteer.profiles?.last_name || ''}`.trim() || volunteer.profiles?.email}
+                  </Text>
+                  <Text color={mutedTextColor} fontSize="xs" m={0} noOfLines={1}>
+                    {(volunteerToInstrumentIds[volunteer.id] || [])
+                      .map(instId => instruments.find(i => i.id === instId)?.name)
+                      .filter(Boolean)
+                      .join(', ') || 'No instruments assigned'}
+                  </Text>
+                </Box>
+                {canManagePrimary ? (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorScheme="red"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRemoveVolunteer(volunteer.id, service.id)
+                    }}
+                    isLoading={removingVolunteerById[volunteer.id]}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+              </Box>
+            ))}
+          </VStack>
+        )}
+      </Box>
     )
   }
 
@@ -644,29 +758,29 @@ export function Dashboard() {
       <Box
         ref={setNodeRef}
         style={style}
-        bg="#f9f9f9"
-        borderRadius="20px"
-        p={4}
+        bg={useColorModeValue('gray.50', 'gray.700')}
+        borderRadius="lg"
+        p={3}
         display="flex"
         alignItems="center"
         gap={3}
         transition="all 0.2s ease"
-        _hover={{ bg: "#f0f0f0" }}
+        _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
         cursor={canManage ? 'grab' : 'default'}
         userSelect="none"
         {...attributes}
       >
         <Box
-          bg="blue.500"
-          color="white"
-          borderRadius="full"
-          w={8}
-          h={8}
+          bg={useColorModeValue('gray.200', 'gray.600')}
+          color={mutedTextColor}
+          borderRadius="md"
+          w={6}
+          h={6}
           display="flex"
           alignItems="center"
           justifyContent="center"
           fontWeight="600"
-          fontSize="sm"
+          fontSize="xs"
           flexShrink={0}
           position="relative"
           {...(canManage ? listeners : {})}
@@ -675,14 +789,15 @@ export function Dashboard() {
         </Box>
 
         <Box flex="1" minW="0" cursor={canManage ? 'grab' : 'default'} {...(canManage ? listeners : {})}>
-          <Text fontWeight="600" color="black" fontSize="md" mb={0} noOfLines={1}>
+          <Text fontWeight="600" color={textColor} fontSize="sm" mb={0} noOfLines={1}>
             {serviceSong.songs.title}
           </Text>
-          <Text color="gray.600" fontSize="sm" mb={0} noOfLines={1}>
+          <Text color={mutedTextColor} fontSize="xs" mb={0} noOfLines={1}>
             {serviceSong.songs.artist}
+            {serviceSong.songs.key || serviceSong.songs.bpm ? ` · ${serviceSong.songs.key || '-'}${serviceSong.songs.bpm ? ` · ${serviceSong.songs.bpm} BPM` : ''}` : ''}
           </Text>
           {serviceSong.notes && (
-            <Text color="gray.500" fontSize="xs" fontStyle="italic" noOfLines={2} mt={1}>
+            <Text color={mutedTextColor} fontSize="xs" fontStyle="italic" noOfLines={2} mt={1}>
               {serviceSong.notes}
             </Text>
           )}
@@ -690,21 +805,6 @@ export function Dashboard() {
 
         {canManage && (
           <HStack spacing={2}>
-            <Tooltip label="Edit song">
-              <IconButton
-                aria-label="Edit song"
-                icon={<EditIcon boxSize="4" />}
-                variant="ghost"
-                colorScheme="gray"
-                size="sm"
-                borderRadius="full"
-                _hover={{ bg: "gray.200" }}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-              />
-            </Tooltip>
             <Tooltip label="Remove song from service">
               <IconButton
                 aria-label="Remove song from service"
@@ -712,8 +812,7 @@ export function Dashboard() {
                 variant="ghost"
                 colorScheme="red"
                 size="sm"
-                borderRadius="full"
-                _hover={{ bg: "red.100" }}
+                borderRadius="lg"
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -728,8 +827,8 @@ export function Dashboard() {
     )
   }
 
-  async function handleCreateServiceSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleCreateServiceSubmit(e?: React.FormEvent | React.MouseEvent) {
+    e?.preventDefault()
 
     if (!organization || !user) {
       setFormError('You must be logged in to create a service.')
@@ -786,6 +885,358 @@ export function Dashboard() {
     } finally {
       setCreating(false)
     }
+  }
+
+  function resetAddSongForm() {
+    setSongTitle('')
+    setSongArtist('')
+    setSongYouTubeUrl('')
+    setSongSpotifyUrl('')
+    setSongKey('')
+    setSongBpm('')
+    setSongCcli('')
+    setSongTags('')
+    setSongLyrics('')
+  }
+
+  async function handleCreateSongSubmit(e?: React.FormEvent | React.MouseEvent) {
+    e?.preventDefault()
+
+    if (!organization) {
+      setSongError('Organization not found.')
+      return
+    }
+
+    if (!canManagePrimary) {
+      setSongError('You do not have permission to create songs. Only admins and owners can create songs.')
+      return
+    }
+
+    if (!songTitle.trim() || !songArtist.trim()) {
+      setSongError('Title and Artist are required.')
+      return
+    }
+
+    try {
+      setIsAddingSong(true)
+      setSongError('')
+      const tagsArray = songTags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0)
+
+      const { error } = await supabase
+        .from('songs')
+        .insert({
+          organization_id: organization.organization_id,
+          title: songTitle.trim(),
+          artist: songArtist.trim(),
+          youtube_url: songYouTubeUrl || null,
+          spotify_url: songSpotifyUrl || null,
+          key: songKey || null,
+          bpm: songBpm ? parseInt(songBpm) : null,
+          ccli_number: songCcli || null,
+          tags: tagsArray,
+          lyrics: songLyrics || null,
+          created_by: user?.id || null
+        })
+
+      if (error) {
+        setSongError('Failed to add song. Please try again.')
+        return
+      }
+
+      resetAddSongForm()
+      addSongDrawer.onClose()
+      await loadRecentSongs()
+    } catch (err) {
+      setSongError('Failed to add song. Please try again later.')
+    } finally {
+      setIsAddingSong(false)
+    }
+  }
+
+  function renderCreateServiceContent() {
+    const scheduledDateLabel = formDateTime
+      ? new Date(formDateTime).toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : selectedDate
+        ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        : null
+
+    return (
+      <Box as="form" onSubmit={handleCreateServiceSubmit}>
+        <VStack align="stretch" spacing={6}>
+          {formError ? (
+            <Alert status="error" borderRadius="md">
+              <AlertIcon />
+              {formError}
+            </Alert>
+          ) : null}
+
+          <Box>
+            <HStack align="center" gap={2} mb={1} flexWrap="wrap">
+              <Text color={titleColor} fontSize="xl" fontWeight="700" m={0}>
+                {formTitle.trim() || 'New Service'}
+              </Text>
+              <Badge colorScheme="green" variant="subtle">
+                published
+              </Badge>
+            </HStack>
+            <Text color={mutedTextColor} fontSize="sm" m={0}>
+              {scheduledDateLabel ? `Schedule and publish this service for ${scheduledDateLabel}.` : 'Create a new published service for your team.'}
+            </Text>
+          </Box>
+
+          <Box
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            border="1px"
+            borderColor={cardBorderColor}
+            borderRadius="xl"
+            p={4}
+          >
+            <VStack align="stretch" spacing={4}>
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  Service Title
+                </FormLabel>
+                <Input
+                  type="text"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="e.g., Sunday Morning Service"
+                  size="md"
+                />
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  Service Date & Time
+                </FormLabel>
+                <Input
+                  type="datetime-local"
+                  value={formDateTime}
+                  onChange={(e) => setFormDateTime(e.target.value)}
+                  size="md"
+                />
+              </FormControl>
+            </VStack>
+          </Box>
+
+          <Box
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            border="1px"
+            borderColor={cardBorderColor}
+            borderRadius="xl"
+            p={4}
+          >
+            <VStack align="stretch" spacing={3}>
+              <Text color={titleColor} fontSize="sm" fontWeight="600" m={0}>
+                Description
+              </Text>
+              <Textarea
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder="Add service notes or preparation details..."
+                rows={5}
+                resize="vertical"
+              />
+            </VStack>
+          </Box>
+
+          <VStack align="stretch" spacing={2}>
+            <Button
+              className="btn-primary"
+              isLoading={creating}
+              loadingText="Scheduling..."
+              onClick={handleCreateServiceSubmit}
+              size="sm"
+              type="submit"
+              w="100%"
+            >
+              Schedule Service
+            </Button>
+            <Button
+              onClick={createDrawer.onClose}
+              size="sm"
+              variant="ghost"
+              w="100%"
+            >
+              Cancel
+            </Button>
+          </VStack>
+        </VStack>
+      </Box>
+    )
+  }
+
+  function renderCreateSongContent() {
+    const hasMetadata = Boolean(songKey.trim() || songBpm.trim() || songCcli.trim() || songTags.trim())
+
+    return (
+      <Box as="form" onSubmit={handleCreateSongSubmit}>
+        <VStack align="stretch" spacing={6}>
+          {songError ? (
+            <Alert status="error" borderRadius="md">
+              <AlertIcon />
+              {songError}
+            </Alert>
+          ) : null}
+
+          <Box>
+            <Text color={titleColor} fontSize="xl" fontWeight="700" m={0}>
+              {songTitle.trim() || 'New Song'}
+            </Text>
+            <Text color={mutedTextColor} fontSize="sm" mt={1}>
+              Build out your library using the same song details shown throughout the dashboard.
+            </Text>
+          </Box>
+
+          <Box
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            border="1px"
+            borderColor={cardBorderColor}
+            borderRadius="xl"
+            p={4}
+          >
+            <VStack align="stretch" spacing={4}>
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  Title
+                </FormLabel>
+                <Input value={songTitle} onChange={(e) => setSongTitle(e.target.value)} placeholder="Song title" size="md" />
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  Artist
+                </FormLabel>
+                <Input value={songArtist} onChange={(e) => setSongArtist(e.target.value)} placeholder="Artist name" size="md" />
+              </FormControl>
+            </VStack>
+          </Box>
+
+          <Box
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            border="1px"
+            borderColor={cardBorderColor}
+            borderRadius="xl"
+            p={4}
+          >
+            <VStack align="stretch" spacing={4}>
+              <Text color={titleColor} fontSize="sm" fontWeight="600" m={0}>
+                Links
+              </Text>
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  YouTube URL
+                </FormLabel>
+                <Input type="url" value={songYouTubeUrl} onChange={(e) => setSongYouTubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." size="md" />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  Spotify URL
+                </FormLabel>
+                <Input type="url" value={songSpotifyUrl} onChange={(e) => setSongSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/track/..." size="md" />
+              </FormControl>
+            </VStack>
+          </Box>
+
+          <Box
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            border="1px"
+            borderColor={cardBorderColor}
+            borderRadius="xl"
+            p={4}
+          >
+            <VStack align="stretch" spacing={4}>
+              <HStack justify="space-between" align="center">
+                <Text color={titleColor} fontSize="sm" fontWeight="600" m={0}>
+                  Metadata
+                </Text>
+                {hasMetadata ? (
+                  <Badge colorScheme="blue" variant="subtle">
+                    Optional details added
+                  </Badge>
+                ) : null}
+              </HStack>
+
+              <HStack spacing={4} align="stretch">
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                    Key
+                  </FormLabel>
+                  <Input value={songKey} onChange={(e) => setSongKey(e.target.value)} placeholder="C, G, D, etc." size="md" />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                    BPM
+                  </FormLabel>
+                  <Input type="number" value={songBpm} onChange={(e) => setSongBpm(e.target.value)} placeholder="120" size="md" />
+                </FormControl>
+              </HStack>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  CCLI Number
+                </FormLabel>
+                <Input value={songCcli} onChange={(e) => setSongCcli(e.target.value)} placeholder="CCLI-123456" size="md" />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="600" m={0}>
+                  Tags
+                </FormLabel>
+                <Input value={songTags} onChange={(e) => setSongTags(e.target.value)} placeholder="worship, contemporary, gospel" size="md" />
+              </FormControl>
+            </VStack>
+          </Box>
+
+          <Box
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            border="1px"
+            borderColor={cardBorderColor}
+            borderRadius="xl"
+            p={4}
+          >
+            <VStack align="stretch" spacing={3}>
+              <Text color={titleColor} fontSize="sm" fontWeight="600" m={0}>
+                Lyrics
+              </Text>
+              <Textarea value={songLyrics} onChange={(e) => setSongLyrics(e.target.value)} placeholder="Enter song lyrics..." size="md" rows={5} />
+            </VStack>
+          </Box>
+
+          <VStack align="stretch" spacing={2}>
+            <Button
+              className="btn-primary"
+              isLoading={isAddingSong}
+              loadingText="Adding..."
+              onClick={handleCreateSongSubmit}
+              size="sm"
+              type="submit"
+              w="100%"
+            >
+              Add Song
+            </Button>
+            <Button onClick={addSongDrawer.onClose} size="sm" variant="ghost" w="100%">
+              Cancel
+            </Button>
+          </VStack>
+        </VStack>
+      </Box>
+    )
   }
 
   const loadServicesForDate = useCallback(async (isoDate: string) => {
@@ -1493,84 +1944,6 @@ export function Dashboard() {
     }
   }, [organization])
 
-  const loadVolunteerLink = useCallback(async () => {
-    if (!organization) return
-    if (volunteerLinkLoaded) return
-    try {
-      setLoadingVolunteerLink(true)
-      console.log('Loading volunteer link for organization:', organization.organization_id)
-      
-      // Check if organization already has a volunteer link
-      const { data: existingLink, error: fetchError } = await supabase
-        .from('organization_volunteer_links')
-        .select('public_url')
-        .eq('organization_id', organization.organization_id)
-        .single()
-
-      if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          // PGRST116 is "no rows returned" - that's expected if no link exists
-          console.log('No existing volunteer link found, creating new one...')
-        } else {
-          console.error('Error fetching volunteer link:', fetchError)
-          toast({
-            title: 'Error',
-            description: 'Failed to check existing volunteer link',
-            status: 'error',
-            duration: 3000,
-            isClosable: true
-          })
-          return
-        }
-      }
-
-      if (existingLink) {
-        console.log('Found existing volunteer link:', existingLink.public_url)
-        setVolunteerLink(existingLink.public_url)
-        setVolunteerLinkLoaded(true)
-        return
-      }
-
-      // Create new volunteer link if none exists
-      const publicUrl = `volunteer-${organization.organization_id.slice(0, 8)}`
-      console.log('Creating new volunteer link:', publicUrl)
-      
-      const { error: createError } = await supabase
-        .from('organization_volunteer_links')
-        .insert({
-          organization_id: organization.organization_id,
-          public_url: publicUrl
-        })
-
-      if (createError) {
-        console.error('Error creating volunteer link:', createError)
-        toast({
-          title: 'Error',
-          description: `Failed to create volunteer link: ${createError.message}`,
-          status: 'error',
-          duration: 5000,
-          isClosable: true
-        })
-        return
-      }
-
-      console.log('Successfully created volunteer link:', publicUrl)
-      setVolunteerLink(publicUrl)
-      setVolunteerLinkLoaded(true)
-    } catch (err) {
-      console.error('Unexpected error loading volunteer link:', err)
-      toast({
-        title: 'Error',
-        description: 'Failed to load volunteer link',
-        status: 'error',
-        duration: 3000,
-        isClosable: true
-      })
-    } finally {
-      setLoadingVolunteerLink(false)
-    }
-  }, [organization, toast])
-
   const loadUserVolunteerDates = useCallback(async () => {
     if (!organization || !user) return
     if (userVolunteerDatesLoaded) return
@@ -1660,53 +2033,6 @@ export function Dashboard() {
       setUserVolunteerDates([])
     }
   }, [organization, user, displayYear, displayMonth, loadVolunteersForServices])
-
-  const copyVolunteerLink = async () => {
-    try {
-      setCopyingLink(true)
-      
-      // If no volunteer link exists, create one first
-      if (!volunteerLink) {
-        await loadVolunteerLink()
-        // Wait a moment for the state to update
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-      
-      if (!volunteerLink) {
-        toast({
-          title: 'Error',
-          description: 'Failed to create volunteer link',
-          status: 'error',
-          duration: 3000,
-          isClosable: true
-        })
-        return
-      }
-      
-      const fullUrl = `${window.location.origin}/volunteer/${volunteerLink}`
-      await navigator.clipboard.writeText(fullUrl)
-      
-      toast({
-        title: 'Link copied!',
-        description: 'Volunteer link copied to clipboard',
-        status: 'success',
-        duration: 3000,
-        isClosable: true
-      })
-    } catch (err) {
-      console.error('Failed to copy link:', err)
-      toast({
-        title: 'Error',
-        description: 'Failed to copy link to clipboard',
-        status: 'error',
-        duration: 3000,
-        isClosable: true
-      })
-    } finally {
-      setCopyingLink(false)
-    }
-  }
-
 
   async function handleAddSongToService(serviceId: string, overrideSongId?: string) {
     if (!serviceId) return
@@ -1845,7 +2171,6 @@ export function Dashboard() {
     if (!organization) return
     loadServices()
     loadRecentSongs()
-    loadVolunteerLink()
     loadUserVolunteerDates()
     loadOrganizationInstruments()
   }, [organization])
@@ -1917,19 +2242,10 @@ export function Dashboard() {
   const subtitleColor = useColorModeValue('gray.600', 'gray.300')
   const textColor = useColorModeValue('gray.700', 'gray.200')
   const mutedTextColor = useColorModeValue('gray.500', 'gray.400')
-  const rankColors = ['blue.500', 'blue.400', 'blue.300', 'blue.200', 'blue.100']
-  function getRankColor(index: number) {
-    return rankColors[index] || 'blue.100'
-  }
   const addSongPulse = keyframes`
     0% { box-shadow: 0 0 0 0 rgba(49, 130, 206, 0.45) }
     70% { box-shadow: 0 0 0 10px rgba(49, 130, 206, 0) }
     100% { box-shadow: 0 0 0 0 rgba(49, 130, 206, 0) }
-  `
-  const volunteerPulse = keyframes`
-    0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.6) }
-    70% { box-shadow: 0 0 0 8px rgba(33, 150, 243, 0) }
-    100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0) }
   `
   const mobileTextSx = {
     '@media (max-width: 48em)': {
@@ -1942,6 +2258,115 @@ export function Dashboard() {
     }
   }
   // Removed unused activity styles after replacing Recent Activity with Songs
+
+  const todayDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
+  })
+  const upcomingDashboardServices = services
+    .filter((service) => new Date(service.service_time) > new Date())
+    .sort((a, b) => new Date(a.service_time).getTime() - new Date(b.service_time).getTime())
+    .slice(0, 4)
+  const popularSongs = recentSongs.slice(0, 5)
+  const currentMonthLabel = displayMonth === null || displayYear === null
+    ? ''
+    : `${monthNames[displayMonth]} ${displayYear}`
+
+  function openCreateServiceDrawer() {
+    setDrawerMode('day')
+    setSelectedSingleService(null)
+    setSelectedDate('')
+    setDayServices([])
+    setFormDateTime('')
+    setIsAddingServiceMode(true)
+    createDrawer.onOpen()
+  }
+
+  function jumpToCurrentMonth() {
+    const now = new Date()
+    setDisplayMonth(now.getMonth())
+    setDisplayYear(now.getFullYear())
+  }
+
+  const openVolunteerPage = useCallback(async () => {
+    if (!organization) return
+
+    try {
+      setOpeningVolunteerPage(true)
+
+      const { data: existingLinks, error: loadError } = await supabase
+        .from('organization_volunteer_links')
+        .select('public_url')
+        .eq('organization_id', organization.organization_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+
+      if (loadError) {
+        throw loadError
+      }
+
+      let publicUrl = existingLinks?.[0]?.public_url
+
+      if (!publicUrl) {
+        const orgMeta = Array.isArray(organization.organizations)
+          ? organization.organizations[0]
+          : organization.organizations
+        const baseSlug = orgMeta?.slug || 'organization'
+        const generatedUrl = `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`
+
+        const { data: createdLink, error: createError } = await supabase
+          .from('organization_volunteer_links')
+          .insert({
+            organization_id: organization.organization_id,
+            public_url: generatedUrl
+          })
+          .select('public_url')
+          .single()
+
+        if (createError) {
+          throw createError
+        }
+
+        publicUrl = createdLink.public_url
+      }
+
+      const volunteerUrl = `${window.location.origin}/volunteer/${publicUrl}`
+
+      try {
+        await navigator.clipboard.writeText(volunteerUrl)
+
+        toast({
+          title: t('dashboard.success.copiedVolunteerPageLink'),
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        })
+      } catch (clipboardError) {
+        console.error('Error copying volunteer page link:', clipboardError)
+        toast({
+          title: 'Error',
+          description: t('dashboard.errors.failedToCopyLink'),
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+        })
+      }
+
+      navigate(`/volunteer/${publicUrl}`)
+    } catch (error) {
+      console.error('Error opening volunteer page:', error)
+      toast({
+        title: 'Error',
+        description: t('dashboard.errors.failedToLoadVolunteerLink'),
+        status: 'error',
+        duration: 4000,
+        isClosable: true,
+      })
+    } finally {
+      setOpeningVolunteerPage(false)
+    }
+  }, [navigate, organization, t, toast])
 
   if (authLoading) {
     return (
@@ -1971,750 +2396,400 @@ export function Dashboard() {
   }
 
   return (
-    <Box minH="100vh" bg={bgColor} sx={mobileTextSx}>
+    <Box className="sl-dashboard-page" minH="100vh" bg={bgColor} sx={mobileTextSx}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }} pb={{ base: '200px', md: 8 }} sx={mobileTextSx}>
-        {/* Dashboard Content */}
-        <VStack spacing={8}>
-          {/* Main Content Grid */}
-          <Grid templateColumns={{ base: '1fr', md: 'repeat(12, 1fr)' }} gap={6} w="100%">
-            {/* Left Column (8/12) - Upcoming + Calendar */}
-            <GridItem colSpan={{ base: 12, md: 8 }}>
+      <Box
+        as="main"
+        maxW="1200px"
+        mx="auto"
+        px={{ base: 6, md: 8 }}
+        pt={{ base: 2, md: 3 }}
+        pb={{ base: 8, md: 8 }}
+        sx={mobileTextSx}
+      >
+        <VStack spacing={8} align="stretch">
+          <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
+            <Text color={mutedTextColor} fontSize="xs">{todayDate}</Text>
+            <HStack spacing={2} flexWrap="wrap" justify="flex-end">
+              <Button
+                leftIcon={<AtSignIcon boxSize={3} />}
+                onClick={openVolunteerPage}
+                size="sm"
+                variant="outline"
+                isLoading={openingVolunteerPage}
+              >
+                Volunteer Page
+              </Button>
+              {canManagePrimary ? (
+                <Button className="btn-primary" leftIcon={<AddIcon boxSize={3} />} onClick={openCreateServiceDrawer} size="sm">
+                  New Service
+                </Button>
+              ) : null}
+            </HStack>
+          </HStack>
+
+          <Grid templateColumns={{ base: '1fr', lg: 'repeat(3, minmax(0, 1fr))' }} gap={6} w="100%">
+            <GridItem colSpan={{ base: 1, lg: 2 }}>
               <VStack spacing={6} align="stretch">
-                {/* Upcoming Section */}
-                <Box
-                  bg={cardBg}
-                  borderRadius="xl"
-                  p={{ base: 5, md: 6 }}
-                  boxShadow="sm"
-                  w="100%"
-                >
-                  <Heading
-                    as="h3"
-                    size="lg"
-                    color={titleColor}
-                    mb={4}
-                    fontWeight="600"
-                  >
-                    Upcoming 📅
-                  </Heading>
-                  
-                  {(() => {
-                    const now = new Date() // Use current time, not just date
-                    
-                    // Get all services from now forward, ordered chronologically
-                    const upcomingServices = services
-                      .filter(service => {
-                        const serviceDateTime = new Date(service.service_time)
-                        return serviceDateTime > now // Use current time for comparison
-                      })
-                      .sort((a, b) => new Date(a.service_time).getTime() - new Date(b.service_time).getTime())
-                      .slice(0, 8) // Show next 8 upcoming services
-                    
-                    console.log('Debug - Current time:', now.toISOString())
-                    console.log('Debug - All services:', services.length)
-                    console.log('Debug - Upcoming services:', upcomingServices.length)
-                    console.log('Debug - All services with times:', services.map(s => ({ 
-                      id: s.id, 
-                      status: s.status, 
-                      service_time: s.service_time,
-                      isPast: new Date(s.service_time) <= now 
-                    })))
-                    
-                    return upcomingServices.length === 0 ? (
-                      <Text color={mutedTextColor} textAlign="center" py={4}>
-                        No upcoming services
-                      </Text>
-                    ) : (
-                      <VStack spacing={3} align="stretch">
-                        {upcomingServices.map((service, index) => {
-                          const volunteers = serviceIdToVolunteers[service.id] || []
-                          const isUserVolunteer = user && volunteers.some(v => v.user_id === user.id)
-                          const isNextService = index < 2 // First 2 services are "Next Service"
-                          
-                          return (
-                            <Box
-                              key={service.id}
-                              bg={isUserVolunteer 
-                                ? useColorModeValue('rgba(33, 150, 243, 0.05)', 'rgba(33, 150, 243, 0.1)') 
-                                : useColorModeValue('#f9f9f9', 'gray.700')
-                              }
-                              borderRadius="20px"
-                              p="12px 16px"
-                              cursor="pointer"
-                              _hover={{ 
-                                bg: isUserVolunteer 
-                                  ? useColorModeValue('rgba(33, 150, 243, 0.08)', 'rgba(33, 150, 243, 0.15)')
-                                  : useColorModeValue('#f0f0f0', 'gray.600'),
-                                transform: 'translateY(-1px)'
-                              }}
-                              transition="all 0.2s"
-                              onClick={() => {
-                                // Set single service mode for upcoming service clicks
-                                setDrawerMode('single')
-                                setSelectedSingleService(service)
-                                setIsAddingServiceMode(false)
-                                createDrawer.onOpen()
-                              }}
-                              position="relative"
-                              {...(isUserVolunteer ? {
-                                animation: `${volunteerPulse} 2s ease-in-out infinite`,
-                                border: '2px solid #2196f3',
-                                boxShadow: '0 0 0 2px rgba(33, 150, 243, 0.3)'
-                              } : {})}
-                            >
-                              {(() => {
-                                const serviceDate = new Date(service.service_time)
-                                const dateStr = formatServiceDate(service.service_time)
+                <Box>
+                  <HStack align="center" justify="space-between" mb={4}>
+                    <Heading as="h2" className="section-title" size="md">Upcoming Services</Heading>
+                    <Button
+                      rightIcon={<ArrowForwardIcon />}
+                      size="sm"
+                      variant="ghost"
+                      color={useColorModeValue('blue.600', 'blue.300')}
+                      onClick={() => navigate('/services')}
+                    >
+                      View all
+                    </Button>
+                  </HStack>
 
-                                const weekday = serviceDate.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
-                                const occurrenceOfWeekdayInMonth = Math.floor((serviceDate.getDate() - 1) / 7) + 1
-                                const ordinals = ['', '1st', '2nd', '3rd', '4th', '5th']
-                                const ordinal = ordinals[occurrenceOfWeekdayInMonth] || `${occurrenceOfWeekdayInMonth}th`
-                                const timePart = getServiceTimeDisplay(service.service_time).toLowerCase().replace(' ', '')
-                                
-                                
-                                return (
-                                  <>
-                                    {/* Large screens: Single row layout */}
-                                    <HStack 
-                                      justify="space-between" 
-                                      align="center" 
-                                      w="100%" 
-                                      display={{ base: "none", lg: "flex" }}
-                                      sx={{
-                                        '@media (max-width: 1055px)': {
-                                          display: 'none'
-                                        },
-                                        '@media (min-width: 1056px)': {
-                                          display: 'flex'
-                                        }
-                                      }}
-                                    >
-                                      {/* Date | Ordinal Weekday | Time */}
-                                      <HStack spacing={3} align="center" flex="1">
-                                        <Box minW="90px">
-                                          <Text fontWeight="600" color={textColor} fontSize="sm" textAlign="left">
-                                            {dateStr}
-                                          </Text>
-                                        </Box>
-                                        <Text color={mutedTextColor} fontSize="sm">
-                                          |
-                                        </Text>
-                                        <Box minW="65px">
-                                          <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
-                                            {ordinal} {weekday}
-                                          </Text>
-                                        </Box>
-                                        <Text color={mutedTextColor} fontSize="sm">
-                                          |
-                                        </Text>
-                                        <Box minW="45px">
-                                          <Text fontWeight="500" color={textColor} fontSize="sm" textAlign="left">
-                                            {timePart}
-                                          </Text>
-                                        </Box>
-                                        {isNextService && (
-                                          <Badge
-                                            colorScheme="orange"
-                                            variant="solid"
-                                            fontSize="xs"
-                                            px={2}
-                                            py={1}
-                                            borderRadius="md"
-                                            ml={2}
-                                          >
-                                            Next Service
-                                          </Badge>
-                                        )}
-                                      </HStack>
-                                      
-                                      {/* Desktop: Volunteer circles on same row */}
-                                      <HStack spacing={2} align="center">
-                                        <HStack spacing={1}>
-                                          {(() => {
-                                            // Sort volunteers to put current user first
-                                            const sortedVolunteers = [...volunteers].sort((a, b) => {
-                                              if (user && a.user_id === user.id) return -1
-                                              if (user && b.user_id === user.id) return 1
-                                              return 0
-                                            })
-                                            
-                                            return sortedVolunteers.map((volunteer) => {
-                                              const firstName = volunteer.profiles.first_name || 'U'
-                                              const lastName = volunteer.profiles.last_name || 'U'
-                                              const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
-                                              const isCurrentUser = user && volunteer.user_id === user.id
-                                              
-                                              return (
-                                                <Tooltip 
-                                                  key={volunteer.id}
-                                                  label={`${firstName} ${lastName}`}
-                                                  placement="top"
-                                                  hasArrow
-                                                >
-                                                  <Box
-                                                    bg={isCurrentUser 
-                                                      ? useColorModeValue('#2196f3', '#1976d2') 
-                                                      : useColorModeValue('#eee', 'gray.600')
-                                                    }
-                                                    borderRadius="50%"
-                                                    w="30px"
-                                                    h="30px"
-                                                    display="flex"
-                                                    alignItems="center"
-                                                    justifyContent="center"
-                                                    fontSize="14px"
-                                                    fontWeight="600"
-                                                    color={isCurrentUser ? 'white' : textColor}
-                                                    cursor="pointer"
-                                                  >
-                                                    {initials}
-                                                  </Box>
-                                                </Tooltip>
-                                              )
-                                            })
-                                          })()}
-                                        </HStack>
-                                        
-                                      </HStack>
-                                    </HStack>
+                  {upcomingDashboardServices.length === 0 ? (
+                    <Box className="sl-empty-state">
+                      <Text className="sl-empty-state__title">No upcoming services</Text>
+                      <Text className="sl-empty-state__description">Schedule your next gathering to start planning.</Text>
+                    </Box>
+                  ) : (
+                    <VStack spacing={2} align="stretch">
+                      {upcomingDashboardServices.map((service) => {
+                        const volunteers = serviceIdToVolunteers[service.id] || []
+                        return (
+                          <Box
+                            key={service.id}
+                            className="card-shadow card-hover"
+                            bg="white"
+                            borderRadius="xl"
+                            cursor="pointer"
+                            p={3}
+                            onClick={() => {
+                              setDrawerMode('single')
+                              setSelectedSingleService(service)
+                              setIsAddingServiceMode(false)
+                              createDrawer.onOpen()
+                            }}
+                          >
+                            <HStack align="center" gap={3}>
+                              <Box flex="1" minW={0}>
+                                <Text color={textColor} fontSize="sm" fontWeight="600" noOfLines={1}>
+                                  {service.title}
+                                </Text>
+                                <HStack color={mutedTextColor} fontSize="xs" mt={1} spacing={3}>
+                                  <HStack spacing={1}>
+                                    <CalendarIcon boxSize={3} />
+                                    <Text m={0}>
+                                      {new Date(service.service_time).toLocaleDateString('en-US', {
+                                        weekday: 'short',
+                                        month: 'short',
+                                        day: 'numeric'
+                                      })}
+                                    </Text>
+                                  </HStack>
+                                  <HStack spacing={1}>
+                                    <TimeIcon boxSize={3} />
+                                    <Text m={0}>{getServiceTimeDisplay(service.service_time)}</Text>
+                                  </HStack>
+                                </HStack>
+                              </Box>
 
-                                    {/* Medium screens (tablet): Two row layout */}
-                                    <VStack 
-                                      spacing={2} 
-                                      align="stretch" 
-                                      w="100%" 
-                                      display={{ base: "none", md: "flex", lg: "none" }}
-                                      sx={{
-                                        '@media (max-width: 767px)': {
-                                          display: 'none'
-                                        },
-                                        '@media (min-width: 768px) and (max-width: 1055px)': {
-                                          display: 'flex'
-                                        },
-                                        '@media (min-width: 1056px)': {
-                                          display: 'none'
-                                        }
-                                      }}
+                              <HStack spacing={3} flexShrink={0}>
+                                <HStack spacing={0}>
+                                  {volunteers.slice(0, 5).map((volunteer, index) => {
+                                    const fullName = `${volunteer.profiles.first_name || ''} ${volunteer.profiles.last_name || ''}`.trim() || volunteer.profiles.email
+                                    const isCurrentUser = user?.id === volunteer.user_id
+                                    return (
+                                      <Tooltip key={volunteer.id} hasArrow label={fullName} placement="top">
+                                        <Box
+                                          alignItems="center"
+                                          bg={isCurrentUser ? '#2563EB' : getAvatarColor(fullName)}
+                                          border="2px solid white"
+                                          borderRadius="full"
+                                          color="white"
+                                          display="flex"
+                                          fontSize="10px"
+                                          fontWeight="700"
+                                          h="28px"
+                                          justifyContent="center"
+                                          ml={index === 0 ? 0 : '-8px'}
+                                          title={fullName}
+                                          w="28px"
+                                        >
+                                          {getNameInitials(volunteer.profiles.first_name, volunteer.profiles.last_name, volunteer.profiles.email)}
+                                        </Box>
+                                      </Tooltip>
+                                    )
+                                  })}
+                                  {volunteers.length > 5 ? (
+                                    <Box
+                                      alignItems="center"
+                                      bg="gray.100"
+                                      border="2px solid white"
+                                      borderRadius="full"
+                                      color={mutedTextColor}
+                                      display="flex"
+                                      fontSize="10px"
+                                      fontWeight="700"
+                                      h="28px"
+                                      justifyContent="center"
+                                      ml="-8px"
+                                      w="28px"
                                     >
-                                      {/* Medium: Service details row */}
-                                      <HStack spacing={3} align="center" w="100%">
-                                        <Box minW="90px">
-                                          <Text fontWeight="600" color={textColor} fontSize="sm" textAlign="left">
-                                            {dateStr}
-                                          </Text>
-                                        </Box>
-                                        <Text color={mutedTextColor} fontSize="sm">
-                                          |
-                                        </Text>
-                                        <Box minW="65px">
-                                          <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
-                                            {ordinal} {weekday}
-                                          </Text>
-                                        </Box>
-                                        <Text color={mutedTextColor} fontSize="sm">
-                                          |
-                                        </Text>
-                                        <Box minW="45px">
-                                          <Text fontWeight="500" color={textColor} fontSize="sm" textAlign="left">
-                                            {timePart}
-                                          </Text>
-                                        </Box>
-                                        {isNextService && (
-                                          <Badge
-                                            colorScheme="orange"
-                                            variant="solid"
-                                            fontSize="xs"
-                                            px={2}
-                                            py={1}
-                                            borderRadius="md"
-                                            ml={2}
-                                          >
-                                            Next Service
-                                          </Badge>
-                                        )}
-                                      </HStack>
-                                      
-                                      {/* Medium: Volunteer circles on separate row */}
-                                      {volunteers.length > 0 && (
-                                        <HStack spacing={1} align="center" justify="flex-start" flexWrap="wrap">
-                                          {(() => {
-                                            // Sort volunteers to put current user first
-                                            const sortedVolunteers = [...volunteers].sort((a, b) => {
-                                              if (user && a.user_id === user.id) return -1
-                                              if (user && b.user_id === user.id) return 1
-                                              return 0
-                                            })
-                                            
-                                            return sortedVolunteers.map((volunteer) => {
-                                              const firstName = volunteer.profiles.first_name || 'U'
-                                              const lastName = volunteer.profiles.last_name || 'U'
-                                              const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
-                                              const isCurrentUser = user && volunteer.user_id === user.id
-                                              
-                                              return (
-                                                <Tooltip 
-                                                  key={volunteer.id}
-                                                  label={`${firstName} ${lastName}`}
-                                                  placement="top"
-                                                  hasArrow
-                                                >
-                                                  <Box
-                                                    bg={isCurrentUser 
-                                                      ? useColorModeValue('#2196f3', '#1976d2') 
-                                                      : useColorModeValue('#eee', 'gray.600')
-                                                    }
-                                                    borderRadius="50%"
-                                                    w="30px"
-                                                    h="30px"
-                                                    display="flex"
-                                                    alignItems="center"
-                                                    justifyContent="center"
-                                                    fontSize="14px"
-                                                    fontWeight="600"
-                                                    color={isCurrentUser ? 'white' : textColor}
-                                                    cursor="pointer"
-                                                  >
-                                                    {initials}
-                                                  </Box>
-                                                </Tooltip>
-                                              )
-                                            })
-                                          })()}
-                                        </HStack>
-                                      )}
-                                    </VStack>
-
-                                    {/* Mobile: Two row layout */}
-                                    <VStack 
-                                      spacing={2} 
-                                      align="stretch" 
-                                      w="100%" 
-                                      display={{ base: "flex", md: "none" }}
-                                      sx={{
-                                        '@media (max-width: 767px)': {
-                                          display: 'flex'
-                                        },
-                                        '@media (min-width: 768px)': {
-                                          display: 'none'
-                                        }
-                                      }}
-                                    >
-                                      {/* Mobile: Service details row */}
-                                      <HStack spacing={2} align="center" w="100%">
-                                        <Box minW="115px">
-                                          <Text fontWeight="600" color={textColor} fontSize="sm" textAlign="left">
-                                            {dateStr}
-                                          </Text>
-                                        </Box>
-                                        <Text color={mutedTextColor} fontSize="sm">
-                                          |
-                                        </Text>
-                                        <Box minW="55px">
-                                          <Text fontWeight="500" color={mutedTextColor} fontSize="sm" textAlign="center">
-                                            {ordinal} {weekday}
-                                          </Text>
-                                        </Box>
-                                        <Text color={mutedTextColor} fontSize="sm">
-                                          |
-                                        </Text>
-                                        <Box minW="35px">
-                                          <Text fontWeight="500" color={textColor} fontSize="sm" textAlign="left">
-                                            {timePart}
-                                          </Text>
-                                        </Box>
-                                      </HStack>
-                                      
-                                      {/* Mobile: Next Service badge row */}
-                                      {isNextService && (
-                                        <HStack spacing={2} align="center" justify="flex-start" w="100%">
-                                          <Badge
-                                            colorScheme="orange"
-                                            variant="solid"
-                                            fontSize="xs"
-                                            px={2}
-                                            py={1}
-                                            borderRadius="md"
-                                          >
-                                            Next Service
-                                          </Badge>
-                                        </HStack>
-                                      )}
-                                      
-                                      {/* Mobile: Volunteer circles on separate row */}
-                                      {volunteers.length > 0 && (
-                                        <HStack spacing={1} align="center" justify="flex-start" flexWrap="wrap">
-                                          {(() => {
-                                            // Sort volunteers to put current user first
-                                            const sortedVolunteers = [...volunteers].sort((a, b) => {
-                                              if (user && a.user_id === user.id) return -1
-                                              if (user && b.user_id === user.id) return 1
-                                              return 0
-                                            })
-                                            
-                                            return sortedVolunteers.map((volunteer) => {
-                                              const firstName = volunteer.profiles.first_name || 'U'
-                                              const lastName = volunteer.profiles.last_name || 'U'
-                                              const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
-                                              const isCurrentUser = user && volunteer.user_id === user.id
-                                              
-                                              return (
-                                                <Tooltip 
-                                                  key={volunteer.id}
-                                                  label={`${firstName} ${lastName}`}
-                                                  placement="top"
-                                                  hasArrow
-                                                >
-                                                  <Box
-                                                    bg={isCurrentUser 
-                                                      ? useColorModeValue('#2196f3', '#1976d2') 
-                                                      : useColorModeValue('#eee', 'gray.600')
-                                                    }
-                                                    borderRadius="50%"
-                                                    w="28px"
-                                                    h="28px"
-                                                    display="flex"
-                                                    alignItems="center"
-                                                    justifyContent="center"
-                                                    fontSize="12px"
-                                                    fontWeight="600"
-                                                    color={isCurrentUser ? 'white' : textColor}
-                                                    cursor="pointer"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation()
-                                                    }}
-                                                  >
-                                                    {initials}
-                                                  </Box>
-                                                </Tooltip>
-                                              )
-                                            })
-                                          })()}
-                                        </HStack>
-                                      )}
-                                    </VStack>
-                                  </>
-                                )
-                              })()}
-                            </Box>
-                          )
-                          })
-                          .filter(Boolean) // Remove any null entries
-                      }
-                      </VStack>
-                    )
-                  })()}
+                                      +{volunteers.length - 5}
+                                    </Box>
+                                  ) : null}
+                                </HStack>
+                                <ChevronRightIcon color="gray.400" boxSize={5} />
+                              </HStack>
+                            </HStack>
+                          </Box>
+                        )
+                      })}
+                    </VStack>
+                  )}
                 </Box>
 
-                {/* Service Calendar Section */}
-                <Box
-                  bg={cardBg}
-                  borderRadius="xl"
-                  p={{ base: 5, md: 6 }}
-                  boxShadow="sm"
-                  w="100%"
-                  display={{ base: "none", md: "block" }}
-                >
+                <Box className="sl-surface-card" bg={cardBg} display={{ base: 'none', md: 'block' }}>
+                  <HStack align="center" justify="space-between" mb={4}>
+                    <Heading as="h2" className="section-title" size="md">{currentMonthLabel}</Heading>
+                    <HStack spacing={1}>
+                      <IconButton
+                        aria-label={t('dashboard.calendar.previousMonth')}
+                        icon={<ChevronLeftIcon />}
+                        onClick={handlePrevMonth}
+                        size="sm"
+                        variant="ghost"
+                        isDisabled={displayYear === null || displayMonth === null}
+                      />
+                      <Button onClick={jumpToCurrentMonth} size="sm" variant="ghost">Today</Button>
+                      <IconButton
+                        aria-label={t('dashboard.calendar.nextMonth')}
+                        icon={<ChevronRightIcon />}
+                        onClick={handleNextMonth}
+                        size="sm"
+                        variant="ghost"
+                        isDisabled={displayYear === null || displayMonth === null}
+                      />
+                    </HStack>
+                  </HStack>
 
-                <HStack justify="center" mb={4}>
-                  <IconButton
-                    aria-label={t('dashboard.calendar.previousMonth')}
-                    icon={<ChevronLeftIcon />}
-                    size="sm"
-                    variant="outline"
-                    onClick={handlePrevMonth}
-                    isDisabled={displayYear === null || displayMonth === null}
-                  />
+                  {displayYear === null || displayMonth === null ? (
+                    <Center py={8}>
+                      <Spinner />
+                    </Center>
+                  ) : (
+                    <CalendarGrid
+                      year={displayYear}
+                      month={displayMonth}
+                      scheduledDates={[...new Set(services.map(s => getServiceDateISO(s.service_time)))]}
+                      userVolunteerDates={userVolunteerDates}
+                      onDateClick={(iso) => {
+                        setDrawerMode('day')
+                        setSelectedSingleService(null)
+                        setFormDateTime(`${iso}T10:00`)
+                        setSelectedDate(iso)
+                        loadServicesForDate(iso)
+                        setIsAddingServiceMode(false)
+                        createDrawer.onOpen()
+                      }}
+                    />
+                  )}
 
-                  <Select
-                    value={displayMonth ?? new Date().getMonth()}
-                    onChange={handleSelectMonth}
-                    maxW={{ base: '200px', md: '220px' }}
-                    size="sm"
-                    isDisabled={displayYear === null || displayMonth === null}
-                  >
-                    {monthNames.map((label, idx) => (
-                      <option key={label} value={idx}>{label}</option>
-                    ))}
-                  </Select>
+                  {canManagePrimary ? (
+                    <Button className="btn-primary" leftIcon={<CalendarIcon boxSize={4} />} mt={4} onClick={openCreateServiceDrawer} w="100%">
+                      Schedule Service
+                    </Button>
+                  ) : null}
+                </Box>
+              </VStack>
+            </GridItem>
 
-                  <Text m={0} fontWeight="600" color={textColor}
-                    minW="64px" textAlign="center">
-                    {displayYear ?? new Date().getFullYear()}
-                  </Text>
-
-                  <IconButton
-                    aria-label={t('dashboard.calendar.nextMonth')}
-                    icon={<ChevronRightIcon />}
-                    size="sm"
-                    variant="outline"
-                    onClick={handleNextMonth}
-                    isDisabled={displayYear === null || displayMonth === null}
-                  />
-                </HStack>
-
-                {displayYear === null || displayMonth === null ? (
-                  <Center py={8}>
-                    <Spinner />
-                  </Center>
-                ) : (
-                  <CalendarGrid
-                    year={displayYear}
-                    month={displayMonth}
-                    scheduledDates={[...new Set(services.map(s => getServiceDateISO(s.service_time)))]}
-                    userVolunteerDates={userVolunteerDates}
-                    onDateClick={(iso) => {
-                      // Set day mode for calendar clicks
-                      setDrawerMode('day')
-                      setSelectedSingleService(null)
-                      const defaultDateTime = `${iso}T10:00`
-                      setFormDateTime(defaultDateTime)
-                      setSelectedDate(iso)
-                      loadServicesForDate(iso)
-                      setIsAddingServiceMode(false)
-                      createDrawer.onOpen()
-                    }}
-                  />
-                )}
-
-                {canManagePrimary && (
-                  <Button
-                    bg="#2196f3"
-                    color="white"
-                    border="none"
-                    borderRadius="999px"
-                    px="24px"
-                    py="12px"
-                    fontSize="15px"
-                    fontWeight="bold"
-                    boxShadow="0 2px 4px rgba(0,0,0,0.2)"
-                    mt={4}
-                    w="100%"
-                    _hover={{ bg: "#1976d2" }}
-                    _active={{ bg: "#1565c0" }}
-                    onClick={() => {
-                      setSelectedDate('')
-                      setDayServices([])
-                      setFormDateTime('')
-                      setIsAddingServiceMode(true)
-                      createDrawer.onOpen()
-                    }}
-                  >
-                    Add New Schedule
-                  </Button>
-                )}
-              </Box>
-            </VStack>
-          </GridItem>
-
-          {/* Right Column (4/12) - Volunteer Link + Songs */}
-          <GridItem colSpan={{ base: 12, md: 4 }}>
-            <VStack spacing={6} align="stretch">
-              {/* Volunteer Link Section */}
-              <Box
-                bg={{ base: useColorModeValue('white', 'gray.800'), md: cardBg }}
-                borderRadius={{ base: '0', md: 'xl' }}
-                p={{ base: 4, md: 6 }}
-                boxShadow={{ base: 'lg', md: 'sm' }}
-                w={{ base: '100%', md: '100%' }}
-                position={{ base: 'fixed', md: 'static' }}
-                bottom={{ base: 0, md: 'auto' }}
-                left={{ base: 0, md: 'auto' }}
-                right={{ base: 0, md: 'auto' }}
-                zIndex={{ base: 1000, md: 'auto' }}
-                borderTop={{ base: '1px', md: 'none' }}
-                borderColor={{ base: 'gray.200', md: 'transparent' }}
-              >
-                <Heading
-                  as="h3"
-                  size="lg"
-                  color={titleColor}
-                  mb={4}
-                  fontWeight="600"
-                >
-                  {t('dashboard.volunteerLink.title')}
-                </Heading>
-                
-                <Text color={subtitleColor} fontSize="sm" mb={4} display={{ base: 'none', md: 'block' }}>
-                  {t('dashboard.volunteerLink.description')}
-                </Text>
-
-                <VStack spacing={3} align="stretch">
-                  <Button
-                    bg="#2196f3"
-                    color="white"
-                    border="none"
-                    borderRadius="999px"
-                    px="24px"
-                    py="12px"
-                    fontSize="15px"
-                    fontWeight="bold"
-                    boxShadow="0 2px 4px rgba(0,0,0,0.2)"
-                    _hover={{ bg: "#1976d2" }}
-                    _active={{ bg: "#1565c0" }}
-                    onClick={copyVolunteerLink}
-                    isLoading={loadingVolunteerLink || copyingLink}
-                    loadingText={loadingVolunteerLink ? t('dashboard.volunteerLink.loading') : t('dashboard.volunteerLink.copying')}
-                    isDisabled={loadingVolunteerLink}
-                    w="100%"
-                  >
-                    {loadingVolunteerLink 
-                      ? t('dashboard.volunteerLink.loading')
-                      : volunteerLink 
-                        ? t('dashboard.volunteerLink.copyButton')
-                        : t('dashboard.volunteerLink.createButton')
-                    }
-                  </Button>
-
-                  {volunteerLink && (
+            <GridItem colSpan={{ base: 1, lg: 1 }}>
+              <VStack spacing={6} align="stretch">
+                <Box>
+                  <HStack align="center" justify="space-between" mb={4}>
+                    <Heading as="h2" className="section-title" size="md">Most Played</Heading>
                     <Button
+                      rightIcon={<ArrowForwardIcon />}
+                      size="sm"
+                      variant="ghost"
+                      color={useColorModeValue('blue.600', 'blue.300')}
+                      onClick={() => navigate('/songbank')}
+                    >
+                      Library
+                    </Button>
+                  </HStack>
+
+                  <Box className="sl-compact-table" bg={cardBg}>
+                    {recentSongsError ? (
+                      <Alert status="error" borderRadius="xl" mb={0}>
+                        <AlertIcon />
+                        {recentSongsError}
+                      </Alert>
+                    ) : loadingRecentSongs ? (
+                      <Center py={8}>
+                        <Spinner />
+                      </Center>
+                    ) : popularSongs.length === 0 ? (
+                      <Box px={5} py={8} textAlign="center">
+                        <Text color={mutedTextColor}>No recent song usage yet.</Text>
+                      </Box>
+                    ) : (
+                      <VStack align="stretch" divider={<Box borderTop="1px solid" borderColor={cardBorderColor} />} spacing={0}>
+                        {popularSongs.map((song, index) => (
+                          <HStack
+                            key={song.songId}
+                            className="sl-compact-row"
+                            align="center"
+                            gap={3}
+                            justify="space-between"
+                            px={{ base: 4, md: 5 }}
+                            py={3.5}
+                          >
+                            <HStack align="center" gap={3} minW={0}>
+                              <Box
+                                alignItems="center"
+                                bg={useColorModeValue('gray.100', 'gray.700')}
+                                borderRadius="md"
+                                color={mutedTextColor}
+                                display="flex"
+                                fontSize="xs"
+                                fontWeight="700"
+                                h="24px"
+                                justifyContent="center"
+                                w="24px"
+                              >
+                                {index + 1}
+                              </Box>
+                              <Box minW={0}>
+                                <Text color={textColor} fontSize="sm" fontWeight="500" noOfLines={1}>{song.title}</Text>
+                                <Text color={mutedTextColor} fontSize="xs" noOfLines={1}>{song.artist}</Text>
+                              </Box>
+                            </HStack>
+                            <Box flexShrink={0} textAlign="right">
+                              <Text color={mutedTextColor} fontSize="xs" m={0}>
+                                {song.usageCount}
+                              </Text>
+                              <Text color={mutedTextColor} fontSize="xs" mt={0.5}>
+                                {new Date(song.lastUsedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </Text>
+                            </Box>
+                          </HStack>
+                        ))}
+                      </VStack>
+                    )}
+                  </Box>
+                </Box>
+
+                <Box>
+                  <Heading as="h2" className="section-title" mb={4} size="md">Quick Actions</Heading>
+                  <VStack spacing={2} align="stretch">
+                    <Box
+                      as="button"
                       bg="white"
-                      color="black"
-                      border="2px solid #000"
-                      borderRadius="999px"
-                      px="24px"
-                      py="12px"
-                      fontSize="15px"
-                      fontWeight="bold"
-                      boxShadow="0 2px 4px rgba(0,0,0,0.2)"
-                      _hover={{ bg: "#f5f5f5" }}
-                      _active={{ bg: "#e0e0e0" }}
-                      onClick={() => navigate(`/volunteer/${volunteerLink}`)}
+                      borderRadius="xl"
+                      className="card-shadow card-hover"
+                      onClick={openVolunteerPage}
+                      px={4}
+                      py={3}
+                      textAlign="left"
+                      type="button"
                       w="100%"
                     >
-                      {t('dashboard.volunteerLink.visitButton')}
-                    </Button>
-                  )}
-                </VStack>
-              </Box>
-
-              {/* Songs Section */}
-              <Box
-                bg={cardBg}
-                borderRadius="xl"
-                p={{ base: 5, md: 6 }}
-                boxShadow="sm"
-                w="100%"
-                display={{ base: "none", md: "block" }}
-              >
-                <Heading
-                    as="h3"
-                    size="lg"
-                    color={titleColor}
-                    mb={5}
-                    fontWeight="600"
-                  >
-                    {t('dashboard.songs.title')}
-                  </Heading>
-
-                  {recentSongsError && (
-                  <Alert status="error" borderRadius="md" mb={4}>
-                    <AlertIcon />
-                    {recentSongsError}
-                  </Alert>
-                )}
-
-                {loadingRecentSongs ? (
-                  <Center py={6}>
-                    <Spinner />
-                  </Center>
-                ) : recentSongs.length === 0 ? (
-                  <Box textAlign="center" py={6}>
-                    <Text color={mutedTextColor}>{t('dashboard.songs.noUsage')}</Text>
-                  </Box>
-                ) : (
-                  <VStack spacing={3} align="stretch">
-                    {recentSongs.map((song, idx) => (
-              <HStack
-                        key={song.songId}
-                        p={3}
-                border="1px"
-                borderColor={cardBorderColor}
-                borderRadius="lg"
-                align="center"
-                        justify="space-between"
-                      >
-                        <HStack>
-                          <Box
-                            w="28px"
-                            h="28px"
-                            borderRadius="full"
-                            bg={getRankColor(idx)}
-                            color="white"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                            fontWeight="700"
-                            fontSize="sm"
-                          >
-                            {idx + 1}
-                          </Box>
-
-                          <Box>
-                            <Text color={textColor} fontWeight="600" m={0}>
-                              {song.title}
-                            </Text>
-                            <Text color={mutedTextColor} fontSize="sm" m={0}>
-                              {song.artist}
-                            </Text>
-                          </Box>
-                        </HStack>
-                        <Box textAlign="right">
-                          <Text color={textColor} fontSize="sm" m={0}>
-                            {song.usageCount} uses
-                          </Text>
-                          <Text color={mutedTextColor} fontSize="xs" m={0}>
-                            Last: {new Date(song.lastUsedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </Text>
+                      <HStack gap={3}>
+                        <Box alignItems="center" bg="purple.50" borderRadius="lg" color="purple.600" display="flex" h="36px" justifyContent="center" w="36px">
+                          <AtSignIcon boxSize={4} />
                         </Box>
+                        <Box flex="1">
+                          <Text color={textColor} fontSize="sm" fontWeight="500">Visit Volunteer Page</Text>
+                          <Text color={mutedTextColor} fontSize="xs">Open your public volunteer signup page</Text>
+                        </Box>
+                        <ChevronRightIcon boxSize={5} color="gray.400" />
                       </HStack>
-                    ))}
+                    </Box>
+
+                    {canManagePrimary ? (
+                      <Box
+                        as="button"
+                        bg="white"
+                        borderRadius="xl"
+                        className="card-shadow card-hover"
+                        onClick={openCreateServiceDrawer}
+                        px={4}
+                        py={3}
+                        textAlign="left"
+                        type="button"
+                        w="100%"
+                      >
+                        <HStack gap={3}>
+                          <Box alignItems="center" bg="blue.50" borderRadius="lg" color="blue.600" display="flex" h="36px" justifyContent="center" w="36px">
+                            <CalendarIcon boxSize={4} />
+                          </Box>
+                          <Box flex="1">
+                            <Text color={textColor} fontSize="sm" fontWeight="500">Schedule Service</Text>
+                            <Text color={mutedTextColor} fontSize="xs">Create a new service plan</Text>
+                          </Box>
+                          <ChevronRightIcon boxSize={5} color="gray.400" />
+                        </HStack>
+                      </Box>
+                    ) : null}
+
+                    <Box
+                      as="button"
+                      bg="white"
+                      borderRadius="xl"
+                      className="card-shadow card-hover"
+                      onClick={() => navigate('/team')}
+                      px={4}
+                      py={3}
+                      textAlign="left"
+                      type="button"
+                      w="100%"
+                    >
+                      <HStack gap={3}>
+                        <Box alignItems="center" bg="green.50" borderRadius="lg" color="green.600" display="flex" h="36px" justifyContent="center" w="36px">
+                          <AtSignIcon boxSize={4} />
+                        </Box>
+                        <Box flex="1">
+                          <Text color={textColor} fontSize="sm" fontWeight="500">Invite Volunteer</Text>
+                          <Text color={mutedTextColor} fontSize="xs">Add someone to a team</Text>
+                        </Box>
+                        <ChevronRightIcon boxSize={5} color="gray.400" />
+                      </HStack>
+                    </Box>
+
+                    <Box
+                      as="button"
+                      bg="white"
+                      borderRadius="xl"
+                      className="card-shadow card-hover"
+                      onClick={() => {
+                        if (canManagePrimary) {
+                          addSongDrawer.onOpen()
+                          return
+                        }
+                        navigate('/songbank')
+                      }}
+                      px={4}
+                      py={3}
+                      textAlign="left"
+                      type="button"
+                      w="100%"
+                    >
+                      <HStack gap={3}>
+                        <Box alignItems="center" bg="purple.50" borderRadius="lg" color="purple.600" display="flex" h="36px" justifyContent="center" w="36px">
+                          <AddIcon boxSize={3} />
+                        </Box>
+                        <Box flex="1">
+                          <Text color={textColor} fontSize="sm" fontWeight="500">Add Song</Text>
+                          <Text color={mutedTextColor} fontSize="xs">Add to your library</Text>
+                        </Box>
+                        <ChevronRightIcon boxSize={5} color="gray.400" />
+                      </HStack>
+                    </Box>
                   </VStack>
-                )}
-
-                {canManagePrimary && (
-                  <Button
-                    bg="#2196f3"
-                    color="white"
-                    border="none"
-                    borderRadius="999px"
-                    px="24px"
-                    py="12px"
-                    fontSize="15px"
-                    fontWeight="bold"
-                    boxShadow="0 2px 4px rgba(0,0,0,0.2)"
-                    mt={5}
-                    w="100%"
-                    _hover={{ bg: "#1976d2" }}
-                    _active={{ bg: "#1565c0" }}
-                    onClick={addSongDrawer.onOpen}
-                  >
-                    Add New Song
-                  </Button>
-                )}
-
-                <Button 
-                  bg="white"
-                  color="black"
-                  border="2px solid #000"
-                  borderRadius="999px"
-                  px="24px"
-                  py="12px"
-                  fontSize="15px"
-                  fontWeight="bold"
-                  boxShadow="0 2px 4px rgba(0,0,0,0.2)"
-                  mt={3} 
-                  w="100%" 
-                  _hover={{ bg: "#f5f5f5" }}
-                  _active={{ bg: "#e0e0e0" }}
-                  onClick={() => navigate('/songbank')}
-                >
-                  Go to Song Bank
-                </Button>
-              </Box>
-            </VStack>
+                </Box>
+              </VStack>
             </GridItem>
           </Grid>
 
@@ -2726,43 +2801,17 @@ export function Dashboard() {
               <DrawerHeader boxShadow="sm" borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
                 <HStack justify="space-between" align="center">
                   {drawerMode === 'single' && selectedSingleService ? (
-                    <Box>
-                      {/* Mobile: 2 lines, Desktop: 1 line */}
-                      <Text 
-                        m={0} 
-                        fontWeight="800" 
-                        fontSize={{ base: '4xl', md: '2xl' }}
-                        display={{ base: 'block', md: 'none' }}
-                      >
-                        {formatServiceDate(selectedSingleService.service_time)}
-                      </Text>
-                      <Text 
-                        m={0} 
-                        fontWeight="800" 
-                        fontSize={{ base: '4xl', md: '2xl' }}
-                        display={{ base: 'block', md: 'none' }}
-                      >
-                        {getServiceTimeDisplay(selectedSingleService.service_time)} - {selectedSingleService.title}
-                      </Text>
-                      
-                      {/* Desktop: Single line */}
-                      <Text 
-                        m={0} 
-                        fontWeight="800" 
-                        fontSize={{ base: '4xl', md: '2xl' }}
-                        display={{ base: 'none', md: 'block' }}
-                      >
-                        {selectedSingleService.title} - {formatServiceDate(selectedSingleService.service_time)} - {getServiceTimeDisplay(selectedSingleService.service_time)}
-                      </Text>
-                    </Box>
+                    <Text m={0} fontWeight="700" fontSize="lg">
+                      Service Details
+                    </Text>
                   ) : (
-                    <Text m={0} fontWeight="800" fontSize={{ base: '4xl', md: '2xl' }}>
-                    {selectedDate && dayServices.length > 0
-                      ? `${new Date(selectedDate).toLocaleDateString('en-US', {
-                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                        })}`
-                      : 'Schedule New Service'}
-                  </Text>
+                    <Text m={0} fontWeight="700" fontSize="lg">
+                      {selectedDate && dayServices.length > 0 && !isAddingServiceMode
+                        ? `${new Date(selectedDate).toLocaleDateString('en-US', {
+                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                          })}`
+                        : 'Schedule Service'}
+                    </Text>
                   )}
                   <IconButton
                     aria-label="Close drawer"
@@ -2785,191 +2834,9 @@ export function Dashboard() {
                 position="relative"
               >
                 {drawerMode === 'single' && selectedSingleService ? (
-                  <VStack align="stretch" spacing={0}>
-                    {/* Service Description Section */}
-                    <Box px={6} py={4} borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
-                      <HStack justify="space-between" align="center" mb={2}>
-                        <Text fontWeight="700" fontSize="xl" color={titleColor}>
-                          Description
-                        </Text>
-                        {canManagePrimary && !isEditingDescription && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            colorScheme="blue"
-                            onClick={() => handleEditDescription(selectedSingleService)}
-                            leftIcon={<EditIcon />}
-                          >
-                            Edit
-                          </Button>
-                        )}
-                      </HStack>
-                      
-                      {isEditingDescription ? (
-                        <VStack align="stretch" spacing={3}>
-                          <Textarea
-                            value={editingDescription}
-                            onChange={(e) => setEditingDescription(e.target.value)}
-                            placeholder="Enter service description using markdown formatting:
-
-# Main Title
-## Section Heading
-### Subsection
-
-**Bold text** or __bold text__
-*Italic text* or _italic text_
-
-- Bullet list item
-- Another item
-
-Example:
-# Welcome to Sunday Service
-Please arrive **15 minutes early** for sound check.
-
-## What to bring:
-- Your music sheets
-- Water bottle
-- Positive attitude!"
-                            rows={6}
-                            resize="vertical"
-                          />
-                          <HStack spacing={2}>
-                            <Button
-                              size="sm"
-                              colorScheme="blue"
-                              onClick={handleSaveDescription}
-                              isLoading={savingDescription}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={handleCancelEditDescription}
-                            >
-                              Cancel
-                            </Button>
-                          </HStack>
-                        </VStack>
-                      ) : (
-                        <Box
-                          p={3}
-                          bg={useColorModeValue('gray.50', 'gray.700')}
-                          borderRadius="md"
-                          minH="60px"
-                          border="1px"
-                          borderColor={useColorModeValue('gray.200', 'gray.600')}
-                          cursor={canManagePrimary ? "pointer" : "default"}
-                          _hover={canManagePrimary ? {
-                            borderColor: useColorModeValue('blue.300', 'blue.500'),
-                            bg: useColorModeValue('blue.50', 'gray.600')
-                          } : {}}
-                          onClick={canManagePrimary ? () => handleEditDescription(selectedSingleService) : undefined}
-                          transition="all 0.2s"
-                        >
-                          {selectedSingleService.description ? (
-                            <Box
-                              dangerouslySetInnerHTML={{
-                                __html: renderMarkdown(selectedSingleService.description)
-                              }}
-                              sx={{
-                                '& h1, & h2, & h3': {
-                                  color: titleColor,
-                                },
-                                '& p': {
-                                  margin: '0.5rem 0',
-                                },
-                                '& li': {
-                                  color: textColor,
-                                },
-                                '& strong': {
-                                  fontWeight: '600',
-                                },
-                                '& em': {
-                                  fontStyle: 'italic',
-                                }
-                              }}
-                            />
-                          ) : (
-                            <Text color={mutedTextColor} fontStyle="italic">
-                              {canManagePrimary ? 'Click here to add a description...' : 'No description available'}
-                            </Text>
-                          )}
-                        </Box>
-                      )}
-                    </Box>
-
-                    {/* Tab Navigation */}
-                    <Box borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')} mt={6}>
-                      <HStack spacing={0} px={6}>
-                        <Button
-                          variant="ghost"
-                          size="md"
-                          px={4}
-                          py={3}
-                          borderRadius={0}
-                          borderBottom="2px"
-                          borderColor={activeDrawerTab === 'songs' ? 'blue.500' : 'transparent'}
-                          color={activeDrawerTab === 'songs' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
-                          fontWeight={activeDrawerTab === 'songs' ? '600' : '400'}
-                          _hover={{ 
-                            bg: useColorModeValue('gray.50', 'gray.700'),
-                            color: activeDrawerTab === 'songs' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
-                          }}
-                          onClick={() => setActiveDrawerTab('songs')}
-                        >
-                          <HStack spacing={2}>
-                            <Text>Songs</Text>
-                            <Badge 
-                              colorScheme="blue" 
-                              variant="solid" 
-                              borderRadius="full"
-                              fontSize="xs"
-                              px={2}
-                              py={1}
-                            >
-                              {selectedSingleService ? (serviceIdToSongs[selectedSingleService.id] || []).length : 0}
-                            </Badge>
-                          </HStack>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="md"
-                          px={4}
-                          py={3}
-                          borderRadius={0}
-                          borderBottom="2px"
-                          borderColor={activeDrawerTab === 'volunteers' ? 'blue.500' : 'transparent'}
-                          color={activeDrawerTab === 'volunteers' ? 'blue.500' : useColorModeValue('gray.600', 'gray.400')}
-                          fontWeight={activeDrawerTab === 'volunteers' ? '600' : '400'}
-                          _hover={{ 
-                            bg: useColorModeValue('gray.50', 'gray.700'),
-                            color: activeDrawerTab === 'volunteers' ? 'blue.600' : useColorModeValue('gray.800', 'gray.200')
-                          }}
-                          onClick={() => setActiveDrawerTab('volunteers')}
-                        >
-                          <HStack spacing={2}>
-                            <Text>Volunteers</Text>
-                            <Badge 
-                              colorScheme="blue" 
-                              variant="solid" 
-                              borderRadius="full"
-                              fontSize="xs"
-                              px={2}
-                              py={1}
-                            >
-                              {selectedSingleService ? (serviceIdToVolunteers[selectedSingleService.id] || []).length : 0}
-                            </Badge>
-                          </HStack>
-                        </Button>
-                      </HStack>
-                    </Box>
-
-                    {/* Tab Content */}
-                    <Box p={6}>
-                      {renderSingleServiceContent(selectedSingleService)}
-                    </Box>
-                  </VStack>
+                  <Box p={6}>
+                    {renderSingleServiceContent(selectedSingleService)}
+                  </Box>
                 ) : selectedDate && !isAddingServiceMode && (
                   <Box p={6} mb={4}>
                     {loadingDayServices ? (
@@ -3906,49 +3773,10 @@ Please arrive **15 minutes early** for sound check.
                   </Box>
                 )}
 
-                {formError && (
-                  <Alert status="error" borderRadius="md" mb={4}>
-                    <AlertIcon />
-                    {formError}
-                  </Alert>
-                )}
                 {drawerMode !== 'single' && (isAddingServiceMode || !selectedDate || dayServices.length === 0) && (
-                  <form onSubmit={handleCreateServiceSubmit}>
-                    <VStack spacing={5} align="stretch">
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm">Service Title *</FormLabel>
-                        <Input
-                          type="text"
-                          value={formTitle}
-                          onChange={(e) => setFormTitle(e.target.value)}
-                          placeholder="e.g., Sunday Morning Service"
-                          size="md"
-                        />
-                      </FormControl>
-
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm">Service Date & Time *</FormLabel>
-                        <Input
-                          type="datetime-local"
-                          value={formDateTime}
-                          onChange={(e) => setFormDateTime(e.target.value)}
-                          size="md"
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel fontSize="sm">Description</FormLabel>
-                        <Textarea
-                          value={formDescription}
-                          onChange={(e) => setFormDescription(e.target.value)}
-                          placeholder="Optional description or notes..."
-                          rows={4}
-                          resize="vertical"
-                          minH="80px"
-                        />
-                      </FormControl>
-                    </VStack>
-                  </form>
+                  <Box p={6}>
+                    {renderCreateServiceContent()}
+                  </Box>
                 )}
               </DrawerBody>
               
@@ -3982,21 +3810,7 @@ Please arrive **15 minutes early** for sound check.
                 // Footer hidden for single service mode - X icon serves as close action
                 null
               ) : (isAddingServiceMode || !selectedDate || dayServices.length === 0) ? (
-                <DrawerFooter>
-                  <HStack w="100%" justify="flex-end">
-                    <Button variant="outline" colorScheme="gray" onClick={createDrawer.onClose}>
-                      Cancel
-                    </Button>
-                    <Button
-                      colorScheme="blue"
-                      onClick={handleCreateServiceSubmit}
-                      isLoading={creating}
-                      loadingText="Scheduling..."
-                    >
-                      Schedule Service
-                    </Button>
-                  </HStack>
-                </DrawerFooter>
+                null
               ) : (
                 // Footer hidden for day view - X icon serves as close action, "Add Service" can be accessed via + button
                 null
@@ -4008,10 +3822,10 @@ Please arrive **15 minutes early** for sound check.
           <Drawer isOpen={addSongDrawer.isOpen} placement="right" onClose={addSongDrawer.onClose} size="lg">
             <DrawerOverlay />
             <DrawerContent sx={mobileTextSx}>
-              <DrawerCloseButton />
-              <DrawerHeader>
+              <DrawerCloseButton display={{ base: 'none', md: 'inline-flex' }} />
+              <DrawerHeader boxShadow="sm" borderBottom="1px" borderColor={useColorModeValue('gray.200', 'gray.600')}>
                 <HStack justify="space-between" align="center">
-                  <Text m={0} fontWeight="800" fontSize={{ base: 'xl', md: 'lg' }}>Add New Song</Text>
+                  <Text m={0} fontWeight="700" fontSize="lg">Add Song</Text>
                   <IconButton
                     aria-label="Close drawer"
                     icon={<CloseIcon boxSize="4" />}
@@ -4024,115 +3838,11 @@ Please arrive **15 minutes early** for sound check.
                   />
                 </HStack>
               </DrawerHeader>
-              <DrawerBody>
-                {songError && (
-                  <Alert status="error" borderRadius="md" mb={4}>
-                    <AlertIcon />
-                    {songError}
-                  </Alert>
-                )}
-                <VStack spacing={5} align="stretch">
-                  <FormControl isRequired>
-                    <FormLabel fontSize="sm">Title *</FormLabel>
-                    <Input value={songTitle} onChange={(e) => setSongTitle(e.target.value)} placeholder="Song title" size="md" />
-                  </FormControl>
-
-                  <FormControl isRequired>
-                    <FormLabel fontSize="sm">Artist *</FormLabel>
-                    <Input value={songArtist} onChange={(e) => setSongArtist(e.target.value)} placeholder="Artist name" size="md" />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel fontSize="sm">YouTube URL</FormLabel>
-                    <Input type="url" value={songYouTubeUrl} onChange={(e) => setSongYouTubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." size="md" />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel fontSize="sm">Spotify URL</FormLabel>
-                    <Input type="url" value={songSpotifyUrl} onChange={(e) => setSongSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/track/..." size="md" />
-                  </FormControl>
-
-                  <HStack spacing={4} align="stretch">
-                    <FormControl>
-                      <FormLabel fontSize="sm">Key</FormLabel>
-                      <Input value={songKey} onChange={(e) => setSongKey(e.target.value)} placeholder="C, G, D, etc." size="md" />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel fontSize="sm">BPM</FormLabel>
-                      <Input type="number" value={songBpm} onChange={(e) => setSongBpm(e.target.value)} placeholder="120" size="md" />
-                    </FormControl>
-                  </HStack>
-
-                  <FormControl>
-                    <FormLabel fontSize="sm">CCLI Number</FormLabel>
-                    <Input value={songCcli} onChange={(e) => setSongCcli(e.target.value)} placeholder="CCLI-123456" size="md" />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel fontSize="sm">Tags</FormLabel>
-                    <Input value={songTags} onChange={(e) => setSongTags(e.target.value)} placeholder="worship, contemporary, gospel (comma separated)" size="md" />
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel fontSize="sm">Lyrics</FormLabel>
-                    <Textarea value={songLyrics} onChange={(e) => setSongLyrics(e.target.value)} placeholder="Enter song lyrics..." size="md" rows={4} />
-                  </FormControl>
-                </VStack>
+              <DrawerBody p={0}>
+                <Box p={6}>
+                  {renderCreateSongContent()}
+                </Box>
               </DrawerBody>
-              <DrawerFooter>
-                <HStack w="100%" justify="flex-end">
-                  <Button variant="outline" colorScheme="gray" onClick={addSongDrawer.onClose}>
-                    Cancel
-                  </Button>
-                  <Button colorScheme="blue" onClick={async () => {
-                    if (!organization) { setSongError('Organization not found.'); return }
-                    if (!canManagePrimary) { setSongError('You do not have permission to create songs. Only admins and owners can create songs.'); return }
-                    if (!songTitle.trim() || !songArtist.trim()) { setSongError('Title and Artist are required.'); return }
-                    try {
-                      setIsAddingSong(true)
-                      setSongError('')
-                      const tagsArray = songTags
-                        .split(',')
-                        .map(tag => tag.trim())
-                        .filter(tag => tag.length > 0)
-                      const { error } = await supabase
-                        .from('songs')
-                        .insert({
-                          organization_id: organization.organization_id,
-                          title: songTitle.trim(),
-                          artist: songArtist.trim(),
-                          youtube_url: songYouTubeUrl || null,
-                          spotify_url: songSpotifyUrl || null,
-                          key: songKey || null,
-                          bpm: songBpm ? parseInt(songBpm) : null,
-                          ccli_number: songCcli || null,
-                          tags: tagsArray,
-                          lyrics: songLyrics || null,
-                          created_by: user?.id || null
-                        })
-                      if (error) { setSongError('Failed to add song. Please try again.'); return }
-                      setSongTitle('')
-                      setSongArtist('')
-                      setSongYouTubeUrl('')
-                      setSongSpotifyUrl('')
-                      setSongKey('')
-                      setSongBpm('')
-                      setSongCcli('')
-                      setSongTags('')
-                      setSongLyrics('')
-                      addSongDrawer.onClose()
-                      await loadRecentSongs()
-                    } catch (err) {
-                      setSongError('Failed to add song. Please try again later.')
-                    } finally {
-                      setIsAddingSong(false)
-                    }
-                  }} isLoading={isAddingSong} loadingText="Adding...">
-                    Add Song
-                  </Button>
-                </HStack>
-              </DrawerFooter>
             </DrawerContent>
           </Drawer>
 

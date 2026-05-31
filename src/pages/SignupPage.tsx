@@ -1,25 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { 
-  Box, 
-  VStack, 
-  HStack, 
-  Heading, 
-  Text, 
-  FormControl, 
-  FormLabel, 
-  Input, 
-  Button, 
-  Alert, 
-  AlertIcon,
-  Spinner,
-  useColorModeValue,
-  Center,
-  FormHelperText
-} from '@chakra-ui/react'
 import { createUserAccount } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { EntryShell } from '../components/EntryShell'
 
 export function SignupPage() {
   const { t } = useTranslation()
@@ -30,7 +14,7 @@ export function SignupPage() {
     lastName: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   })
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -44,7 +28,6 @@ export function SignupPage() {
   } | null>(null)
   const [invitationLoading, setInvitationLoading] = useState(true)
 
-  // Check for invitation token on component mount
   useEffect(() => {
     const inviteToken = searchParams.get('invite')
     if (inviteToken) {
@@ -56,7 +39,7 @@ export function SignupPage() {
 
   const checkInvitation = async (token: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error: invitationError } = await supabase
         .from('organization_invites')
         .select(`
           *,
@@ -68,36 +51,28 @@ export function SignupPage() {
         .eq('id', token)
         .eq('status', 'pending')
 
-      if (error) {
-        console.error('Database error checking invitation:', error)
+      if (invitationError || !data || data.length === 0) {
+        console.error('Database error checking invitation:', invitationError)
         setError('Invalid or expired invitation link')
         setInvitationLoading(false)
         return
       }
 
-      // Check if we got any results
-      if (!data || data.length === 0) {
-        setError('Invalid or expired invitation link')
-        setInvitationLoading(false)
-        return
-      }
-
-      const invitation = data[0] // Get the first (and should be only) invitation
-
-      // Check if invitation has expired
+      const pendingInvitation = data[0]
       const now = new Date()
-      const expiresAt = new Date(invitation.expires_at)
+      const expiresAt = new Date(pendingInvitation.expires_at)
+
       if (now > expiresAt) {
         setError('This invitation has expired. Please request a new one.')
         setInvitationLoading(false)
         return
       }
 
-      setInvitation(invitation)
-      setFormData(prev => ({ ...prev, email: invitation.email }))
+      setInvitation(pendingInvitation)
+      setFormData((prev) => ({ ...prev, email: pendingInvitation.email }))
       setInvitationLoading(false)
-    } catch (error) {
-      console.error('Error checking invitation:', error)
+    } catch (invitationError) {
+      console.error('Error checking invitation:', invitationError)
       setError('Invalid or expired invitation link')
       setInvitationLoading(false)
     }
@@ -105,22 +80,20 @@ export function SignupPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }))
-    // Clear error when user starts typing
-    if (error) setError(null)
+    if (error) {
+      setError(null)
+    }
   }
-
-  // joinOrganizationFromInvitation function removed as it's no longer used
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
-    // Basic validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
       setIsLoading(false)
@@ -134,30 +107,25 @@ export function SignupPage() {
     }
 
     try {
-      // For invited users, we'll handle the signup differently
-      let user, session
-      
+      let user
+      let session
+
       if (invitation) {
-        // For invited users, create account and immediately confirm email via Edge Function
-        const { user: newUser, session: newSession } = await createUserAccount({
-          email: formData.email,
-          password: formData.password,
-          firstName: formData.firstName,
-          lastName: formData.lastName
-        }, true) // Skip email confirmation for invited users
-        
+        const { user: newUser, session: newSession } = await createUserAccount(
+          {
+            email: formData.email,
+            password: formData.password,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+          },
+          true,
+        )
+
         user = newUser
         session = newSession
-        
-        console.log('Invited user signup result:', { user, session, invitation })
-        
+
         if (user) {
-          // User account created and email already confirmed via createUserAccount
-          // Now we need to add them to the organization
           try {
-            console.log('Adding user to organization via invite:', invitation.id)
-            
-            // Add user to organization membership
             const { error: membershipError } = await supabase
               .from('organization_memberships')
               .insert({
@@ -166,385 +134,190 @@ export function SignupPage() {
                 role: 'member',
                 status: 'active',
                 invited_by: invitation.invited_by,
-                accepted_at: new Date().toISOString()
+                accepted_at: new Date().toISOString(),
               })
 
             if (membershipError) {
               console.error('Error creating membership:', membershipError)
-              setError('Account created successfully, but there was an issue adding you to the organization. Please contact your administrator.')
+              setError(
+                'Account created successfully, but there was an issue adding you to the organization. Please contact your administrator.',
+              )
               setIsLoading(false)
               return
             }
 
-            // Update invitation status
             const { error: inviteUpdateError } = await supabase
               .from('organization_invites')
               .update({
                 status: 'accepted',
-                accepted_at: new Date().toISOString()
+                accepted_at: new Date().toISOString(),
               })
               .eq('id', invitation.id)
 
             if (inviteUpdateError) {
               console.error('Error updating invite status:', inviteUpdateError)
-              // Don't fail the whole process for this
             }
 
-            console.log('Successfully added user to organization')
             navigate('/dashboard')
             return
           } catch (inviteError) {
             console.error('Error in invitation flow:', inviteError)
-            setError('Account created successfully, but there was an issue with the invitation. Please contact your administrator.')
+            setError(
+              'Account created successfully, but there was an issue with the invitation. Please contact your administrator.',
+            )
             setIsLoading(false)
             return
           }
         }
       } else {
-        // Regular signup
         const { user: newUser, session: newSession } = await createUserAccount({
           email: formData.email,
           password: formData.password,
           firstName: formData.firstName,
-          lastName: formData.lastName
+          lastName: formData.lastName,
         })
-        
+
         user = newUser
         session = newSession
-        
-        console.log('Regular signup result:', { user, session })
       }
 
       if (user) {
-        // Regular signup - check if we have a session
         if (session) {
           navigate('/dashboard')
         } else {
-          // Email confirmation required for regular signup
           setError('Please check your email to confirm your account before signing in.')
         }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'An unexpected error occurred')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const bgGradient = useColorModeValue(
-    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    'linear-gradient(135deg, #4c51bf 0%, #553c9a 100%)'
-  )
-  const cardBg = useColorModeValue('white', 'gray.800')
-  const cardShadow = useColorModeValue(
-    '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
-  )
-  const titleColor = useColorModeValue('gray.800', 'white')
-  const subtitleColor = useColorModeValue('gray.600', 'gray.300')
-  const borderColor = useColorModeValue('gray.200', 'gray.600')
-  const linkColor = useColorModeValue('blue.500', 'blue.300')
-  const linkHoverColor = useColorModeValue('blue.600', 'blue.200')
-  const copyrightColor = useColorModeValue('rgba(255, 255, 255, 0.7)', 'rgba(255, 255, 255, 0.5)')
-  const disabledBg = useColorModeValue('gray.50', 'gray.700')
-  const disabledColor = useColorModeValue('gray.500', 'gray.400')
+  const title = t('signupPage.title')
+  const description = invitation
+    ? `${t('signupPage.subtitleInvited')} ${invitation.organizations?.name || ''}`.trim()
+    : t('signupPage.subtitleDefault')
 
   if (invitationLoading) {
     return (
-      <Box
-        minH="100vh"
-        bgGradient={bgGradient}
-        p={{ base: 4, md: 8 }}
-        position="relative"
+      <EntryShell
+        accentBody="Set up your account, land in your organization faster, and keep onboarding as clean as the planning experience."
+        cardClassName="max-w-lg"
+        description={t('signupPage.verifyingInvitation')}
+        title={title}
       >
-        {/* Top Logo */}
-        <Box
-          position="absolute"
-          top={{ base: 4, md: 8 }}
-          left={{ base: 4, md: 8 }}
-          zIndex={10}
-        >
-          <Link to="/" style={{ textDecoration: 'none' }}>
-            <Heading
-              as="h1"
-              size={{ base: 'md', md: 'lg' }}
-              fontWeight="700"
-              color="white"
-              m={0}
-              _hover={{ color: 'rgba(255, 255, 255, 0.8)' }}
-              transition="color 0.2s ease"
-            >
-              {t('header.appName')}
-            </Heading>
-          </Link>
-        </Box>
-
-        {/* Loading Container */}
-        <Center minH="100vh">
-          <Box
-            bg={cardBg}
-            borderRadius="xl"
-            boxShadow={cardShadow}
-            p={{ base: 8, md: 10 }}
-            w="100%"
-            maxW="450px"
-            mx="auto"
-            textAlign="center"
-            py={12}
-          >
-            <VStack spacing={4}>
-              <Spinner
-                thickness="4px"
-                speed="0.65s"
-                emptyColor="gray.200"
-                color="blue.500"
-                size="xl"
-              />
-              <Text color={subtitleColor}>{t('signupPage.verifyingInvitation')}</Text>
-            </VStack>
-          </Box>
-        </Center>
-      </Box>
+        <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600" />
+          <p className="text-sm text-text-muted">{t('signupPage.verifyingInvitation')}</p>
+        </div>
+      </EntryShell>
     )
   }
 
   return (
-    <Box
-      minH="100vh"
-      bgGradient={bgGradient}
-      p={{ base: 4, md: 8 }}
-      position="relative"
+    <EntryShell
+      accentBody="The onboarding flow now matches the same calm, light control surface as the rest of the product."
+      accentItems={[
+        'Invite-based signup can prefill the right organization and email.',
+        'First-time setup stays short, clear, and mobile-friendly.',
+        'All forms use the same spacing, font scale, and color system.',
+      ]}
+      cardClassName="max-w-2xl"
+      description={description}
+      title={title}
     >
-      {/* Top Logo */}
-      <Box
-        position="absolute"
-        top={{ base: 4, md: 8 }}
-        left={{ base: 4, md: 8 }}
-        zIndex={10}
-      >
-        <Link to="/" style={{ textDecoration: 'none' }}>
-          <Heading
-            as="h1"
-            size={{ base: 'md', md: 'lg' }}
-            fontWeight="700"
-            color="white"
-            m={0}
-            _hover={{ color: 'rgba(255, 255, 255, 0.8)' }}
-            transition="color 0.2s ease"
-          >
-            Spirit Lead
-          </Heading>
-        </Link>
-      </Box>
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        {error ? (
+          <div className="rounded-2xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+            {error}
+          </div>
+        ) : null}
 
-      {/* Signup Container */}
-      <Center minH="100vh">
-        <Box
-          bg={cardBg}
-          borderRadius="xl"
-          boxShadow={cardShadow}
-          p={{ base: 8, md: 10 }}
-          w="100%"
-          maxW="450px"
-          mx="auto"
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-text-primary">{t('signupPage.firstName')}</span>
+            <input
+              className="input-field"
+              name="firstName"
+              onChange={handleInputChange}
+              placeholder={t('signupPage.placeholders.firstName')}
+              type="text"
+              value={formData.firstName}
+            />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-text-primary">{t('signupPage.lastName')}</span>
+            <input
+              className="input-field"
+              name="lastName"
+              onChange={handleInputChange}
+              placeholder={t('signupPage.placeholders.lastName')}
+              type="text"
+              value={formData.lastName}
+            />
+          </label>
+        </div>
+
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-text-primary">{t('signupPage.email')}</span>
+          <input
+            className={`input-field ${invitation ? 'cursor-not-allowed bg-slate-50 text-text-muted' : ''}`}
+            disabled={!!invitation}
+            name="email"
+            onChange={handleInputChange}
+            placeholder={t('signupPage.placeholders.email')}
+            type="email"
+            value={formData.email}
+          />
+          {invitation ? (
+            <p className="text-xs text-text-muted">{t('signupPage.emailPreFilled')}</p>
+          ) : null}
+        </label>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-text-primary">{t('signupPage.password')}</span>
+            <input
+              className="input-field"
+              name="password"
+              onChange={handleInputChange}
+              placeholder={t('signupPage.placeholders.password')}
+              type="password"
+              value={formData.password}
+            />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-text-primary">{t('signupPage.confirmPassword')}</span>
+            <input
+              className="input-field"
+              name="confirmPassword"
+              onChange={handleInputChange}
+              placeholder={t('signupPage.placeholders.confirmPassword')}
+              type="password"
+              value={formData.confirmPassword}
+            />
+          </label>
+        </div>
+
+        <button
+          className="btn-primary w-full justify-center py-3"
+          disabled={isLoading}
+          type="submit"
         >
-          {/* Signup Header */}
-          <VStack spacing={3} mb={8} textAlign="center">
-            <Heading
-              as="h2"
-              size={'xl'}
-              fontWeight="600"
-              color={titleColor}
-            >
-              {t('signupPage.title')}
-            </Heading>
-            {invitation ? (
-              <Text
-                fontSize={{ base: 'md', md: 'lg' }}
-                color={subtitleColor}
-              >
-                {t('signupPage.subtitleInvited')} <strong>{invitation.organizations?.name}</strong>
-              </Text>
-            ) : (
-              <Text
-                fontSize={{ base: 'md', md: 'lg' }}
-                color={subtitleColor}
-              >
-                {t('signupPage.subtitleDefault')}
-              </Text>
-            )}
-          </VStack>
+          {isLoading ? t('signupPage.creatingAccount') : t('signupPage.createAccount')}
+        </button>
+      </form>
 
-          {/* Signup Form */}
-          <Box as="form" onSubmit={handleSubmit} mb={6}>
-            {error && (
-              <Alert status="error" mb={4} borderRadius="md">
-                <AlertIcon />
-                {error}
-              </Alert>
-            )}
-
-            <VStack spacing={6}>
-              {/* Name Row */}
-              <HStack spacing={4} w="100%" align="start">
-                <FormControl isRequired>
-                  <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                    {t('signupPage.firstName')}
-                  </FormLabel>
-                  <Input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    placeholder={t('signupPage.placeholders.firstName')}
-                    size="lg"
-                    _focus={{
-                      borderColor: 'blue.500',
-                      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                    }}
-                  />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                    {t('signupPage.lastName')}
-                  </FormLabel>
-                  <Input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    placeholder={t('signupPage.placeholders.lastName')}
-                    size="lg"
-                    _focus={{
-                      borderColor: 'blue.500',
-                      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                    }}
-                  />
-                </FormControl>
-              </HStack>
-
-              {/* Email */}
-              <FormControl isRequired>
-                <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                  {t('signupPage.email')}
-                </FormLabel>
-                <Input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder={t('signupPage.placeholders.email')}
-                  size="lg"
-                  disabled={!!invitation}
-                  bg={invitation ? disabledBg : undefined}
-                  color={invitation ? disabledColor : undefined}
-                  _focus={{
-                    borderColor: 'blue.500',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                  }}
-                />
-                {invitation && (
-                  <FormHelperText color={subtitleColor} fontSize="xs">
-                    {t('signupPage.emailPreFilled')}
-                  </FormHelperText>
-                )}
-              </FormControl>
-
-              {/* Password */}
-              <FormControl isRequired>
-                <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                  {t('signupPage.password')}
-                </FormLabel>
-                <Input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder={t('signupPage.placeholders.password')}
-                  size="lg"
-                  _focus={{
-                    borderColor: 'blue.500',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                  }}
-                />
-              </FormControl>
-
-              {/* Confirm Password */}
-              <FormControl isRequired>
-                <FormLabel color={titleColor} fontSize="sm" fontWeight="500">
-                  {t('signupPage.confirmPassword')}
-                </FormLabel>
-                <Input
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  placeholder={t('signupPage.placeholders.confirmPassword')}
-                  size="lg"
-                  _focus={{
-                    borderColor: 'blue.500',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                  }}
-                />
-              </FormControl>
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                colorScheme="blue"
-                size="lg"
-                w="100%"
-                isLoading={isLoading}
-                loadingText={t('signupPage.creatingAccount')}
-                fontWeight="500"
-                fontSize="md"
-                py={3}
-              >
-                {t('signupPage.createAccount')}
-              </Button>
-            </VStack>
-          </Box>
-
-          {/* Signup Footer */}
-          <Box
-            textAlign="center"
-            pt={6}
-            borderTop="1px"
-            borderColor={borderColor}
-          >
-            <Text color={subtitleColor} fontSize="sm">
-              {t('signupPage.alreadyHaveAccount')}{' '}
-              <Box
-                as={Link}
-                to="/login"
-                color={linkColor}
-                fontWeight="500"
-                _hover={{
-                  color: linkHoverColor,
-                  textDecoration: 'underline'
-                }}
-                transition="color 0.2s ease"
-              >
-                {t('signupPage.signIn')}
-              </Box>
-            </Text>
-          </Box>
-        </Box>
-      </Center>
-
-      {/* Copyright */}
-      <Box
-        position="absolute"
-        bottom={4}
-        left="50%"
-        transform="translateX(-50%)"
-        textAlign="center"
-      >
-        <Text color={copyrightColor} fontSize="sm" m={0}>
-          &copy; {new Date().getFullYear()} Spirit Lead. {t('signupPage.copyright')}
-        </Text>
-      </Box>
-    </Box>
+      <div className="text-center text-sm text-text-muted">
+        {t('signupPage.alreadyHaveAccount')}{' '}
+        <Link className="font-semibold text-primary-700 hover:text-primary-800" to="/login">
+          {t('signupPage.signIn')}
+        </Link>
+      </div>
+    </EntryShell>
   )
-} 
+}

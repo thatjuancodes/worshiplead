@@ -1,15 +1,13 @@
-import { Box, useColorModeValue } from '@chakra-ui/react'
 import { AuthProvider } from './contexts'
 import { AuthenticatedApp } from './AuthenticatedApp'
-import './index.css'
 
 function App() {
   return (
-    <Box minH="100vh" bg={useColorModeValue('white', 'gray.900')}>
+    <div className="min-h-screen bg-background font-sans text-text-primary">
       <AuthProvider>
         <AuthenticatedApp />
       </AuthProvider>
-    </Box>
+    </div>
   )
 }
 

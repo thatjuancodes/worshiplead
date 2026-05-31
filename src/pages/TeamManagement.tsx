@@ -52,8 +52,9 @@ import {
   InputGroup,
   InputLeftElement,
 } from '@chakra-ui/react'
-import { ChevronUpIcon, ChevronDownIcon, SearchIcon } from '@chakra-ui/icons'
+import { SearchIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
+import { EmptyState } from '../components'
 
 interface OrganizationData {
   organization_id: string
@@ -162,18 +163,21 @@ export function TeamManagement() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  // Sorting state
-  const [sortField, setSortField] = useState<'name' | 'email' | 'role' | 'joined_at'>('name')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
-
   // Filtering state
   const [searchFilter, setSearchFilter] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | 'owner' | 'admin' | 'member'>('all')
+  const [selectedMember, setSelectedMember] = useState<OrganizationMember | null>(null)
 
   // Drawer states
   const { isOpen: isCreateMemberDrawerOpen, onOpen: onCreateMemberDrawerOpen, onClose: onCreateMemberDrawerClose } = useDisclosure()
   const { isOpen: isInviteDrawerOpen, onOpen: onInviteDrawerOpen, onClose: onInviteDrawerClose } = useDisclosure()
   const { isOpen: isRoleDrawerOpen, onOpen: onRoleDrawerOpen, onClose: onRoleDrawerClose } = useDisclosure()
   const { isOpen: isRemoveMemberModalOpen, onOpen: onRemoveMemberModalOpen, onClose: onRemoveMemberModalClose } = useDisclosure()
+  const {
+    isOpen: isMemberDetailDrawerOpen,
+    onOpen: onMemberDetailDrawerOpen,
+    onClose: onMemberDetailDrawerClose
+  } = useDisclosure()
 
   // Color mode values
   const bgColor = useColorModeValue('gray.50', 'gray.900')
@@ -197,20 +201,32 @@ export function TeamManagement() {
     })
   }
 
-  // Data processing functions
-  const handleSort = (field: 'name' | 'email' | 'role' | 'joined_at') => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortDirection('asc')
-    }
-    setCurrentPage(1) // Reset to first page when sorting
+  const getMemberName = (member: OrganizationMember) => {
+    const firstName = member.profiles?.first_name || ''
+    const lastName = member.profiles?.last_name || ''
+    const fullName = `${firstName} ${lastName}`.trim()
+    return fullName || member.profiles?.email || 'Unknown User'
   }
 
-  const getSortIcon = (field: 'name' | 'email' | 'role' | 'joined_at') => {
-    if (sortField !== field) return null
-    return sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />
+  const getMemberInitials = (member: OrganizationMember) => {
+    const firstInitial = member.profiles?.first_name?.charAt(0) || ''
+    const lastInitial = member.profiles?.last_name?.charAt(0) || ''
+    const initials = `${firstInitial}${lastInitial}`.trim()
+    return (initials || member.profiles?.email?.slice(0, 2) || 'U').toUpperCase()
+  }
+
+  const formatRelativeDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffDays <= 0) return 'Today'
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
   // Process members data: filter, sort, and paginate
@@ -226,45 +242,26 @@ export function TeamManagement() {
         const email = member.profiles?.email?.toLowerCase() || ''
         const fullName = `${firstName} ${lastName}`.trim()
         
-        return fullName.includes(searchTerm) || email.includes(searchTerm)
+        return fullName.includes(searchTerm) || email.includes(searchTerm) || member.role.includes(searchTerm)
       })
     }
 
-    // Apply sorting
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter(member => member.role === roleFilter)
+    }
+
+    // Keep volunteers alphabetized by last name then first name.
     filtered.sort((a, b) => {
-      let aValue: string | number
-      let bValue: string | number
+      const aValue = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim().toLowerCase()
+      const bValue = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim().toLowerCase()
 
-      switch (sortField) {
-        case 'name':
-          // Sort by last name, then first name
-          aValue = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim().toLowerCase()
-          bValue = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim().toLowerCase()
-          break
-        case 'email':
-          aValue = a.profiles?.email?.toLowerCase() || ''
-          bValue = b.profiles?.email?.toLowerCase() || ''
-          break
-        case 'role':
-          aValue = a.role
-          bValue = b.role
-          break
-        case 'joined_at':
-          aValue = new Date(a.joined_at).getTime()
-          bValue = new Date(b.joined_at).getTime()
-          break
-        default:
-          aValue = ''
-          bValue = ''
-      }
-
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      if (aValue < bValue) return -1
+      if (aValue > bValue) return 1
       return 0
     })
 
     return filtered
-  }, [members, searchFilter, sortField, sortDirection])
+  }, [members, searchFilter, roleFilter])
 
   // Calculate pagination
   const totalPages = Math.ceil(processedMembers.length / itemsPerPage)
@@ -275,7 +272,7 @@ export function TeamManagement() {
   // Reset to first page when filter changes
   React.useEffect(() => {
     setCurrentPage(1)
-  }, [searchFilter])
+  }, [searchFilter, roleFilter])
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -1252,67 +1249,35 @@ export function TeamManagement() {
 
 
   return (
-    <Box minH="100vh" bg={bgColor}>
+    <Box className="sl-dashboard-page" minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
-        {/* Back Button */}
-        <Box mb={4}>
-          <Button
-            variant="ghost"
-            colorScheme="gray"
-            onClick={() => navigate('/dashboard')}
-            leftIcon={<Text>←</Text>}
-            size="sm"
-          >
-            Back to Dashboard
-          </Button>
-        </Box>
-
-        {/* Header Section */}
-        <Box
-          bg={cardBg}
-          p={4}
-          borderRadius="lg"
-          boxShadow="sm"
-          border="1px"
-          borderColor={cardBorderColor}
-          mb={3}
-        >
-          <Flex
-            direction={{ base: 'column', md: 'row' }}
-            justify="space-between"
-            align={{ base: 'stretch', md: 'center' }}
-            gap={4}
-          >
-            <Box>
-              <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
-                👥 {t('teamManagement.title')}
-              </Heading>
-            </Box>
-
-            {canManageOrganization && (
-              <HStack spacing={3} flexWrap="wrap" justify={{ base: 'stretch', md: 'flex-end' }}>
-                <Button
-                  colorScheme="green"
-                  onClick={onCreateMemberDrawerOpen}
-                  size="md"
-                  isDisabled={loading}
-                >
-                  + Create Member
-                </Button>
-                <Button
-                  colorScheme="blue"
-                  onClick={onInviteDrawerOpen}
-                  size="md"
-                  isDisabled={loading}
-                >
-                  + Invite Member
-                </Button>
-              </HStack>
-            )}
-          </Flex>
-        </Box>
+      <Box as="main" maxW="1200px" mx="auto" px={{ base: 6, md: 8 }} pt={{ base: 2, md: 3 }} pb={{ base: 6, md: 8 }}>
+        <VStack align="stretch" spacing={4}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
+              Volunteers
+            </h1>
+            <p className="mt-1 text-sm text-text-muted">
+              Manage your team, access levels, and invitations
+            </p>
+          </div>
+          {canManageOrganization ? (
+            <div className="flex items-center gap-2">
+              <button className="btn-secondary" disabled={loading} onClick={onCreateMemberDrawerOpen} type="button">
+                <span aria-hidden="true">＋</span>
+                <span className="hidden sm:inline">Create Member</span>
+                <span className="sm:hidden">Create</span>
+              </button>
+              <Button className="btn-primary" disabled={loading} onClick={onInviteDrawerOpen} size="sm" type="button">
+                <span aria-hidden="true">＋</span>
+                <span className="hidden sm:inline">Invite</span>
+                <span className="sm:hidden">Invite</span>
+              </Button>
+            </div>
+          ) : null}
+        </div>
 
         {/* Permission Info Alert */}
         {!canManageOrganization && (
@@ -1331,311 +1296,245 @@ export function TeamManagement() {
         )}
 
         {/* Tabs */}
-        <Tabs>
-          <TabList>
-            <Tab>Team Members ({processedMembers.length}{searchFilter ? ` of ${members.length}` : ''})</Tab>
-            <Tab>Roles ({instruments.length})</Tab>
-            <Tab>Invitations ({invites.length + joinRequests.length})</Tab>
+        <Tabs variant="unstyled">
+          <TabList className="sl-pill-tabs">
+            <Tab
+              _selected={{ bg: 'white', boxShadow: 'sm', color: 'gray.900' }}
+              borderRadius="md"
+              color="gray.500"
+              fontSize="sm"
+              fontWeight="600"
+            >
+              <HStack spacing={2}>
+                <Text>Volunteers</Text>
+                <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={2} py={0.5}>
+                  {processedMembers.length}
+                  {searchFilter || roleFilter !== 'all' ? ` / ${members.length}` : ''}
+                </Badge>
+              </HStack>
+            </Tab>
+            <Tab
+              _selected={{ bg: 'white', boxShadow: 'sm', color: 'gray.900' }}
+              borderRadius="md"
+              color="gray.500"
+              fontSize="sm"
+              fontWeight="600"
+            >
+              <HStack spacing={2}>
+                <Text>Roles</Text>
+                <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={2} py={0.5}>
+                  {instruments.length}
+                </Badge>
+              </HStack>
+            </Tab>
+            <Tab
+              _selected={{ bg: 'white', boxShadow: 'sm', color: 'gray.900' }}
+              borderRadius="md"
+              color="gray.500"
+              fontSize="sm"
+              fontWeight="600"
+            >
+              <HStack spacing={2}>
+                <Text>Invitations</Text>
+                <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={2} py={0.5}>
+                  {invites.length + joinRequests.length}
+                </Badge>
+              </HStack>
+            </Tab>
           </TabList>
 
           <TabPanels>
             {/* Team Members Tab */}
             <TabPanel px={0}>
-              {/* Search Filter */}
-              <Box mb={4}>
-                <InputGroup maxW="400px">
-                  <InputLeftElement pointerEvents="none">
-                    <SearchIcon color="gray.300" />
-                  </InputLeftElement>
-                  <Input
-                    placeholder="Search members by name or email..."
-                    value={searchFilter}
-                    onChange={(e) => setSearchFilter(e.target.value)}
-                    size="md"
-                  />
-                </InputGroup>
-              </Box>
-              {loading ? (
-                <>
-                  {/* Search Skeleton */}
-                  <Box mb={4}>
-                    <Skeleton height="40px" maxW="400px" />
-                  </Box>
-                  
-                  <Box
-                    bg={cardBg}
-                    borderRadius="lg"
-                    boxShadow="sm"
-                    border="1px"
-                    borderColor={cardBorderColor}
-                    overflow="hidden"
-                  >
-                    <Box overflowX="auto">
-                      <Table variant="simple" minW="700px">
-                        <Thead>
-                          <Tr>
-                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Name</Th>
-                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Email</Th>
-                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Role</Th>
-                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="120px">Joined</Th>
-                            <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
-                          </Tr>
-                        </Thead>
-                        <Tbody>
-                          {[...Array(10)].map((_, index) => (
-                            <Tr key={index}>
-                              <Td minW="200px">
-                                <Skeleton height="20px" />
-                              </Td>
-                              <Td minW="200px">
-                                <Skeleton height="20px" />
-                              </Td>
-                              <Td minW="100px">
-                                <Skeleton height="20px" borderRadius="md" />
-                              </Td>
-                              <Td minW="120px">
-                                <Skeleton height="20px" />
-                              </Td>
-                              <Td minW="100px">
-                                <Skeleton height="24px" width="60px" borderRadius="md" />
-                              </Td>
-                            </Tr>
-                          ))}
-                        </Tbody>
-                      </Table>
-                    </Box>
-                  </Box>
-                  
-                  {/* Pagination Skeleton */}
-                  <Box mt={4} display="flex" justifyContent="center">
-                    <HStack spacing={2}>
-                      <Skeleton height="32px" width="80px" />
-                      <Skeleton height="32px" width="32px" />
-                      <Skeleton height="32px" width="32px" />
-                      <Skeleton height="32px" width="32px" />
-                      <Skeleton height="32px" width="60px" />
-                    </HStack>
-                  </Box>
-                </>
-              ) : processedMembers.length === 0 ? (
-                <Box
-                  bg={cardBg}
-                  p={12}
-                  borderRadius="lg"
-                  boxShadow="sm"
-                  border="1px"
-                  borderColor={cardBorderColor}
-                  textAlign="center"
-                >
-                  <Text color={mutedTextColor} fontSize="md">
-                    {searchFilter ? 'No members match your search criteria' : 'No team members found'}
-                  </Text>
-                </Box>
-              ) : (
-                <Box
-                  bg={cardBg}
-                  borderRadius="lg"
-                  boxShadow="sm"
-                  border="1px"
-                  borderColor={cardBorderColor}
-                  overflow="hidden"
-                >
-                  <Box overflowX="auto">
-                    <Table variant="simple" minW="700px">
-                      <Thead>
-                        <Tr>
-                          <Th 
-                            bg={tableHeaderBg} 
-                            color={textColor} 
-                            fontSize="sm" 
-                            fontWeight="600" 
-                            minW="200px"
-                            cursor="pointer"
-                            onClick={() => handleSort('name')}
-                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-                          >
-                            <HStack spacing={2}>
-                              <Text>Name</Text>
-                              {getSortIcon('name')}
-                            </HStack>
-                          </Th>
-                          <Th 
-                            bg={tableHeaderBg} 
-                            color={textColor} 
-                            fontSize="sm" 
-                            fontWeight="600" 
-                            minW="200px"
-                            cursor="pointer"
-                            onClick={() => handleSort('email')}
-                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-                          >
-                            <HStack spacing={2}>
-                              <Text>Email</Text>
-                              {getSortIcon('email')}
-                            </HStack>
-                          </Th>
-                          <Th 
-                            bg={tableHeaderBg} 
-                            color={textColor} 
-                            fontSize="sm" 
-                            fontWeight="600" 
-                            minW="100px"
-                            cursor="pointer"
-                            onClick={() => handleSort('role')}
-                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-                          >
-                            <HStack spacing={2}>
-                              <Text>Role</Text>
-                              {getSortIcon('role')}
-                            </HStack>
-                          </Th>
-                          <Th 
-                            bg={tableHeaderBg} 
-                            color={textColor} 
-                            fontSize="sm" 
-                            fontWeight="600" 
-                            minW="120px"
-                            cursor="pointer"
-                            onClick={() => handleSort('joined_at')}
-                            _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-                          >
-                            <HStack spacing={2}>
-                              <Text>Joined</Text>
-                              {getSortIcon('joined_at')}
-                            </HStack>
-                          </Th>
-                          <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Actions</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {currentPageMembers.map(member => (
-                          <Tr key={member.id} _hover={{ bg: tableHoverBg }}>
-                            <Td fontWeight="500" color={titleColor} minW="200px">
-                              {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
-                            </Td>
-                            <Td minW="200px">
-                              {member.profiles?.email || 'No email'}
-                            </Td>
-                            <Td minW="100px">
-                              {isOwner && user && user.id !== member.user_id ? (
-                                <HStack spacing={2}>
-                                  <Select
-                                    size="sm"
-                                    value={member.role}
-                                    onChange={e => handleChangeMemberRole(member, e.target.value as 'owner' | 'admin' | 'member')}
-                                    isDisabled={roleChangingMemberId === member.id}
-                                    minW="120px"
-                                  >
-                                    <option value="owner">Owner</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="member">Member</option>
-                                  </Select>
-                                  {roleChangingMemberId === member.id && <Skeleton height="20px" width="20px" />}
-                                </HStack>
-                              ) : (
-                                <Badge
-                                  colorScheme={
-                                    member.role === 'owner' ? 'yellow' : 
-                                    member.role === 'admin' ? 'blue' : 'gray'
-                                  }
-                                  variant="subtle"
-                                  textTransform="capitalize"
-                                  fontSize="xs"
-                                  px={3}
-                                  py={1}
-                                >
-                                  {member.role}
-                                </Badge>
-                              )}
-                            </Td>
-                            <Td minW="120px">
-                              {new Date(member.joined_at).toLocaleDateString()}
-                            </Td>
-                            <Td minW="100px">
-                              {isOwner && user && user.id !== member.user_id && (
-                                <Button
-                                  size="xs"
-                                  colorScheme="red"
-                                  variant="outline"
-                                  onClick={() => handleRemoveMember(member)}
-                                >
-                                  Remove
-                                </Button>
-                              )}
-                            </Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </Box>
-                </Box>
-              )}
+              <div className="space-y-4">
+                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                  <InputGroup maxW={{ base: 'full', sm: '320px' }}>
+                    <InputLeftElement color="gray.400" pointerEvents="none">
+                      <SearchIcon />
+                    </InputLeftElement>
+                    <Input
+                      className="input-field"
+                      placeholder="Search volunteers..."
+                      pl="40px"
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
+                    />
+                  </InputGroup>
+                  <div className="sl-chip-row">
+                    {[
+                      { label: 'All', value: 'all' as const },
+                      { label: 'Owners', value: 'owner' as const },
+                      { label: 'Admins', value: 'admin' as const },
+                      { label: 'Members', value: 'member' as const },
+                    ].map((filterOption) => (
+                      <button
+                        key={filterOption.value}
+                        className={`sl-chip ${roleFilter === filterOption.value ? 'sl-chip-active' : ''}`}
+                        onClick={() => setRoleFilter(filterOption.value)}
+                        type="button"
+                      >
+                        {filterOption.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Pagination Controls */}
-              {processedMembers.length > itemsPerPage && (
-                <Box mt={4} display="flex" justifyContent="center" alignItems="center">
-                  <HStack spacing={2}>
-                    {/* Previous Button */}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      isDisabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-
-                    {/* Page Numbers */}
-                    {[...Array(totalPages)].map((_, index) => {
-                      const pageNumber = index + 1
-                      const isCurrentPage = pageNumber === currentPage
-                      
-                      // Show first page, last page, current page, and pages around current
-                      const showPage = pageNumber === 1 || 
-                                     pageNumber === totalPages || 
-                                     Math.abs(pageNumber - currentPage) <= 1
-
-                      if (!showPage) {
-                        // Show ellipsis for gaps
-                        if (pageNumber === 2 && currentPage > 4) {
-                          return <Text key={pageNumber} color={mutedTextColor}>...</Text>
-                        }
-                        if (pageNumber === totalPages - 1 && currentPage < totalPages - 3) {
-                          return <Text key={pageNumber} color={mutedTextColor}>...</Text>
-                        }
-                        return null
-                      }
-
-                      return (
+                {loading ? (
+                  <div className="sl-compact-table">
+                    {[...Array(8)].map((_, index) => (
+                      <div className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0" key={index}>
+                        <Skeleton borderRadius="full" h="40px" w="40px" />
+                        <div className="flex-1">
+                          <Skeleton height="16px" mb={2} maxW="220px" />
+                          <Skeleton height="12px" maxW="140px" />
+                        </div>
+                        <Skeleton height="24px" maxW="90px" w="90px" />
+                      </div>
+                    ))}
+                  </div>
+                ) : processedMembers.length === 0 ? (
+                  <EmptyState
+                    description={searchFilter || roleFilter !== 'all' ? 'Try adjusting your search or filters.' : 'Add or invite volunteers to start building your team.'}
+                    icon={<span className="text-2xl">👥</span>}
+                    title={searchFilter || roleFilter !== 'all' ? 'No volunteers found' : 'No volunteers yet'}
+                    action={
+                      searchFilter || roleFilter !== 'all' ? (
                         <Button
-                          key={pageNumber}
+                          className="btn-primary"
+                          onClick={() => {
+                            setSearchFilter('')
+                            setRoleFilter('all')
+                          }}
                           size="sm"
-                          variant={isCurrentPage ? "solid" : "outline"}
-                          colorScheme={isCurrentPage ? "blue" : "gray"}
-                          onClick={() => setCurrentPage(pageNumber)}
+                          type="button"
                         >
-                          {pageNumber}
+                          Clear Filters
                         </Button>
-                      )
-                    })}
+                      ) : undefined
+                    }
+                  />
+                ) : (
+                  <>
+                    <div className="sl-compact-table">
+                      <div className="hidden grid-cols-[48px_1fr_120px_220px_110px_48px] gap-3 border-b border-border bg-gray-50/50 px-4 py-2.5 sm:grid">
+                        <span />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Name</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Access</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Email</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Joined</span>
+                        <span />
+                      </div>
+                      <div className="divide-y divide-border">
+                        {currentPageMembers.map((member) => (
+                          <div
+                            key={member.id}
+                            onClick={() => {
+                              setSelectedMember(member)
+                              onMemberDetailDrawerOpen()
+                            }}
+                            className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50/50"
+                          >
+                            <Box
+                              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700"
+                              flexShrink={0}
+                            >
+                              {getMemberInitials(member)}
+                            </Box>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="truncate text-sm font-medium text-text-primary">
+                                  {getMemberName(member)}
+                                </h3>
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-2 sm:hidden">
+                                <span className="text-xs capitalize text-text-muted">{member.role}</span>
+                                <span className="text-xs text-text-muted">·</span>
+                                <span className="truncate text-xs text-text-muted">{member.profiles?.email || 'No email'}</span>
+                              </div>
+                            </div>
+                            <div className="hidden w-[120px] flex-shrink-0 sm:flex">
+                              <Badge
+                                colorScheme={
+                                  member.role === 'owner' ? 'yellow' :
+                                  member.role === 'admin' ? 'blue' : 'gray'
+                                }
+                                variant="subtle"
+                                textTransform="capitalize"
+                                fontSize="xs"
+                                px={2.5}
+                                py={1}
+                              >
+                                {member.role}
+                              </Badge>
+                            </div>
+                            <div className="hidden w-[220px] flex-shrink-0 sm:block">
+                              <span className="truncate text-xs text-text-muted">{member.profiles?.email || 'No email'}</span>
+                            </div>
+                            <div className="hidden w-[110px] flex-shrink-0 sm:block">
+                              <span className="text-xs text-text-muted">{formatRelativeDate(member.joined_at)}</span>
+                            </div>
+                            <div className="flex w-[48px] flex-shrink-0 items-center justify-end">
+                              <span className="text-lg text-text-muted opacity-0 transition-opacity group-hover:opacity-100">›</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                    {/* Next Button */}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      isDisabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </HStack>
-                  
-                  {/* Page Info */}
-                  <Text ml={4} fontSize="sm" color={mutedTextColor}>
-                    Page {currentPage} of {totalPages} ({processedMembers.length} total)
-                  </Text>
-                </Box>
-              )}
+                    {processedMembers.length > itemsPerPage ? (
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="text-xs text-text-muted">
+                          Showing {startIndex + 1}-{Math.min(endIndex, processedMembers.length)} of {processedMembers.length} volunteers
+                        </span>
+                        <HStack spacing={2}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                            isDisabled={currentPage === 1}
+                          >
+                            Previous
+                          </Button>
+                          {[...Array(totalPages)].map((_, index) => {
+                            const pageNumber = index + 1
+                            const showPage = pageNumber === 1 || pageNumber === totalPages || Math.abs(pageNumber - currentPage) <= 1
+
+                            if (!showPage) {
+                              if (pageNumber === 2 && currentPage > 4) {
+                                return <Text key={pageNumber} color={mutedTextColor}>...</Text>
+                              }
+                              if (pageNumber === totalPages - 1 && currentPage < totalPages - 3) {
+                                return <Text key={pageNumber} color={mutedTextColor}>...</Text>
+                              }
+                              return null
+                            }
+
+                            return (
+                              <Button
+                                key={pageNumber}
+                                size="sm"
+                                variant={pageNumber === currentPage ? 'solid' : 'outline'}
+                                colorScheme={pageNumber === currentPage ? 'blue' : 'gray'}
+                                onClick={() => setCurrentPage(pageNumber)}
+                              >
+                                {pageNumber}
+                              </Button>
+                            )
+                          })}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                            isDisabled={currentPage === totalPages}
+                          >
+                            Next
+                          </Button>
+                        </HStack>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
             </TabPanel>
 
             {/* Roles Tab */}
@@ -2036,7 +1935,135 @@ export function TeamManagement() {
             </TabPanel>
           </TabPanels>
         </Tabs>
+        </VStack>
       </Box>
+
+      {/* Member Detail Drawer */}
+      <Drawer
+        isOpen={isMemberDetailDrawerOpen}
+        placement="right"
+        onClose={() => {
+          onMemberDetailDrawerClose()
+          setSelectedMember(null)
+        }}
+        size={{ base: 'full', md: 'md' }}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+            <Heading as="h3" size="lg" color={titleColor} fontWeight="600">
+              {selectedMember ? getMemberName(selectedMember) : 'Volunteer Details'}
+            </Heading>
+          </DrawerHeader>
+
+          <DrawerBody bg={bgColor} p={6}>
+            {selectedMember ? (
+              <VStack align="stretch" spacing={6}>
+                <HStack align="center" spacing={4}>
+                  <Box className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 text-lg font-semibold text-primary-700">
+                    {getMemberInitials(selectedMember)}
+                  </Box>
+                  <Box>
+                    <Text color={titleColor} fontSize="lg" fontWeight="700" m={0}>
+                      {getMemberName(selectedMember)}
+                    </Text>
+                    <Text color={mutedTextColor} fontSize="sm" m={0}>
+                      {selectedMember.profiles?.email || 'No email'}
+                    </Text>
+                  </Box>
+                </HStack>
+
+                <Box className="sl-surface-card" p={4}>
+                  <VStack align="stretch" spacing={3}>
+                    <HStack justify="space-between">
+                      <Text color={mutedTextColor} fontSize="sm">Access Level</Text>
+                      <Badge
+                        colorScheme={
+                          selectedMember.role === 'owner' ? 'yellow' :
+                          selectedMember.role === 'admin' ? 'blue' : 'gray'
+                        }
+                        variant="subtle"
+                        textTransform="capitalize"
+                      >
+                        {selectedMember.role}
+                      </Badge>
+                    </HStack>
+                    <HStack justify="space-between">
+                      <Text color={mutedTextColor} fontSize="sm">Status</Text>
+                      <Badge colorScheme={selectedMember.status === 'active' ? 'green' : 'gray'} variant="subtle" textTransform="capitalize">
+                        {selectedMember.status}
+                      </Badge>
+                    </HStack>
+                    <HStack justify="space-between">
+                      <Text color={mutedTextColor} fontSize="sm">Joined</Text>
+                      <Text color={textColor} fontSize="sm">
+                        {new Date(selectedMember.joined_at).toLocaleDateString()}
+                      </Text>
+                    </HStack>
+                  </VStack>
+                </Box>
+
+                {isOwner && user && user.id !== selectedMember.user_id ? (
+                  <Box>
+                    <Text color={titleColor} fontSize="sm" fontWeight="600" mb={2}>
+                      Change Access
+                    </Text>
+                    <HStack spacing={3}>
+                      <Select
+                        size="sm"
+                        value={selectedMember.role}
+                        onChange={(e) => handleChangeMemberRole(selectedMember, e.target.value as 'owner' | 'admin' | 'member')}
+                        isDisabled={roleChangingMemberId === selectedMember.id}
+                      >
+                        <option value="owner">Owner</option>
+                        <option value="admin">Admin</option>
+                        <option value="member">Member</option>
+                      </Select>
+                      {roleChangingMemberId === selectedMember.id ? <Skeleton h="32px" w="72px" /> : null}
+                    </HStack>
+                  </Box>
+                ) : null}
+
+                <Box>
+                  <Text color={titleColor} fontSize="sm" fontWeight="600" mb={2}>
+                    Contact
+                  </Text>
+                  <Box className="sl-surface-card" p={4}>
+                    <Text color={textColor} fontSize="sm">
+                      {selectedMember.profiles?.email || 'No email available'}
+                    </Text>
+                  </Box>
+                </Box>
+
+                <HStack spacing={3} pt={2}>
+                  <Button
+                    flex="1"
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedMember.profiles?.email) {
+                        window.location.href = `mailto:${selectedMember.profiles.email}`
+                      }
+                    }}
+                  >
+                    Email
+                  </Button>
+                  {isOwner && user && user.id !== selectedMember.user_id ? (
+                    <Button
+                      flex="1"
+                      colorScheme="red"
+                      variant="outline"
+                      onClick={() => handleRemoveMember(selectedMember)}
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
+                </HStack>
+              </VStack>
+            ) : null}
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
 
       {/* Create Member Drawer */}
       <Drawer
@@ -2134,9 +2161,9 @@ export function TeamManagement() {
                     Cancel
                   </Button>
                   <Button
+                    className="btn-primary-size"
                     type="submit"
                     colorScheme="green"
-                    size="md"
                     isLoading={creatingMember}
                     loadingText="Creating..."
                     isDisabled={
@@ -2199,9 +2226,9 @@ export function TeamManagement() {
                     Cancel
                   </Button>
                   <Button
+                    className="btn-primary-size"
                     type="submit"
                     colorScheme="blue"
-                    size="md"
                     isLoading={inviting}
                     loadingText="Sending..."
                     isDisabled={!inviteEmail.trim()}
@@ -2268,9 +2295,9 @@ export function TeamManagement() {
                     Cancel
                   </Button>
                   <Button
+                    className="btn-primary-size"
                     type="submit"
                     colorScheme="green"
-                    size="md"
                     isLoading={isSavingInstrument}
                     loadingText={editingInstrumentId ? 'Saving...' : 'Adding...'}
                     isDisabled={!instrumentForm.name.trim()}

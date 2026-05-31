@@ -1,36 +1,8 @@
-import { Link } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { signOut } from '../lib/auth'
-import { useNavigate } from 'react-router-dom'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLanguage } from '../hooks/useLanguage'
-import { 
-  Box, 
-  Flex, 
-  Heading, 
-  Text, 
-  Button, 
-  useColorModeValue,
-  Container,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  MenuDivider,
-  Avatar,
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  VStack,
-  Divider,
-  useDisclosure,
-  Image,
-  HStack
-} from '@chakra-ui/react'
-import { ChevronDownIcon, HamburgerIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
@@ -60,446 +32,410 @@ interface DashboardHeaderProps {
   organization: OrganizationData | null
 }
 
-// Helper function to get organization name
-const getOrganizationName = (organization: OrganizationData | null): string => {
-  if (!organization?.organizations) return 'Loading...'
-  
-  if (Array.isArray(organization.organizations)) {
-    return organization.organizations[0]?.name || 'Loading...'
+type NavIcon = 'dashboard' | 'services' | 'volunteers' | 'songbank'
+type NavItem = { path: string; label: string; exact: boolean; icon: NavIcon }
+
+function getOrganizationName(organization: OrganizationData | null): string {
+  if (!organization?.organizations) {
+    return 'Loading...'
   }
-  
-  return organization.organizations.name || 'Loading...'
+
+  return Array.isArray(organization.organizations)
+    ? organization.organizations[0]?.name || 'Loading...'
+    : organization.organizations.name || 'Loading...'
+}
+
+function getOrganizationSlug(organization: OrganizationData | null): string {
+  if (!organization?.organizations) {
+    return ''
+  }
+
+  return Array.isArray(organization.organizations)
+    ? organization.organizations[0]?.slug || ''
+    : organization.organizations.slug || ''
+}
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+function SidebarIcon({ icon }: { icon: NavIcon }) {
+  const commonProps = {
+    className: 'h-4 w-4 shrink-0',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    strokeWidth: 1.8,
+    viewBox: '0 0 24 24'
+  }
+
+  if (icon === 'dashboard') {
+    return (
+      <svg {...commonProps}>
+        <rect x="3" y="3" width="8" height="8" rx="2" />
+        <rect x="13" y="3" width="8" height="5" rx="2" />
+        <rect x="13" y="10" width="8" height="11" rx="2" />
+        <rect x="3" y="13" width="8" height="8" rx="2" />
+      </svg>
+    )
+  }
+
+  if (icon === 'services') {
+    return (
+      <svg {...commonProps}>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M16 3v4M8 3v4M3 11h18" />
+      </svg>
+    )
+  }
+
+  if (icon === 'volunteers') {
+    return (
+      <svg {...commonProps}>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+        <circle cx="9.5" cy="7" r="3.5" />
+        <path d="M21 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 4.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg {...commonProps}>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  )
+}
+
+function SignOutIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  )
 }
 
 export function DashboardHeader({ user, organization }: DashboardHeaderProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { currentLanguage, changeLanguage, availableLanguages } = useLanguage()
   const navigate = useNavigate()
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const location = useLocation()
   const { canManagePrimary } = useOrganizationAccess()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [desktopUserMenuOpen, setDesktopUserMenuOpen] = useState(false)
+  const [mobileUserMenuOpen, setMobileUserMenuOpen] = useState(false)
+  const desktopUserMenuRef = useRef<HTMLDivElement | null>(null)
+  const mobileUserMenuRef = useRef<HTMLDivElement | null>(null)
 
-  // Debug i18n resources
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Current language:', currentLanguage)
-    console.log('i18n language:', i18n.language)
-    console.log('Available resources:', Object.keys(i18n.store?.data || {}))
-    console.log('VN header resources:', (i18n.store?.data as any)?.vn?.translation?.header)
-  }
-
-  // Create translation helper function that provides fallbacks
-  const translate = useCallback((key: string, fallback: string) => {
-    const translation = t(key)
-    // Debug logging for troubleshooting
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Translation for ${key}:`, translation, `(current language: ${currentLanguage})`)
-    }
-    // Check if translation exists and is not just the key returned
-    if (translation && translation !== key && translation.trim() !== '') {
-      return translation
-    }
-    return fallback
-  }, [t, currentLanguage])
-
-  // Color mode values
-  const headerBg = useColorModeValue('white', 'gray.800')
-  const headerBorderColor = useColorModeValue('gray.200', 'gray.600')
-  const logoColor = useColorModeValue('gray.800', 'white')
-  const userNameColor = useColorModeValue('gray.700', 'gray.200')
-  const orgNameBg = useColorModeValue('blue.50', 'blue.900')
-  const orgNameColor = useColorModeValue('blue.700', 'blue.200')
-  const menuBg = useColorModeValue('white', 'gray.800')
-  const menuBorderColor = useColorModeValue('gray.200', 'gray.600')
-  const drawerBg = useColorModeValue('white', 'gray.900')
-  const drawerHeaderBg = useColorModeValue('blue.500', 'blue.600')
-  const drawerHeaderColor = 'white'
-
-  // Fetch user profile from the profiles table
   useEffect(() => {
     const fetchUserProfile = async () => {
-      if (!user?.id) return
+      if (!user?.id) {
+        return
+      }
 
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .eq('id', user.id)
-          .single()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('id', user.id)
+        .single()
 
-        if (error) {
-          console.error('Error fetching user profile:', error)
-          return
-        }
-
-        setUserProfile(profile)
-      } catch (error) {
-        console.error('Error fetching user profile:', error)
+      if (!error) {
+        setUserProfile(data)
       }
     }
 
-    fetchUserProfile()
+    fetchUserProfile().catch(() => {
+      setUserProfile(null)
+    })
   }, [user?.id])
 
-  // Fallback to user metadata if profile is not available
-  const displayName = userProfile 
-    ? `${userProfile.first_name} ${userProfile.last_name}`
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node
+
+      if (desktopUserMenuRef.current && !desktopUserMenuRef.current.contains(target)) {
+        setDesktopUserMenuOpen(false)
+      }
+
+      if (mobileUserMenuRef.current && !mobileUserMenuRef.current.contains(target)) {
+        setMobileUserMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+    }
+  }, [])
+
+  const displayName = userProfile
+    ? `${userProfile.first_name} ${userProfile.last_name}`.trim()
     : user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'User'
 
+  const navItems = useMemo(() => {
+    const items: NavItem[] = [
+      { path: '/dashboard', label: t('header.dashboard', 'Dashboard'), exact: true, icon: 'dashboard' },
+      { path: '/schedule', label: t('header.scheduleService', 'Services'), exact: false, icon: 'services' },
+      { path: '/songbank', label: t('header.songbank', 'Songs'), exact: false, icon: 'songbank' },
+    ]
 
+    if (canManagePrimary) {
+      items.splice(2, 0, { path: '/team', label: t('header.teamManagement', 'Volunteers'), exact: false, icon: 'volunteers' })
+    }
+
+    return items
+  }, [canManagePrimary, t])
 
   const handleSignOut = async () => {
-    try {
-      await signOut()
-      navigate('/')
-      onClose()
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
+    await signOut()
+    navigate('/')
   }
 
-  const buildPathWithOrganization = useCallback((path: string) => {
-    if (path === '/team' && organization?.organization_id) {
-      return `/team?organizationId=${encodeURIComponent(organization.organization_id)}`
+  const isActive = (path: string, exact: boolean) => {
+    if (exact) {
+      return location.pathname === path
     }
 
-    return path
-  }, [organization])
-
-  const handleNavigation = (path: string) => {
-    navigate(buildPathWithOrganization(path))
-    onClose()
+    return location.pathname.startsWith(path)
   }
 
+  const avatar = getInitials(displayName)
+  const organizationName = getOrganizationName(organization)
+  const organizationSlug = getOrganizationSlug(organization)
+  const userEmail = userProfile?.email || user?.email || ''
+
+  const renderUserMenu = (mobile = false) => {
+    const isOpen = mobile ? mobileUserMenuOpen : desktopUserMenuOpen
+    const setOpen = mobile ? setMobileUserMenuOpen : setDesktopUserMenuOpen
+    const containerRef = mobile ? mobileUserMenuRef : desktopUserMenuRef
+
+    return (
+      <div className="relative" ref={containerRef}>
+        {isOpen ? (
+          <div
+            className={`absolute left-0 right-0 z-20 rounded-2xl border border-border bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] ${
+              mobile ? 'bottom-[calc(100%+12px)]' : 'bottom-[calc(100%+10px)]'
+            }`}
+          >
+            <div className="border-b border-border px-3 py-2.5">
+              <p className="truncate text-sm font-semibold text-text-primary">{displayName}</p>
+              <p className="truncate text-xs text-text-muted">{userEmail}</p>
+            </div>
+            <div className="px-1 py-2">
+              <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                Language
+              </p>
+              <div className="space-y-1">
+                {availableLanguages.map((language) => {
+                  const active = currentLanguage === language.code
+
+                  return (
+                    <button
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors ${
+                        active
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-text-primary hover:bg-gray-50'
+                      }`}
+                      key={language.code}
+                      onClick={() => {
+                        changeLanguage(language.code)
+                        setOpen(false)
+                      }}
+                      type="button"
+                    >
+                      <span>{language.name}</span>
+                      {active ? <span className="text-xs font-semibold">Active</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="border-t border-border px-1 pt-2">
+              <button
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-danger-700 transition-colors hover:bg-danger-50"
+                onClick={handleSignOut}
+                type="button"
+              >
+                <SignOutIcon />
+                <span>{t('header.signOut', 'Sign Out')}</span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <button
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-gray-50"
+          onClick={() => setOpen((current) => !current)}
+          type="button"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">
+            {avatar}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-text-primary">{displayName}</p>
+            <p className="truncate text-xs text-text-muted">{organizationName}</p>
+          </div>
+        </button>
+      </div>
+    )
+  }
+
+  const renderNav = (mobile = false) => (
+    <nav className={`space-y-1 ${mobile ? '' : 'px-3 py-4'}`}>
+      {navItems.map((item) => (
+        <button
+          className={`flex w-full items-center rounded-lg py-2.5 text-sm font-medium transition-colors ${
+            mobile ? 'gap-3 px-3' : 'gap-3 px-3'
+          } ${
+            isActive(item.path, item.exact)
+              ? 'bg-primary-50 text-primary-700'
+              : 'text-text-muted hover:bg-gray-50 hover:text-text-primary'
+          }`}
+          key={item.path}
+          onClick={() => {
+            navigate(item.path === '/team' && organization?.organization_id
+              ? `/team?organizationId=${encodeURIComponent(organization.organization_id)}`
+              : item.path)
+            setMobileSidebarOpen(false)
+          }}
+          type="button"
+        >
+          <SidebarIcon icon={item.icon} />
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </nav>
+  )
 
   return (
     <>
-      <Box
-        as="header"
-        bg={headerBg}
-        borderBottom="1px"
-        borderColor={headerBorderColor}
-        py={4}
-        position="sticky"
-        top={0}
-        zIndex={10}
-      >
-        <Container maxW="1200px" px={6}>
-          <Flex justify="space-between" align="center">
-            {/* Logo */}
-            <Box>
-              <Link to="/dashboard" style={{ textDecoration: 'none' }}>
-                <HStack spacing={3} align="center">
-                  <Image
-                    src={logoImage}
-                    alt="Spirit Lead Logo"
-                    h="32px"
-                    w="auto"
-                    objectFit="contain"
-                  />
-                  <Heading
-                    as="h1"
-                    size="lg"
-                    color={logoColor}
-                    fontWeight="700"
-                    m={0}
-                    _hover={{ color: 'blue.500' }}
-                    transition="color 0.2s ease"
-                  >
-                    {t('header.appName')}
-                  </Heading>
-                </HStack>
-              </Link>
-            </Box>
-            
-            {/* User Info and Menu */}
-            <Flex align="center" gap={4} flexShrink={0}>
-              {/* Organization name - hidden on mobile, shown in dropdown instead */}
-              <Box
-                bg={orgNameBg}
-                color={orgNameColor}
-                px={3}
-                py={1}
-                borderRadius="full"
-                fontSize="sm"
-                fontWeight="500"
-                whiteSpace="nowrap"
-                display={{ base: 'none', md: 'block' }}
-              >
-                {getOrganizationName(organization)}
-              </Box>
-              
-              {/* Mobile Menu Button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                px={3}
-                py={2}
-                display={{ base: 'flex', md: 'none' }}
-                onClick={onOpen}
-                _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                _active={{ bg: useColorModeValue('gray.200', 'gray.600') }}
-              >
-                <HamburgerIcon />
-              </Button>
-              
-              {/* Desktop Dropdown Menu */}
-              <Box display={{ base: 'none', md: 'block' }}>
-                <Menu>
-                  <MenuButton
-                    as={Button}
-                    variant="ghost"
-                    size="sm"
-                    px={3}
-                    py={2}
-                    _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                    _active={{ bg: useColorModeValue('gray.200', 'gray.600') }}
-                    rightIcon={<ChevronDownIcon />}
-                  >
-                    <Flex align="center" gap={2}>
-                      <Avatar
-                        size="sm"
-                        name={displayName}
-                        bg="blue.500"
-                        color="white"
-                        fontSize="xs"
-                      />
-                      <Text
-                        fontWeight="500"
-                        color={userNameColor}
-                        whiteSpace="nowrap"
-                        fontSize="sm"
-                      >
-                        {displayName}
-                      </Text>
-                    </Flex>
-                  </MenuButton>
-                  
-                  <MenuList
-                    bg={menuBg}
-                    border="1px"
-                    borderColor={menuBorderColor}
-                    boxShadow="lg"
-                    py={2}
-                  >
-                    <MenuItem
-                      onClick={() => navigate('/dashboard')}
-                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                    >
-                      {translate('header.dashboard', 'Dashboard')}
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => navigate('/songbank')}
-                      _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                    >
-                      {translate('header.songbank', 'Songbank')}
-                    </MenuItem>
-                    {canManagePrimary && (
-                      <MenuItem
-                        onClick={() => navigate(buildPathWithOrganization('/team'))}
-                        _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                      >
-                        {translate('header.teamManagement', 'Team Management')}
-                      </MenuItem>
-                    )}
-                    {canManagePrimary && (
-                      <MenuItem
-                        onClick={() => navigate('/schedule')}
-                        _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                      >
-                        {translate('header.scheduleService', 'Schedule Service')}
-                      </MenuItem>
-                    )}
-                    <MenuDivider />
-                    
-                    {/* Language Selector - Simple MenuItems */}
-                    {availableLanguages.map((language) => (
-                      <MenuItem
-                        key={language.code}
-                        onClick={() => changeLanguage(language.code)}
-                        _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
-                        bg={currentLanguage === language.code ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
-                        color={currentLanguage === language.code ? 'blue.600' : 'inherit'}
-                        fontWeight={currentLanguage === language.code ? '600' : 'normal'}
-                      >
-                        <Flex justify="space-between" align="center" w="100%">
-                          <Text>
-                            {language.name}
-                          </Text>
-                          {currentLanguage === language.code && (
-                            <Text fontSize="xs" color="blue.500">
-                              ✓
-                            </Text>
-                          )}
-                        </Flex>
-                      </MenuItem>
-                    ))}
-                    
-                    <MenuDivider />
-                    <MenuItem
-                      onClick={handleSignOut}
-                      _hover={{ bg: useColorModeValue('red.50', 'red.900') }}
-                      color="red.500"
-                    >
-                      {translate('header.signOut', 'Sign Out')}
-                    </MenuItem>
-                  </MenuList>
-                </Menu>
-              </Box>
-            </Flex>
-          </Flex>
-        </Container>
-      </Box>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[240px] border-r border-border bg-white lg:flex lg:flex-col">
+        <button
+          className="flex items-center gap-3 border-b border-border px-5 py-5 text-left transition-colors hover:bg-gray-50"
+          onClick={() => navigate('/dashboard')}
+          type="button"
+        >
+          <img alt="Spirit Lead Logo" className="h-8 w-auto object-contain" src={logoImage} />
+          <div>
+            <p className="sl-brand-wordmark text-lg font-bold tracking-tight text-text-primary">
+              <span>{t('header.appName', 'Spirit Lead')}</span>
+              <span className="sl-beta-badge">Beta</span>
+            </p>
+          </div>
+        </button>
 
-      {/* Mobile Full-Page Menu Overlay */}
-      <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="full">
-        <DrawerOverlay />
-        <DrawerContent bg={drawerBg}>
-          <DrawerCloseButton color={drawerHeaderColor} size="lg" />
-          
-          {/* Header Section */}
-          <DrawerHeader bg={drawerHeaderBg} color={drawerHeaderColor} py={8}>
-            <VStack spacing={4} align="center">
-              <Avatar
-                size="xl"
-                name={displayName}
-                bg="white"
-                color="blue.500"
-                fontSize="2xl"
-                fontWeight="bold"
-              />
-              <VStack spacing={1}>
-                <Text fontSize="lg" fontWeight="600">
-                  {displayName}
-                </Text>
-                <Text fontSize="sm" opacity={0.9}>
-                  {userProfile?.email || user?.email}
-                </Text>
-              </VStack>
-              <Box
-                bg="white"
-                color={drawerHeaderBg}
-                px={4}
-                py={2}
-                borderRadius="full"
-                fontSize="sm"
-                fontWeight="600"
+        {renderNav()}
+
+        <div className="mt-auto border-t border-border p-3">
+          <div className="rounded-xl border border-border bg-gray-50">
+            {renderUserMenu()}
+          </div>
+        </div>
+      </aside>
+
+      <header className="fixed left-0 right-0 top-0 z-30 border-b border-border bg-white/95 backdrop-blur lg:hidden">
+        <div className="flex h-[72px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-text-primary transition-colors hover:bg-gray-50 lg:hidden"
+              onClick={() => setMobileSidebarOpen(true)}
+              type="button"
+            >
+              <span className="text-lg leading-none">☰</span>
+            </button>
+            <div>
+              <p className="text-sm font-semibold text-text-primary">{organizationName}</p>
+              <p className="text-xs text-text-muted">{organizationSlug ? `/${organizationSlug}` : 'Primary organization'}</p>
+            </div>
+          </div>
+
+          <div className="hidden items-center gap-3 md:flex">
+            <div className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+              {organization?.role || 'member'}
+            </div>
+            <div className="flex items-center gap-3 rounded-full border border-border bg-white px-2 py-1">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">
+                {avatar}
+              </div>
+              <div className="pr-2">
+                <p className="text-sm font-medium text-text-primary">{displayName}</p>
+                <p className="text-xs text-text-muted">{userProfile?.email || user?.email}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {mobileSidebarOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setMobileSidebarOpen(false)}
+            type="button"
+          />
+          <div className="absolute inset-y-0 left-0 flex w-[280px] flex-col bg-white shadow-drawer">
+            <div className="flex items-center justify-between border-b border-border px-5 py-5">
+              <button
+                className="flex items-center gap-3 text-left"
+                onClick={() => {
+                  navigate('/dashboard')
+                  setMobileSidebarOpen(false)
+                }}
+                type="button"
               >
-                {getOrganizationName(organization)}
-              </Box>
-            </VStack>
-          </DrawerHeader>
-          
-          {/* Navigation Menu */}
-          <DrawerBody py={0}>
-            <VStack spacing={0} align="stretch">
-              <Button
-                variant="ghost"
-                size="lg"
-                justifyContent="flex-start"
-                py={6}
-                px={6}
-                onClick={() => handleNavigation('/dashboard')}
-                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
-                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
+                <img alt="Spirit Lead Logo" className="h-8 w-auto object-contain" src={logoImage} />
+                <span className="sl-brand-wordmark text-lg font-bold tracking-tight text-text-primary">
+                  <span>{t('header.appName', 'Spirit Lead')}</span>
+                  <span className="sl-beta-badge">Beta</span>
+                </span>
+              </button>
+              <button
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-gray-50"
+                onClick={() => setMobileSidebarOpen(false)}
+                type="button"
               >
-                <Text fontSize="lg" fontWeight="500">
-                  {translate('header.dashboard', 'Dashboard')}
-                </Text>
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="lg"
-                justifyContent="flex-start"
-                py={6}
-                px={6}
-                onClick={() => handleNavigation('/songbank')}
-                _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
-                _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-              >
-                <Text fontSize="lg" fontWeight="500">
-                  {translate('header.songbank', 'Songbank')}
-                </Text>
-              </Button>
-              
-              {canManagePrimary && (
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  justifyContent="flex-start"
-                  py={6}
-                  px={6}
-                  onClick={() => handleNavigation('/team')}
-                  _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
-                  _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-                >
-                  <Text fontSize="lg" fontWeight="500">
-                    {translate('header.teamManagement', 'Team Management')}
-                  </Text>
-                </Button>
-              )}
-              
-              {canManagePrimary && (
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  justifyContent="flex-start"
-                  py={6}
-                  px={6}
-                  onClick={() => handleNavigation('/schedule')}
-                  _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
-                  _active={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-                >
-                  <Text fontSize="lg" fontWeight="500">
-                    {translate('header.scheduleService', 'Schedule Service')}
-                  </Text>
-                </Button>
-              )}
-              
-              <Divider my={4} />
-              
-              {/* Language Selector for Mobile */}
-              <Box px={6} py={3}>
-                <Text fontSize="sm" fontWeight="600" color="gray.500" mb={2}>
-                  {translate('header.language', 'Language')}
-                </Text>
-                <Flex gap={2}>
-                  {availableLanguages.map((language) => (
-                    <Button
-                      key={language.code}
-                      size="sm"
-                      variant={currentLanguage === language.code ? 'solid' : 'outline'}
-                      colorScheme={currentLanguage === language.code ? 'blue' : 'gray'}
-                      onClick={() => changeLanguage(language.code)}
-                      flex="1"
-                    >
-                      {language.name}
-                    </Button>
-                  ))}
-                </Flex>
-              </Box>
-              
-              <Divider my={4} />
-              
-              <Button
-                variant="ghost"
-                size="lg"
-                justifyContent="flex-start"
-                py={6}
-                px={6}
-                onClick={handleSignOut}
-                color="red.500"
-                _hover={{ bg: useColorModeValue('red.50', 'red.900') }}
-                _active={{ bg: useColorModeValue('red.100', 'red.800') }}
-              >
-                <Text fontSize="lg" fontWeight="500">
-                  {translate('header.signOut', 'Sign Out')}
-                </Text>
-              </Button>
-            </VStack>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+
+            <div className="border-b border-border px-4 py-4">
+              <p className="text-sm font-semibold text-text-primary">{organizationName}</p>
+              <p className="text-xs text-text-muted">{organizationSlug ? `/${organizationSlug}` : 'Primary organization'}</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 py-4">
+              {renderNav(true)}
+            </div>
+
+            <div className="border-t border-border p-3">
+              <div className="rounded-xl border border-border bg-gray-50">
+                {renderUserMenu(true)}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
-} 
+}

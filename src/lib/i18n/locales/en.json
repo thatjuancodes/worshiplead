@@ -39,7 +39,7 @@
       "description": "Share this link with potential volunteers to let them sign up for services",
       "copyButton": "Copy volunteer link",
       "createButton": "Create volunteer link",
-      "visitButton": "Visit Volunteer Page",
+      "visitButton": "Visit Volunteer Link",
       "loading": "Loading...",
       "copying": "Copying..."
     },
@@ -125,7 +125,8 @@
       "volunteerRemoved": "Volunteer removed from service",
       "volunteerAdded": "Volunteer added to service",
       "linkCopied": "Link copied!",
-      "linkCopiedDescription": "Volunteer link copied to clipboard"
+      "linkCopiedDescription": "Volunteer link copied to clipboard",
+      "copiedVolunteerPageLink": "Copied volunteer page link"
     },
     "info": {
       "alreadyVolunteering": "Already volunteering",
@@ -161,8 +162,8 @@
   "header": {
     "appName": "Spirit Lead",
     "dashboard": "Dashboard",
-    "songbank": "Songbank",
-    "teamManagement": "Team Management",
+    "songbank": "Song Library",
+    "teamManagement": "Volunteers",
     "scheduleService": "Services",
     "signOut": "Sign Out",
     "login": "Login",
@@ -174,7 +175,7 @@
     }
   },
   "songbank": {
-    "title": "Songbank",
+    "title": "Song Library",
     "backToDashboard": "Back to Dashboard",
     "addSong": "Add Song",
     "searchSongs": "Search songs...",
@@ -548,7 +549,7 @@
     "organizationNotFound": "Organization not found",
     "goHome": "Go Home",
     "noServicesAvailable": "No services available for volunteering at the moment",
-    "viewDashboard": "View Dashboard",
+    "viewDashboard": "Go to Dashboard",
     "success": {
       "assigned": "You have been assigned to this service",
       "removed": "You have been removed from this service"

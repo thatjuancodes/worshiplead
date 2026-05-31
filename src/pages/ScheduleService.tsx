@@ -2,19 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser, getUserPrimaryOrganization } from '../lib/auth'
-import { DashboardHeader } from '../components'
+import { DashboardHeader, EmptyState } from '../components'
 import { useOrganizationAccess } from '../hooks/useOrganizationAccess'
 import { formatServiceDate, getServiceTimeDisplay, formatForDateTimeInput } from '../utils/dateTime'
 import { 
   Box, 
   VStack, 
-  HStack, 
+  HStack,
   Heading, 
   Text, 
   Button, 
   useColorModeValue,
   Skeleton,
-  SkeletonText,
   FormControl,
   FormLabel,
   Input,
@@ -22,12 +21,6 @@ import {
   Select,
   Badge,
   Flex,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
   useDisclosure,
   Drawer,
   DrawerBody,
@@ -43,8 +36,53 @@ import {
   ModalCloseButton,
   ModalBody,
   ModalFooter,
+  InputGroup,
+  InputLeftElement,
 } from '@chakra-ui/react'
+import { ArrowForwardIcon, CalendarIcon, SearchIcon, TimeIcon } from '@chakra-ui/icons'
 import type { User } from '@supabase/supabase-js'
+
+interface Song {
+  id: string
+  title: string
+  artist: string
+  key?: string
+  bpm?: number
+}
+
+interface ServiceSong {
+  id: string
+  position: number
+  notes?: string
+  songs: Song
+}
+
+interface ServiceVolunteer {
+  id: string
+  user_id: string
+  worship_service_id?: string
+  profiles: {
+    first_name: string
+    last_name: string
+    email: string
+  }
+}
+
+const serviceAvatarColors = ['#2563EB', '#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444']
+
+function getNameInitials(firstName?: string, lastName?: string, email?: string) {
+  const initials = `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.trim()
+  if (initials) return initials.toUpperCase()
+  return (email || 'U').slice(0, 2).toUpperCase()
+}
+
+function getAvatarColor(seed: string) {
+  let hash = 0
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = seed.charCodeAt(index) + ((hash << 5) - hash)
+  }
+  return serviceAvatarColors[Math.abs(hash) % serviceAvatarColors.length]
+}
 
 interface WorshipService {
   id: string
@@ -70,20 +108,28 @@ interface OrganizationData {
 }
 
 export function ScheduleService() {
+  const SERVICES_PER_PAGE = 20
   const navigate = useNavigate()
   const toast = useToast()
-  const { canManagePrimary } = useOrganizationAccess()
+  const { canManagePrimary, isPrimaryAdmin } = useOrganizationAccess()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<OrganizationData | null>(null)
   const [services, setServices] = useState<WorshipService[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   
   // Drawer states
   const { isOpen: isAddDrawerOpen, onOpen: onAddDrawerOpen, onClose: onAddDrawerClose } = useDisclosure()
   const { isOpen: isEditDrawerOpen, onOpen: onEditDrawerOpen, onClose: onEditDrawerClose } = useDisclosure()
+  const { isOpen: isDetailDrawerOpen, onOpen: onDetailDrawerOpen, onClose: onDetailDrawerClose } = useDisclosure()
   const [editingService, setEditingService] = useState<WorshipService | null>(null)
+  const [selectedService, setSelectedService] = useState<WorshipService | null>(null)
+  const [detailSongs, setDetailSongs] = useState<ServiceSong[]>([])
+  const [detailVolunteers, setDetailVolunteers] = useState<ServiceVolunteer[]>([])
+  const [serviceIdToVolunteers, setServiceIdToVolunteers] = useState<Record<string, ServiceVolunteer[]>>({})
+  const [detailLoading, setDetailLoading] = useState(false)
   
   // Delete modal state
   const [deleteService, setDeleteService] = useState<WorshipService | null>(null)
@@ -105,8 +151,6 @@ export function ScheduleService() {
   const titleColor = useColorModeValue('gray.800', 'white')
   const textColor = useColorModeValue('gray.700', 'gray.200')
   const mutedTextColor = useColorModeValue('gray.500', 'gray.400')
-  const tableHeaderBg = useColorModeValue('gray.50', 'gray.700')
-  const tableHoverBg = useColorModeValue('gray.50', 'gray.700')
 
   const checkUserAndOrganization = useCallback(async () => {
     try {
@@ -134,6 +178,65 @@ export function ScheduleService() {
   useEffect(() => {
     checkUserAndOrganization()
   }, [checkUserAndOrganization])
+
+  const loadVolunteersForServices = useCallback(async (serviceIds: string[]) => {
+    if (serviceIds.length === 0) {
+      setServiceIdToVolunteers({})
+      return
+    }
+
+    try {
+      const { data: volunteerRecords, error: volunteerError } = await supabase
+        .from('worship_service_volunteers')
+        .select('*')
+        .in('worship_service_id', serviceIds)
+        .order('created_at', { ascending: true })
+
+      if (volunteerError) {
+        console.error('Error loading volunteers for services:', volunteerError)
+        return
+      }
+
+      if (!volunteerRecords || volunteerRecords.length === 0) {
+        const emptyMapping: Record<string, ServiceVolunteer[]> = {}
+        serviceIds.forEach((serviceId) => {
+          emptyMapping[serviceId] = []
+        })
+        setServiceIdToVolunteers(emptyMapping)
+        return
+      }
+
+      const userIds = [...new Set(volunteerRecords.map((volunteer) => volunteer.user_id))]
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+
+      if (profilesError) {
+        console.error('Error loading volunteer profiles for services:', profilesError)
+        return
+      }
+
+      const mapping: Record<string, ServiceVolunteer[]> = {}
+      serviceIds.forEach((serviceId) => {
+        mapping[serviceId] = []
+      })
+
+      volunteerRecords.forEach((volunteer) => {
+        const profile = profiles?.find((item) => item.id === volunteer.user_id)
+        const svcId = volunteer.worship_service_id as string
+        if (!mapping[svcId]) mapping[svcId] = []
+        mapping[svcId].push({
+          ...(volunteer as Omit<ServiceVolunteer, 'profiles'>),
+          profiles: profile || { first_name: 'Unknown', last_name: 'User', email: 'N/A' }
+        })
+      })
+
+      setServiceIdToVolunteers(mapping)
+    } catch (error) {
+      console.error('Error loading volunteers for services:', error)
+    }
+  }, [])
 
   const loadServices = async (organizationId: string) => {
     try {
@@ -232,6 +335,7 @@ export function ScheduleService() {
       })
 
       setServices(sortedServices)
+      await loadVolunteersForServices(sortedServices.map((service) => service.id))
     } catch (error) {
       console.error('Error loading services:', error)
     }
@@ -389,6 +493,78 @@ export function ScheduleService() {
     setIsDeleteModalOpen(true)
   }
 
+  const loadServiceDetail = async (service: WorshipService) => {
+    try {
+      setDetailLoading(true)
+      setSelectedService(service)
+      setDetailSongs([])
+      setDetailVolunteers([])
+      onDetailDrawerOpen()
+
+      const [{ data: songsData, error: songsError }, { data: volunteerRecords, error: volunteersError }] = await Promise.all([
+        supabase
+          .from('service_songs')
+          .select(`
+            id,
+            position,
+            notes,
+            songs (
+              id,
+              title,
+              artist,
+              key,
+              bpm
+            )
+          `)
+          .eq('service_id', service.id)
+          .order('position', { ascending: true }),
+        supabase
+          .from('worship_service_volunteers')
+          .select('id, user_id')
+          .eq('worship_service_id', service.id)
+      ])
+
+      if (songsError) throw songsError
+      if (volunteersError) throw volunteersError
+
+      setDetailSongs((songsData as unknown as ServiceSong[]) || [])
+
+      if (!volunteerRecords || volunteerRecords.length === 0) {
+        setDetailVolunteers([])
+        return
+      }
+
+      const userIds = [...new Set(volunteerRecords.map((volunteer) => volunteer.user_id))]
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+
+      if (profilesError) throw profilesError
+
+      const volunteersWithProfiles = volunteerRecords.map((volunteer) => {
+        const profile = profiles?.find((item) => item.id === volunteer.user_id)
+        return {
+          ...volunteer,
+          profiles: profile || { first_name: 'Unknown', last_name: 'User', email: 'N/A' }
+        }
+      })
+
+      setDetailVolunteers(volunteersWithProfiles as ServiceVolunteer[])
+    } catch (error) {
+      console.error('Error loading service detail:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load service details',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
   const handleDeleteService = async () => {
     if (!deleteService || deleteConfirmation !== deleteService.title) {
       toast({
@@ -401,10 +577,10 @@ export function ScheduleService() {
       return
     }
 
-    if (!canManagePrimary) {
+    if (!isPrimaryAdmin) {
       toast({
         title: 'Access Denied',
-        description: 'You do not have permission to delete services. Only admins and owners can delete services.',
+        description: 'You do not have permission to delete services. Only admins can delete services.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -465,6 +641,26 @@ export function ScheduleService() {
     
     return matchesSearch && matchesStatus
   })
+  const totalPages = Math.max(1, Math.ceil(filteredServices.length / SERVICES_PER_PAGE))
+  const visiblePageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1).filter((page) => (
+    page === 1 ||
+    page === totalPages ||
+    Math.abs(page - currentPage) <= 1
+  ))
+  const paginatedServices = filteredServices.slice(
+    (currentPage - 1) * SERVICES_PER_PAGE,
+    currentPage * SERVICES_PER_PAGE
+  )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, selectedStatus])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const getStatusBadge = (status: string) => {
     const statusColorScheme = {
@@ -475,265 +671,238 @@ export function ScheduleService() {
     return statusColorScheme[status as keyof typeof statusColorScheme] || 'yellow'
   }
 
+  const getStatusDotClass = (status: WorshipService['status']) => {
+    if (status === 'published') return 'bg-success-500'
+    if (status === 'completed') return 'bg-primary-500'
+    return 'bg-warning-500'
+  }
+
 
   return (
-    <Box minH="100vh" bg={bgColor}>
+    <Box className="sl-dashboard-page" minH="100vh" bg={bgColor}>
       <DashboardHeader user={user} organization={organization} />
 
-      <Box as="main" maxW="1200px" mx="auto" p={{ base: 6, md: 8 }}>
-        {/* Back Button */}
-        <Box mb={4}>
-          <Button
-            variant="ghost"
-            colorScheme="gray"
-            onClick={() => navigate('/dashboard')}
-            leftIcon={<Text>←</Text>}
-            size="sm"
-          >
-            Back to Dashboard
-          </Button>
-        </Box>
-
-          {/* Header Section */}
-        <Box
-          bg={cardBg}
-          p={4}
-          borderRadius="lg"
-          boxShadow="sm"
-          border="1px"
-          borderColor={cardBorderColor}
-          mb={3}
-        >
-          <Flex 
-            direction={{ base: 'column', md: 'row' }}
-            justify="space-between"
-            align={{ base: 'stretch', md: 'center' }}
-            gap={4}
-          >
-            <Box>
-              <Heading as="h2" size="lg" color={titleColor} m={0} fontWeight="600">
-                📅 Services
-              </Heading>
-            </Box>
-            
-              {canManagePrimary && (
-                <Button
-                  colorScheme="blue"
-                onClick={onAddDrawerOpen}
-                size="md"
-                isDisabled={loading}
-              >
-                + Add Service
+      <Box as="main" maxW="1200px" mx="auto" px={{ base: 6, md: 8 }} pt={{ base: 2, md: 3 }} pb={{ base: 6, md: 8 }}>
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
+                Services
+              </h1>
+              <p className="mt-1 text-sm text-text-muted">
+                Manage worship services and volunteer assignments
+              </p>
+            </div>
+            {canManagePrimary ? (
+              <Button className="btn-primary" disabled={loading} onClick={onAddDrawerOpen} size="sm" type="button">
+                <span aria-hidden="true">＋</span>
+                <span className="hidden sm:inline">New Service</span>
+                <span className="sm:hidden">New</span>
               </Button>
-            )}
-          </Flex>
-        </Box>
+            ) : null}
+          </div>
 
-        {/* Search and Filters */}
-            <Box
-              bg={cardBg}
-          p={4}
-              borderRadius="lg"
-              boxShadow="sm"
-              border="1px"
-              borderColor={cardBorderColor}
-          mb={4}
-        >
-          <Flex
-            direction={{ base: 'column', lg: 'row' }}
-            gap={4}
-            align={{ base: 'stretch', lg: 'center' }}
-            w="full"
-          >
-            {/* Search */}
-            <Box flex="6" minW="200px">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Box w="100%" maxW={{ base: 'full', sm: '320px' }}>
               {loading ? (
-                <Skeleton height="40px" borderRadius="md" />
+                <Skeleton borderRadius="lg" height="44px" />
               ) : (
-                      <Input
-                  placeholder="Search services..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                        size="md"
-                  w="full"
-                />
+                <InputGroup>
+                  <InputLeftElement color="gray.400" pointerEvents="none">
+                    <SearchIcon />
+                  </InputLeftElement>
+                  <Input
+                    className="input-field"
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search services..."
+                    pl="40px"
+                    value={searchTerm}
+                  />
+                </InputGroup>
               )}
             </Box>
-
-            {/* Status Filter */}
-            <Box flex="3" minW="120px" maxW="200px">
-              {loading ? (
-                <Skeleton height="40px" borderRadius="md" />
-              ) : (
-                <Select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                        size="md"
-                  minW="100px"
-                  w="full"
+            <div className="sl-chip-row">
+              {[
+                { label: 'All', value: '' },
+                { label: 'Published', value: 'published' },
+                { label: 'Draft', value: 'draft' },
+                { label: 'Completed', value: 'completed' },
+              ].map((status) => (
+                <button
+                  className={`sl-chip ${selectedStatus === status.value ? 'sl-chip-active' : ''}`}
+                  key={status.label}
+                  onClick={() => setSelectedStatus(status.value)}
+                  type="button"
                 >
-                  <option value="">All Status</option>
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="completed">Completed</option>
-                </Select>
-              )}
-            </Box>
-          </Flex>
-        </Box>
+                  {status.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
         {/* Services Table */}
         {loading ? (
-          /* Skeleton Loading */
-          <Box
-            bg={cardBg}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            overflow="hidden"
-          >
-            <Box overflowX="auto">
-              <Table variant="simple" minW="800px">
-                <Thead>
-                  <Tr>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Title</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Date</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Time</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Status</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Description</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {[...Array(5)].map((_, index) => (
-                    <Tr key={index}>
-                      <Td minW="200px">
-                        <Skeleton height="20px" />
-                      </Td>
-                      <Td minW="150px">
-                        <Skeleton height="20px" />
-                      </Td>
-                      <Td minW="100px">
-                        <Skeleton height="20px" />
-                      </Td>
-                      <Td minW="100px">
-                        <Skeleton height="20px" borderRadius="md" />
-                      </Td>
-                      <Td minW="200px">
-                        <SkeletonText noOfLines={2} spacing={2} />
-                      </Td>
-                      <Td minW="150px">
-                        <HStack spacing={2}>
-                          <Skeleton height="24px" width="50px" borderRadius="md" />
-                          <Skeleton height="24px" width="40px" borderRadius="md" />
-                          <Skeleton height="24px" width="50px" borderRadius="md" />
-                        </HStack>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </Box>
-          </Box>
+          <div className="space-y-2">
+            {[...Array(5)].map((_, index) => (
+              <div className="rounded-xl bg-white p-3 card-shadow" key={index}>
+                <Skeleton height="18px" mb={2} />
+                <Skeleton height="12px" width="60%" />
+              </div>
+            ))}
+          </div>
         ) : filteredServices.length === 0 ? (
-          <Box
-            bg={cardBg}
-            p={12}
-            borderRadius="lg"
-            boxShadow="sm"
-            border="1px"
-            borderColor={cardBorderColor}
-            textAlign="center"
-          >
-            <Text color={mutedTextColor} fontSize="md">
-              {services.length === 0 ? 'No services yet' : 'No services found'}
-                </Text>
-              </Box>
-            ) : (
-                  <Box
-                    bg={cardBg}
-                    borderRadius="lg"
-            boxShadow="sm"
-                    border="1px"
-                    borderColor={cardBorderColor}
-            overflow="hidden"
-          >
-            <Box overflowX="auto">
-              <Table variant="simple" minW="800px">
-                <Thead>
-                  <Tr>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Title</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Date</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Time</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="100px">Status</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="200px">Description</Th>
-                    <Th bg={tableHeaderBg} color={textColor} fontSize="sm" fontWeight="600" minW="150px">Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {filteredServices.map(service => (
-                    <Tr key={service.id} _hover={{ bg: tableHoverBg }}>
-                      <Td fontWeight="500" color={titleColor} minW="200px">
-                        {service.title}
-                      </Td>
-                      <Td minW="150px">
-                        {formatServiceDate(service.service_time)}
-                      </Td>
-                      <Td minW="100px">
-                        {getServiceTimeDisplay(service.service_time)}
-                      </Td>
-                      <Td minW="100px">
-                        <Badge
-                          colorScheme={getStatusBadge(service.status)}
-                          variant="subtle"
-                          textTransform="capitalize"
+          <EmptyState
+            description={services.length === 0 ? 'Create your first service to start planning.' : 'Try adjusting your search or status filters.'}
+            icon={<span className="text-2xl">📅</span>}
+            title={services.length === 0 ? 'No services yet' : 'No services found'}
+            action={
+              searchTerm || selectedStatus ? (
+                <Button
+                  className="btn-primary"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setSelectedStatus('')
+                  }}
+                  size="sm"
+                  type="button"
+                >
+                  Clear Filters
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="space-y-2">
+            {paginatedServices.map((service) => (
+              <div
+                className="flex cursor-pointer items-center gap-3 rounded-xl bg-white p-3 card-shadow card-hover"
+                key={service.id}
+                onClick={() => loadServiceDetail(service)}
+              >
+                {(() => {
+                  const volunteers = serviceIdToVolunteers[service.id] || []
+                  return (
+                    <>
+                <div className={`h-2 w-2 rounded-full ${getStatusDotClass(service.status)}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-text-primary">{service.title}</span>
+                    <Badge colorScheme={getStatusBadge(service.status)} variant="subtle" textTransform="capitalize">
+                      {service.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
+                    <span>{formatServiceDate(service.service_time)}</span>
+                    <span>•</span>
+                    <span>{getServiceTimeDisplay(service.service_time)}</span>
+                  </div>
+                </div>
+                <div className="hidden shrink-0 md:block">
+                  <Text fontSize="xs" maxW="240px" noOfLines={2} color="gray.500">
+                    {service.description || 'No description'}
+                  </Text>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="hidden items-center sm:flex">
+                    {volunteers.slice(0, 5).map((volunteer, index) => {
+                      const fullName = `${volunteer.profiles.first_name || ''} ${volunteer.profiles.last_name || ''}`.trim() || volunteer.profiles.email
+                      const isCurrentUser = user?.id === volunteer.user_id
+
+                      return (
+                        <Box
+                          key={volunteer.id}
+                          alignItems="center"
+                          bg={isCurrentUser ? '#2563EB' : getAvatarColor(fullName)}
+                          border="2px solid white"
+                          borderRadius="full"
+                          color="white"
+                          display="flex"
+                          fontSize="10px"
+                          fontWeight="700"
+                          h="28px"
+                          justifyContent="center"
+                          ml={index === 0 ? 0 : '-8px'}
+                          title={fullName}
+                          w="28px"
                         >
-                          {service.status}
-                        </Badge>
-                      </Td>
-                      <Td minW="200px" maxW="250px">
-                        <Text noOfLines={2} fontSize="sm">
-                          {service.description || '-'}
-                        </Text>
-                      </Td>
-                      <Td minW="150px">
-                        <HStack spacing={2}>
-                          <Button
-                            size="xs"
-                            colorScheme="blue"
-                            onClick={() => navigate(`/service/${service.id}`)}
+                          {getNameInitials(volunteer.profiles.first_name, volunteer.profiles.last_name, volunteer.profiles.email)}
+                        </Box>
+                      )
+                    })}
+                    {volunteers.length > 5 ? (
+                      <Box
+                        alignItems="center"
+                        bg="gray.100"
+                        border="2px solid white"
+                        borderRadius="full"
+                        color={mutedTextColor}
+                        display="flex"
+                        fontSize="10px"
+                        fontWeight="700"
+                        h="28px"
+                        justifyContent="center"
+                        ml="-8px"
+                        w="28px"
+                      >
+                        +{volunteers.length - 5}
+                      </Box>
+                    ) : null}
+                  </div>
+                  <span className="text-text-muted">›</span>
+                </div>
+                    </>
+                  )
+                })()}
+              </div>
+            ))}
+
+            {filteredServices.length > SERVICES_PER_PAGE ? (
+              <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs text-text-muted">
+                  Showing {(currentPage - 1) * SERVICES_PER_PAGE + 1}-{Math.min(currentPage * SERVICES_PER_PAGE, filteredServices.length)} of {filteredServices.length} services
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn-secondary px-3"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    type="button"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {visiblePageNumbers.map((page, index) => {
+                      const previousPage = visiblePageNumbers[index - 1]
+                      const showGap = previousPage && page - previousPage > 1
+
+                      return (
+                        <React.Fragment key={page}>
+                          {showGap ? <span className="px-1 text-sm text-text-muted">…</span> : null}
+                          <button
+                            className={page === currentPage ? 'btn-primary px-3' : 'btn-secondary px-3'}
+                            onClick={() => setCurrentPage(page)}
+                            type="button"
                           >
-                            View
-                          </Button>
-                          {canManagePrimary && (
-                            <>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                colorScheme="gray"
-                                onClick={() => openEditForm(service)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="xs"
-                                colorScheme="red"
-                                onClick={() => openDeleteModal(service)}
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          )}
-                        </HStack>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-                    </Box>
-                  </Box>
+                            {page}
+                          </button>
+                        </React.Fragment>
+                      )
+                    })}
+                  </div>
+                  <button
+                    className="btn-secondary px-3"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    type="button"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         )}
+        </div>
       </Box>
 
       {/* Add Service Drawer */}
@@ -808,9 +977,9 @@ export function ScheduleService() {
                     Cancel
                   </Button>
                   <Button
+                    className="btn-primary-size"
                     type="submit"
                     colorScheme="blue"
-                    size="md"
                     isLoading={loading}
                   >
                     Add Service
@@ -818,6 +987,240 @@ export function ScheduleService() {
                 </Flex>
               </VStack>
           </Box>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer
+        isOpen={isDetailDrawerOpen}
+        placement="right"
+        onClose={onDetailDrawerClose}
+        size={{ base: 'full', md: 'md', lg: 'lg' }}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" bg={cardBg}>
+            <Heading as="h3" size="md" color={titleColor} fontWeight="700">
+              Service Details
+            </Heading>
+          </DrawerHeader>
+
+          <DrawerBody bg={bgColor} p={6}>
+            {selectedService ? (
+              detailLoading ? (
+                <VStack align="stretch" spacing={4}>
+                  <Skeleton h="28px" w="70%" />
+                  <Skeleton h="18px" w="60%" />
+                  <Skeleton h="88px" />
+                  <Skeleton h="120px" />
+                  <Skeleton h="120px" />
+                </VStack>
+              ) : (
+                <VStack align="stretch" spacing={6}>
+                  <Box>
+                    <HStack align="center" gap={2} mb={1} flexWrap="wrap">
+                      <Text color={titleColor} fontSize="xl" fontWeight="700" m={0}>
+                        {selectedService.title}
+                      </Text>
+                      <Badge colorScheme={getStatusBadge(selectedService.status)} textTransform="capitalize" variant="subtle">
+                        {selectedService.status}
+                      </Badge>
+                    </HStack>
+                    <HStack color={mutedTextColor} fontSize="sm" spacing={3} flexWrap="wrap">
+                      <HStack spacing={1}>
+                        <CalendarIcon boxSize={4} />
+                        <Text m={0}>
+                          {new Date(selectedService.service_time).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </Text>
+                      </HStack>
+                      <HStack spacing={1}>
+                        <TimeIcon boxSize={4} />
+                        <Text m={0}>{getServiceTimeDisplay(selectedService.service_time)}</Text>
+                      </HStack>
+                    </HStack>
+                  </Box>
+
+                  <Box
+                    bg={useColorModeValue('gray.50', 'gray.700')}
+                    border="1px"
+                    borderColor={cardBorderColor}
+                    borderRadius="xl"
+                    p={4}
+                  >
+                    <Text color={titleColor} fontSize="sm" fontWeight="600" mb={selectedService.description ? 3 : 0}>
+                      Description
+                    </Text>
+                    <Text color={selectedService.description ? textColor : mutedTextColor} fontSize="sm" fontStyle={selectedService.description ? 'normal' : 'italic'} m={0}>
+                      {selectedService.description || 'No description available.'}
+                    </Text>
+                  </Box>
+
+                  <Box>
+                    <HStack justify="space-between" align="center" mb={3}>
+                      <HStack spacing={2}>
+                        <Text color={titleColor} fontSize="sm" fontWeight="600">Setlist</Text>
+                        <Text color={mutedTextColor} fontSize="xs">({detailSongs.length} songs)</Text>
+                      </HStack>
+                    </HStack>
+
+                    {detailSongs.length === 0 ? (
+                      <Text color={mutedTextColor} fontSize="sm">No songs added yet.</Text>
+                    ) : (
+                      <VStack spacing={2} align="stretch">
+                        {detailSongs.map((serviceSong) => (
+                          <Box
+                            key={serviceSong.id}
+                            bg={useColorModeValue('gray.50', 'gray.700')}
+                            borderRadius="lg"
+                            p={3}
+                            display="flex"
+                            alignItems="center"
+                            gap={3}
+                          >
+                            <Box
+                              bg={useColorModeValue('gray.200', 'gray.600')}
+                              color={mutedTextColor}
+                              borderRadius="md"
+                              w={6}
+                              h={6}
+                              display="flex"
+                              alignItems="center"
+                              justifyContent="center"
+                              fontWeight="600"
+                              fontSize="xs"
+                              flexShrink={0}
+                            >
+                              {serviceSong.position}
+                            </Box>
+                            <Box flex="1" minW={0}>
+                              <Text fontWeight="600" color={textColor} fontSize="sm" m={0} noOfLines={1}>
+                                {serviceSong.songs.title}
+                              </Text>
+                              <Text color={mutedTextColor} fontSize="xs" m={0} noOfLines={1}>
+                                {serviceSong.songs.artist}
+                                {serviceSong.songs.key || serviceSong.songs.bpm ? ` · ${serviceSong.songs.key || '-'}${serviceSong.songs.bpm ? ` · ${serviceSong.songs.bpm} BPM` : ''}` : ''}
+                              </Text>
+                              {serviceSong.notes ? (
+                                <Text color={mutedTextColor} fontSize="xs" fontStyle="italic" mt={1} noOfLines={2}>
+                                  {serviceSong.notes}
+                                </Text>
+                              ) : null}
+                            </Box>
+                          </Box>
+                        ))}
+                      </VStack>
+                    )}
+                  </Box>
+
+                  <Box>
+                    <HStack justify="space-between" align="center" mb={3}>
+                      <HStack spacing={2}>
+                        <Text color={titleColor} fontSize="sm" fontWeight="600">Volunteers</Text>
+                        <Text color={mutedTextColor} fontSize="xs">({detailVolunteers.length})</Text>
+                      </HStack>
+                    </HStack>
+
+                    {detailVolunteers.length === 0 ? (
+                      <Text color={mutedTextColor} fontSize="sm">No volunteers assigned yet.</Text>
+                    ) : (
+                      <VStack spacing={2} align="stretch">
+                        {detailVolunteers.map((volunteer) => {
+                          const fullName = `${volunteer.profiles?.first_name || ''} ${volunteer.profiles?.last_name || ''}`.trim() || volunteer.profiles?.email
+                          const initials = `${volunteer.profiles?.first_name?.charAt(0) || ''}${volunteer.profiles?.last_name?.charAt(0) || ''}`.trim().toUpperCase() || (volunteer.profiles?.email || 'U').slice(0, 2).toUpperCase()
+
+                          return (
+                            <Box
+                              key={volunteer.id}
+                              bg={useColorModeValue('gray.50', 'gray.700')}
+                              borderRadius="lg"
+                              p={3}
+                              display="flex"
+                              alignItems="center"
+                              gap={3}
+                            >
+                              <Box
+                                bg="blue.100"
+                                color="blue.700"
+                                borderRadius="full"
+                                w="28px"
+                                h="28px"
+                                display="flex"
+                                alignItems="center"
+                                justifyContent="center"
+                                fontSize="xs"
+                                fontWeight="700"
+                                flexShrink={0}
+                              >
+                                {initials}
+                              </Box>
+                              <Box flex="1" minW={0}>
+                                <Text color={textColor} fontWeight="600" fontSize="sm" m={0} noOfLines={1}>
+                                  {fullName}
+                                </Text>
+                                <Text color={mutedTextColor} fontSize="xs" m={0} noOfLines={1}>
+                                  {volunteer.profiles?.email}
+                                </Text>
+                              </Box>
+                            </Box>
+                          )
+                        })}
+                      </VStack>
+                    )}
+                  </Box>
+
+                  {canManagePrimary || isPrimaryAdmin ? (
+                    <HStack spacing={3} w="100%">
+                      {canManagePrimary ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          flex="1"
+                          onClick={() => {
+                            onDetailDrawerClose()
+                            openEditForm(selectedService)
+                          }}
+                        >
+                          Edit Service
+                        </Button>
+                      ) : null}
+                      {isPrimaryAdmin ? (
+                        <Button
+                          variant="outline"
+                          colorScheme="red"
+                          size="sm"
+                          flex="1"
+                          onClick={() => {
+                            onDetailDrawerClose()
+                            openDeleteModal(selectedService)
+                          }}
+                        >
+                          Delete Service
+                        </Button>
+                      ) : null}
+                    </HStack>
+                  ) : null}
+
+                  <Button
+                    className="btn-primary"
+                    onClick={() => {
+                      onDetailDrawerClose()
+                      navigate(`/service/${selectedService.id}`)
+                    }}
+                    rightIcon={<ArrowForwardIcon />}
+                    size="sm"
+                    w="100%"
+                  >
+                    Open Full Page
+                  </Button>
+                </VStack>
+              )
+            ) : null}
           </DrawerBody>
         </DrawerContent>
       </Drawer>
@@ -897,9 +1300,9 @@ export function ScheduleService() {
                     Cancel
                   </Button>
                   <Button
+                    className="btn-primary-size"
                     type="submit"
                     colorScheme="blue"
-                    size="md"
                     isLoading={loading}
                   >
                     Update Service

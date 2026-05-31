@@ -39,7 +39,7 @@
       "description": "Chia sẻ liên kết này với các tình nguyện viên tiềm năng để họ đăng ký tham gia dịch vụ",
       "copyButton": "Sao chép liên kết tình nguyện",
       "createButton": "Tạo liên kết tình nguyện",
-      "visitButton": "Truy cập Trang Tình nguyện",
+      "visitButton": "Truy cập Liên kết Tình nguyện",
       "loading": "Đang tải...",
       "copying": "Đang sao chép..."
     },
@@ -125,7 +125,8 @@
       "volunteerRemoved": "Đã xóa tình nguyện viên khỏi dịch vụ",
       "volunteerAdded": "Đã thêm tình nguyện viên vào dịch vụ",
       "linkCopied": "Đã sao chép liên kết!",
-      "linkCopiedDescription": "Liên kết tình nguyện đã được sao chép vào clipboard"
+      "linkCopiedDescription": "Liên kết tình nguyện đã được sao chép vào clipboard",
+      "copiedVolunteerPageLink": "Đã sao chép liên kết trang tình nguyện"
     },
     "info": {
       "alreadyVolunteering": "Đã tình nguyện",
@@ -161,8 +162,8 @@
   "header": {
     "appName": "Spirit Lead",
     "dashboard": "Bảng điều khiển",
-    "songbank": "Kho bài hát",
-    "teamManagement": "Quản lý Nhóm",
+    "songbank": "Thư viện bài hát",
+    "teamManagement": "Tình nguyện viên",
     "scheduleService": "Dịch vụ",
     "signOut": "Đăng xuất",
     "login": "Đăng nhập",
@@ -174,7 +175,7 @@
     }
   },
   "songbank": {
-    "title": "Kho bài hát",
+    "title": "Thư viện bài hát",
     "backToDashboard": "Quay lại Bảng điều khiển",
     "addSong": "Thêm Bài hát",
     "searchSongs": "Tìm kiếm bài hát...",
@@ -548,7 +549,7 @@
     "organizationNotFound": "Không tìm thấy tổ chức",
     "goHome": "Về Trang chủ",
     "noServicesAvailable": "Hiện tại không có dịch vụ nào để tình nguyện",
-    "viewDashboard": "Xem Bảng điều khiển",
+    "viewDashboard": "Đi đến Bảng điều khiển",
     "success": {
       "assigned": "Bạn đã được phân công cho dịch vụ này",
       "removed": "Bạn đã được xóa khỏi dịch vụ này"
